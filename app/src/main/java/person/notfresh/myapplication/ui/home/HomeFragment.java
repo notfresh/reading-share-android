@@ -49,20 +49,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         inflater.inflate(R.menu.home_menu, menu);
         shareMenuItem = menu.findItem(R.id.action_share);
         shareMenuItem.setVisible(isSelectionMode);
-        
-        MenuItem selectItem = menu.findItem(R.id.action_select);
-        Log.d("HomeFragment", "Select menu item exists: " + (selectItem != null));
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         Log.d("HomeFragment", "onOptionsItemSelected: " + item.getItemId());
-        int id = item.getItemId();
-        if (id == R.id.action_select) {
-            Log.d("HomeFragment", "Select button clicked");
-            toggleSelectionMode();
-            return true;
-        } else if (id == R.id.action_share) {
+        if (item.getItemId() == R.id.action_share) {
             Log.d("HomeFragment", "Share button clicked");
             shareSelectedItems();
             return true;
@@ -133,6 +125,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         adapter.setGroupedLinks(groupedLinks);
     }
 
+    @Override
+    public void onEnterSelectionMode() {
+        if (!isSelectionMode) {
+            toggleSelectionMode();
+        }
+    }
+
     private void toggleSelectionMode() {
         Log.d("HomeFragment", "toggleSelectionMode called");
         isSelectionMode = !isSelectionMode;
@@ -146,7 +145,6 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         } else {
             requireActivity().setTitle(R.string.app_name);
         }
-        // 刷新菜单
         requireActivity().invalidateOptionsMenu();
         Log.d("HomeFragment", "Selection mode: " + isSelectionMode);
     }

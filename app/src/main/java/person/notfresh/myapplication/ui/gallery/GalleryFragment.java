@@ -12,7 +12,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import person.notfresh.myapplication.databinding.FragmentGalleryBinding;
 
-public class GalleryFragment extends Fragment {
+public class GalleryFragment extends TagsFragment {
 
     private FragmentGalleryBinding binding;
 

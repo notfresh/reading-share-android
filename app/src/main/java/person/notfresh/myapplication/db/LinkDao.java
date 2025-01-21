@@ -4,6 +4,8 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.util.Log;
+import android.text.TextUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,6 +15,8 @@ import java.util.TreeMap;
 import java.util.Locale;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Set;
+import java.util.Arrays;
 
 import person.notfresh.myapplication.model.LinkItem;
 
@@ -163,14 +167,18 @@ public class LinkDao {
     // 获取所有标签
     public List<String> getAllTags() {
         List<String> tags = new ArrayList<>();
+        Log.d("LinkDao", "Getting all tags");
         Cursor cursor = database.query(
                 LinkDbHelper.TABLE_TAGS,
                 new String[]{LinkDbHelper.COLUMN_TAG_NAME},
                 null, null, null, null, null);
         
+        Log.d("LinkDao", "Cursor count: " + cursor.getCount());
         if (cursor.moveToFirst()) {
             do {
-                tags.add(cursor.getString(0));
+                String tag = cursor.getString(0);
+                Log.d("LinkDao", "Found tag: " + tag);
+                tags.add(tag);
             } while (cursor.moveToNext());
         }
         cursor.close();
@@ -213,5 +221,114 @@ public class LinkDao {
         // 如果标签不存在，创建新标签
         cursor.close();
         return addTag(tagName);
+    }
+
+    public List<LinkItem> getLinksByTag(String tag) {
+        List<LinkItem> links = new ArrayList<>();
+        String query = "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l " +
+                "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + " " +
+                "JOIN " + LinkDbHelper.TABLE_TAGS + " t ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID + " " +
+                "WHERE t." + LinkDbHelper.COLUMN_TAG_NAME + " = ?";
+        
+        Cursor cursor = database.rawQuery(query, new String[]{tag});
+        
+        if (cursor.moveToFirst()) {
+            do {
+                long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
+                String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
+                String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+                String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
+                String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
+                String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
+                
+                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity);
+                item.setId(id);
+                
+                // 加载该链接的所有标签
+                List<String> tags = getLinkTags(id);
+                for (String t : tags) {
+                    item.addTag(t);
+                }
+                
+                links.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        
+        return links;
+    }
+
+    public List<LinkItem> getLinksWithoutTags() {
+        List<LinkItem> links = new ArrayList<>();
+        // 查找不在 link_tags 表中的链接
+        String query = "SELECT * FROM " + LinkDbHelper.TABLE_LINKS + " l " +
+                "WHERE NOT EXISTS (SELECT 1 FROM " + LinkDbHelper.TABLE_LINK_TAGS + 
+                " lt WHERE l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + ")";
+        
+        Cursor cursor = database.rawQuery(query, null);
+        
+        if (cursor.moveToFirst()) {
+            do {
+                long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
+                String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
+                String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+                String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
+                String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
+                String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
+                
+                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity);
+                item.setId(id);
+                links.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        
+        return links;
+    }
+
+    public List<LinkItem> getLinksByTags(Set<String> tags) {
+        List<LinkItem> links = new ArrayList<>();
+        
+        // 构建查询条件
+        StringBuilder query = new StringBuilder();
+        query.append("SELECT DISTINCT l.* FROM ").append(LinkDbHelper.TABLE_LINKS).append(" l ")
+             .append("JOIN ").append(LinkDbHelper.TABLE_LINK_TAGS).append(" lt ON l.")
+             .append(LinkDbHelper.COLUMN_ID).append(" = lt.").append(LinkDbHelper.COLUMN_LINK_ID).append(" ")
+             .append("JOIN ").append(LinkDbHelper.TABLE_TAGS).append(" t ON lt.")
+             .append(LinkDbHelper.COLUMN_TAG_ID_REF).append(" = t.").append(LinkDbHelper.COLUMN_TAG_ID).append(" ")
+             .append("WHERE t.").append(LinkDbHelper.COLUMN_TAG_NAME).append(" IN (");
+        
+        // 添加标签占位符
+        String[] placeholders = new String[tags.size()];
+        Arrays.fill(placeholders, "?");
+        query.append(TextUtils.join(",", placeholders)).append(")");
+        
+        // 执行查询
+        Cursor cursor = database.rawQuery(query.toString(), tags.toArray(new String[0]));
+        
+        if (cursor.moveToFirst()) {
+            do {
+                long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
+                String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
+                String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+                String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
+                String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
+                String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
+                
+                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity);
+                item.setId(id);
+                
+                // 加载该链接的所有标签
+                List<String> tagsForItem = getLinkTags(id);
+                for (String t : tagsForItem) {
+                    item.addTag(t);
+                }
+                
+                links.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        
+        return links;
     }
 } 

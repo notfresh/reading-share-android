@@ -17,12 +17,12 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String COLUMN_ORIGINAL_INTENT = "original_intent";
     public static final String COLUMN_TARGET_ACTIVITY = "target_activity";
 
-    // 新增标签表
+    // 标签表
     public static final String TABLE_TAGS = "tags";
     public static final String COLUMN_TAG_ID = "_id";
     public static final String COLUMN_TAG_NAME = "name";
     
-    // 新增链接-标签关联表
+    // 链接-标签关联表
     public static final String TABLE_LINK_TAGS = "link_tags";
     public static final String COLUMN_LINK_ID = "link_id";
     public static final String COLUMN_TAG_ID_REF = "tag_id";

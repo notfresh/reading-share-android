@@ -8,6 +8,6 @@
     <string name="action_settings">设置</string>
 
     <string name="menu_home">首页</string>
-    <string name="menu_gallery">图库</string>
+    <string name="menu_gallery">标签</string>
     <string name="menu_slideshow">幻灯片</string>
 </resources>

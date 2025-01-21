@@ -2,11 +2,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_select"
-        android:icon="@drawable/ic_select"
-        android:title="选择"
-        app:showAsAction="always" />
-    <item
         android:id="@+id/action_share"
         android:icon="@drawable/ic_share"
         android:title="分享"

@@ -18,10 +18,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.Date;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 
 import person.notfresh.myapplication.R;
 import person.notfresh.myapplication.model.LinkItem;
@@ -39,12 +44,14 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private Context context;  // 添加 context 引用
     private Set<LinkItem> selectedItems = new HashSet<>();
     private boolean isSelectionMode = false;
+    private List<LinkItem> links = new ArrayList<>();
 
     public interface OnLinkActionListener {
         void onDeleteLink(LinkItem link);
         void onUpdateLink(LinkItem oldLink, String newTitle);
         void addTagToLink(LinkItem item, String tag);
         void updateLinkTags(LinkItem item);
+        void onEnterSelectionMode();  // 添加新的回调方法
     }
 
     public LinksAdapter(Context context) {
@@ -131,19 +138,32 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     }
 
     void showActionDialog(View view, LinkItem item, int position) {
-        String[] options = {"编辑标题", "删除"};
+        // 根据是否在多选模式显示不同的选项
+        String[] options = isSelectionMode ? 
+            new String[]{"编辑标题", "删除", "退出多选模式"} : 
+            new String[]{"编辑标题", "删除", "进入多选模式"};
         
         new AlertDialog.Builder(view.getContext())
                 .setItems(options, (dialog, which) -> {
                     switch (which) {
-                        case 0:
+                        case 0: // 编辑标题
                             showEditTitleDialog(view, item);
                             break;
-                        case 1:
+                        case 1: // 删除
                             if (listener != null) {
                                 listener.onDeleteLink(item);
                                 items.remove(position);
                                 notifyItemRemoved(position);
+                            }
+                            break;
+                        case 2: // 切换多选模式
+                            if (isSelectionMode) {
+                                // 退出多选模式
+                                toggleSelectionMode();
+                            } else {
+                                // 进入多选模式并选中当前项
+                                listener.onEnterSelectionMode();
+                                toggleItemSelection(item);
                             }
                             break;
                     }
@@ -199,6 +219,43 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     public Set<LinkItem> getSelectedItems() {
         return new HashSet<>(selectedItems);
+    }
+
+    public void setLinks(List<LinkItem> newLinks) {
+        // 清除现有的分组数据
+        items.clear();
+        
+        // 对新的链接列表进行分组
+        if (newLinks != null && !newLinks.isEmpty()) {
+            // 按日期分组
+            Map<String, List<LinkItem>> groups = new TreeMap<>(Collections.reverseOrder());
+            for (LinkItem item : newLinks) {
+                String date = formatDate(item.getTimestamp());
+                groups.computeIfAbsent(date, k -> new ArrayList<>()).add(item);
+            }
+            
+            // 转换为展平的列表
+            for (Map.Entry<String, List<LinkItem>> entry : groups.entrySet()) {
+                items.add(entry.getKey());
+                items.addAll(entry.getValue());
+            }
+        }
+        
+        // 同时更新 links 列表（用于 getLinks 方法）
+        this.links = new ArrayList<>(newLinks);
+        
+        // 通知适配器数据已更新
+        notifyDataSetChanged();
+    }
+
+    private String formatDate(long timestamp) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return sdf.format(new Date(timestamp));
+    }
+
+    // 添加获取当前链接列表的方法
+    public List<LinkItem> getLinks() {
+        return new ArrayList<>(links);  // 返回副本以避免外部修改
     }
 
     static class LinkViewHolder extends RecyclerView.ViewHolder {
@@ -318,6 +375,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
 
             itemView.setOnLongClickListener(v -> {
+                // 直接显示操作对话框，不管是否在多选模式
                 adapter.showActionDialog(v, item, getAdapterPosition());
                 return true;
             });
