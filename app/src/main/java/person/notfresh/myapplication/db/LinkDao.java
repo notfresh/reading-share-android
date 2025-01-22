@@ -36,14 +36,14 @@ public class LinkDao {
         dbHelper.close();
     }
 
-    public long insertLink(LinkItem link) {
+    public long insertLink(LinkItem item) {
         ContentValues values = new ContentValues();
-        values.put(LinkDbHelper.COLUMN_TITLE, link.getTitle());
-        values.put(LinkDbHelper.COLUMN_URL, link.getUrl());
-        values.put(LinkDbHelper.COLUMN_SOURCE_APP, link.getSourceApp());
-        values.put(LinkDbHelper.COLUMN_ORIGINAL_INTENT, link.getOriginalIntent());
-        values.put(LinkDbHelper.COLUMN_TARGET_ACTIVITY, link.getTargetActivity());
-        values.put(LinkDbHelper.COLUMN_TIMESTAMP, link.getTimestamp());
+        values.put(LinkDbHelper.COLUMN_TITLE, item.getTitle());
+        values.put(LinkDbHelper.COLUMN_URL, item.getUrl());
+        values.put(LinkDbHelper.COLUMN_SOURCE_APP, item.getSourceApp());
+        values.put(LinkDbHelper.COLUMN_TIMESTAMP, item.getTimestamp());
+        values.put(LinkDbHelper.COLUMN_ORIGINAL_INTENT, item.getOriginalIntent());
+        values.put(LinkDbHelper.COLUMN_TARGET_ACTIVITY, item.getTargetActivity());
 
         return database.insert(LinkDbHelper.TABLE_LINKS, null, values);
     }
@@ -69,8 +69,9 @@ public class LinkDao {
                 String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
                 String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
                 String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
+                long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TIMESTAMP));
                 
-                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity);
+                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
                 item.setId(id);  // 设置 id
                 
                 // 加载该链接的标签
@@ -260,75 +261,77 @@ public class LinkDao {
 
     public List<LinkItem> getLinksWithoutTags() {
         List<LinkItem> links = new ArrayList<>();
-        // 查找不在 link_tags 表中的链接
+        
+        // 查找没有任何标签的链接，按时间戳降序排序
         String query = "SELECT * FROM " + LinkDbHelper.TABLE_LINKS + " l " +
                 "WHERE NOT EXISTS (SELECT 1 FROM " + LinkDbHelper.TABLE_LINK_TAGS + 
-                " lt WHERE l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + ")";
-        
+                " lt WHERE l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + ") " +
+                "ORDER BY " + LinkDbHelper.COLUMN_TIMESTAMP + " DESC";
+
         Cursor cursor = database.rawQuery(query, null);
-        
         if (cursor.moveToFirst()) {
             do {
-                long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
-                String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
-                String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
-                String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
-                String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
-                String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
-                
-                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity);
-                item.setId(id);
+                LinkItem item = createLinkItemFromCursor(cursor);
                 links.add(item);
             } while (cursor.moveToNext());
         }
         cursor.close();
-        
         return links;
     }
 
     public List<LinkItem> getLinksByTags(Set<String> tags) {
         List<LinkItem> links = new ArrayList<>();
         
-        // 构建查询条件
-        StringBuilder query = new StringBuilder();
-        query.append("SELECT DISTINCT l.* FROM ").append(LinkDbHelper.TABLE_LINKS).append(" l ")
-             .append("JOIN ").append(LinkDbHelper.TABLE_LINK_TAGS).append(" lt ON l.")
-             .append(LinkDbHelper.COLUMN_ID).append(" = lt.").append(LinkDbHelper.COLUMN_LINK_ID).append(" ")
-             .append("JOIN ").append(LinkDbHelper.TABLE_TAGS).append(" t ON lt.")
-             .append(LinkDbHelper.COLUMN_TAG_ID_REF).append(" = t.").append(LinkDbHelper.COLUMN_TAG_ID).append(" ")
-             .append("WHERE t.").append(LinkDbHelper.COLUMN_TAG_NAME).append(" IN (");
-        
-        // 添加标签占位符
-        String[] placeholders = new String[tags.size()];
-        Arrays.fill(placeholders, "?");
-        query.append(TextUtils.join(",", placeholders)).append(")");
-        
-        // 执行查询
-        Cursor cursor = database.rawQuery(query.toString(), tags.toArray(new String[0]));
-        
+        // 构建查询语句，按时间戳降序排序
+        String query = "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l " +
+                "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + " " +
+                "JOIN " + LinkDbHelper.TABLE_TAGS + " t ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID + " " +
+                "WHERE t." + LinkDbHelper.COLUMN_TAG_NAME + " IN (" + makePlaceholders(tags.size()) + ") " +
+                "ORDER BY l." + LinkDbHelper.COLUMN_TIMESTAMP + " DESC";
+
+        String[] selectionArgs = tags.toArray(new String[0]);
+        Cursor cursor = database.rawQuery(query, selectionArgs);
+
         if (cursor.moveToFirst()) {
             do {
-                long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
-                String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
-                String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
-                String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
-                String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
-                String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
-                
-                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity);
-                item.setId(id);
-                
-                // 加载该链接的所有标签
-                List<String> tagsForItem = getLinkTags(id);
-                for (String t : tagsForItem) {
-                    item.addTag(t);
-                }
-                
+                LinkItem item = createLinkItemFromCursor(cursor);
                 links.add(item);
             } while (cursor.moveToNext());
         }
         cursor.close();
-        
         return links;
+    }
+
+    // 辅助方法：从游标创建 LinkItem 对象
+    private LinkItem createLinkItemFromCursor(Cursor cursor) {
+        long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
+        String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
+        String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+        String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
+        String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
+        String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
+        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TIMESTAMP));
+
+        LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
+        item.setId(id);
+        
+        // 加载该链接的标签
+        List<String> tags = getLinkTags(id);
+        for (String tag : tags) {
+            item.addTag(tag);
+        }
+        
+        return item;
+    }
+
+    // 辅助方法：生成占位符
+    private String makePlaceholders(int count) {
+        if (count < 1) return "";
+        StringBuilder sb = new StringBuilder(count * 2 - 1);
+        sb.append("?");
+        for (int i = 1; i < count; i++) {
+            sb.append(",?");
+        }
+        return sb.toString();
     }
 } 

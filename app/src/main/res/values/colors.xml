@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <color name="primary">#2E51A4</color>          <!-- 主色调：蓝色 (46,81,164) -->
+    <color name="primary_dark">#243F83</color>     <!-- 深蓝色，状态栏颜色 (暗一点) -->
+    <color name="primary_light">#8599D1</color>    <!-- 浅蓝色 (亮一点) -->
+    <color name="accent">#4267B2</color>           <!-- 强调色：亮蓝色 -->
+    
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="popup_background">#F5F5F5</color>  <!-- 浅灰色背景 -->
+    <color name="popup_text">#333333</color>        <!-- 深灰色文字 -->
 </resources>

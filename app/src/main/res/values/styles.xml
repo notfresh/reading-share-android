@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 基础应用主题 -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+    </style>
+
+    <!-- 弹出菜单样式 -->
+    <style name="PopupMenuStyle" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:popupBackground">@color/popup_background</item>
+    </style>
+
+    <!-- 弹出菜单主题 -->
+    <style name="PopupMenuTheme" parent="ThemeOverlay.AppCompat">
+        <item name="android:textColor">@color/popup_text</item>
+        <item name="android:itemBackground">@color/popup_background</item>
+        <item name="android:popupMenuStyle">@style/PopupMenuStyle</item>
+    </style>
+</resources>

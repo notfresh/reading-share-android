@@ -2,6 +2,8 @@ package person.notfresh.myapplication.ui.gallery;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -13,7 +15,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -25,10 +29,19 @@ import person.notfresh.myapplication.R;
 import person.notfresh.myapplication.adapter.LinksAdapter;
 import person.notfresh.myapplication.db.LinkDao;
 import person.notfresh.myapplication.model.LinkItem;
+import person.notfresh.myapplication.util.ExportUtil;
+
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.io.File;
 
 public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
     private static final String PREF_NAME = "TagsPreferences";
@@ -42,6 +55,10 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private LinksAdapter linksAdapter;
     private LinkDao linkDao;
     private Set<TextView> selectedTags = new HashSet<>();  // 使用Set存储选中的标签
+    private MenuItem shareMenuItem;
+    private MenuItem closeSelectionMenuItem;
+    private MenuItem selectAllMenuItem;  // 添加全选菜单项引用
+    private boolean isSelectionMode = false;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -78,21 +95,40 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     }
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);  // 启用选项菜单
     }
 
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        menu.clear();
         inflater.inflate(R.menu.tags_menu, menu);
-        super.onCreateOptionsMenu(menu, inflater);
+        shareMenuItem = menu.findItem(R.id.action_share);
+        closeSelectionMenuItem = menu.findItem(R.id.action_close_selection);
+        selectAllMenuItem = menu.findItem(R.id.action_select_all);  // 获取全选菜单项
+        shareMenuItem.setVisible(isSelectionMode);
+        closeSelectionMenuItem.setVisible(isSelectionMode);
+        selectAllMenuItem.setVisible(isSelectionMode);  // 设置全选按钮可见性
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == R.id.action_add_tag) {
-            showAddTagDialog();
+        int id = item.getItemId();
+        if (id == R.id.action_close_selection) {
+            toggleSelectionMode();
+            return true;
+        } else if (id == R.id.action_select_all) {
+            selectAllItems();  // 处理全选
+            return true;
+        } else if (id == R.id.action_share_text) {
+            shareAsText();
+            return true;
+        } else if (id == R.id.action_share_json) {
+            shareAsFile(true);  // true 表示 JSON
+            return true;
+        } else if (id == R.id.action_share_csv) {
+            shareAsFile(false);  // false 表示 CSV
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -189,10 +225,11 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     }
 
     private void updateContentBySelectedTags() {
+        List<LinkItem> links = new ArrayList<>();
         Set<String> selectedTagNames = new HashSet<>();
         boolean hasNoTagFilter = false;
 
-        // 收集选中的标签名
+        // 收集选中的标签名称
         for (TextView tagView : selectedTags) {
             String tag = (String) tagView.getTag();
             if (NO_TAG.equals(tag)) {
@@ -202,24 +239,43 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             }
         }
 
-        // 获取符合条件的链接
-        List<LinkItem> filteredLinks = new ArrayList<>();
-        if (hasNoTagFilter) {
-            filteredLinks.addAll(linkDao.getLinksWithoutTags());
-        }
-        if (!selectedTagNames.isEmpty()) {
-            filteredLinks.addAll(linkDao.getLinksByTags(selectedTagNames));
-        }
+        // 根据选择获取链接
         if (selectedTags.isEmpty()) {
-            // 如果没有选中的标签，显示所有内容
-            filteredLinks = linkDao.getAllLinks();
+            // 如果没有选中任何标签，显示所有链接
+            links = linkDao.getAllLinks();
+        } else {
+            // 如果选中了"无标签"
+            if (hasNoTagFilter) {
+                links.addAll(linkDao.getLinksWithoutTags());
+            }
+            // 如果还选中了其他标签
+            if (!selectedTagNames.isEmpty()) {
+                links.addAll(linkDao.getLinksByTags(selectedTagNames));
+            }
         }
 
         // 更新标题
         updateTitle(selectedTagNames, hasNoTagFilter);
 
-        // 更新显示
-        linksAdapter.setLinks(filteredLinks);
+        // 按日期分组显示
+        Map<String, List<LinkItem>> groupedLinks = new TreeMap<>(Collections.reverseOrder());
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        
+        // 对链接列表按时间戳排序
+        Collections.sort(links, (a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
+        
+        for (LinkItem link : links) {
+            String date = dateFormat.format(new Date(link.getTimestamp()));
+            List<LinkItem> dayLinks = groupedLinks.computeIfAbsent(date, k -> new ArrayList<>());
+            dayLinks.add(link);
+        }
+        
+        // 确保每个日期组内的链接也按时间排序
+        for (List<LinkItem> dayLinks : groupedLinks.values()) {
+            Collections.sort(dayLinks, (a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
+        }
+        
+        linksAdapter.setGroupedLinks(groupedLinks);
 
         // 保存选择状态
         saveSelections(selectedTagNames, hasNoTagFilter);
@@ -385,6 +441,120 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     @Override
     public void onEnterSelectionMode() {
-        // 标签页不需要处理多选模式
+        if (!isSelectionMode) {
+            toggleSelectionMode();
+        }
+    }
+
+    private void toggleSelectionMode() {
+        isSelectionMode = !isSelectionMode;
+        linksAdapter.toggleSelectionMode();
+        if (shareMenuItem != null) {
+            shareMenuItem.setVisible(isSelectionMode);
+        }
+        if (closeSelectionMenuItem != null) {
+            closeSelectionMenuItem.setVisible(isSelectionMode);
+        }
+        if (selectAllMenuItem != null) {
+            selectAllMenuItem.setVisible(isSelectionMode);
+        }
+        // 更新标题
+        if (isSelectionMode) {
+            requireActivity().setTitle("选择要分享的链接");
+        } else {
+            requireActivity().setTitle("标签");
+        }
+        requireActivity().invalidateOptionsMenu();
+    }
+
+    private void shareAsText() {
+        Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
+        if (selectedItems.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择要分享的链接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StringBuilder shareText = new StringBuilder();
+        for (LinkItem item : selectedItems) {
+            shareText.append(item.getTitle())
+                    .append("\n")
+                    .append(item.getUrl())
+                    .append("\n\n");
+        }
+
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
+        startActivity(Intent.createChooser(shareIntent, "分享到"));
+    }
+
+    private void shareAsFile(boolean isJson) {
+        Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
+        if (selectedItems.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择要分享的链接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            String filePath;
+            if (isJson) {
+                filePath = ExportUtil.exportToJson(requireContext(), new ArrayList<>(selectedItems));
+            } else {
+                filePath = ExportUtil.exportToCsv(requireContext(), new ArrayList<>(selectedItems));
+            }
+            
+            File file = new File(filePath);
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                requireContext(),
+                requireContext().getPackageName() + ".provider",
+                file);
+            
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("*/*");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(shareIntent, "分享文件"));
+            
+        } catch (Exception e) {
+            Snackbar.make(requireView(), 
+                "分享失败：" + e.getMessage(), 
+                Snackbar.LENGTH_LONG).show();
+        }
+    }
+
+    private void selectAllItems() {
+        // 获取当前标签过滤后的链接
+        List<LinkItem> links;
+        if (selectedTags.isEmpty()) {
+            links = linkDao.getAllLinks();  // 如果没有选中标签，获取所有链接
+        } else {
+            // 收集选中的标签名称
+            Set<String> selectedTagNames = new HashSet<>();
+            boolean hasNoTagFilter = false;
+            
+            for (TextView tagView : selectedTags) {
+                String tag = (String) tagView.getTag();
+                if (NO_TAG.equals(tag)) {
+                    hasNoTagFilter = true;
+                } else {
+                    selectedTagNames.add(tag);
+                }
+            }
+            
+            // 根据选中的标签获取链接
+            links = new ArrayList<>();
+            if (hasNoTagFilter) {
+                links.addAll(linkDao.getLinksWithoutTags());
+            }
+            if (!selectedTagNames.isEmpty()) {
+                links.addAll(linkDao.getLinksByTags(selectedTagNames));
+            }
+        }
+
+        // 选中所有符合条件的链接
+        for (LinkItem item : links) {
+            linksAdapter.selectItem(item);
+        }
+        linksAdapter.notifyDataSetChanged();
     }
 } 

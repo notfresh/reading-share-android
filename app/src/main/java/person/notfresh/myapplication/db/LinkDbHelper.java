@@ -16,6 +16,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String COLUMN_SOURCE_APP = "source_app";
     public static final String COLUMN_ORIGINAL_INTENT = "original_intent";
     public static final String COLUMN_TARGET_ACTIVITY = "target_activity";
+    public static final String COLUMN_REMARK = "remark";
 
     // 标签表
     public static final String TABLE_TAGS = "tags";
@@ -32,6 +33,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     COLUMN_TITLE + " TEXT, " +
                     COLUMN_URL + " TEXT, " +
+                    COLUMN_REMARK + " TEXT, " +
                     COLUMN_SOURCE_APP + " TEXT, " +
                     COLUMN_ORIGINAL_INTENT + " TEXT, " +
                     COLUMN_TARGET_ACTIVITY + " TEXT, " +
@@ -63,6 +65,10 @@ public class LinkDbHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        if (oldVersion < 2) {  // 假设当前版本为2
+            db.execSQL("ALTER TABLE " + TABLE_LINKS + 
+                      " ADD COLUMN " + COLUMN_REMARK + " TEXT");
+        }
         // 简单处理升级：删除旧表，创建新表
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINKS);
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_TAGS);

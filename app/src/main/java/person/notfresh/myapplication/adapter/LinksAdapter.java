@@ -4,14 +4,19 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.content.pm.LabeledIntent;
 import android.net.Uri;
 import android.util.Log;
+import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.PopupMenu;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -27,12 +32,16 @@ import java.util.TreeMap;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
+import java.io.File;
+import java.util.Arrays;
+import android.content.ComponentName;
 
 import person.notfresh.myapplication.R;
 import person.notfresh.myapplication.model.LinkItem;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.flexbox.FlexboxLayout;
 import person.notfresh.myapplication.db.LinkDao;
+import person.notfresh.myapplication.util.ExportUtil;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_DATE_HEADER = 0;
@@ -137,38 +146,37 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 .isEmpty();
     }
 
-    void showActionDialog(View view, LinkItem item, int position) {
-        // 根据是否在多选模式显示不同的选项
-        String[] options = isSelectionMode ? 
-            new String[]{"编辑标题", "删除", "退出多选模式"} : 
-            new String[]{"编辑标题", "删除", "进入多选模式"};
+    public void showActionDialog(View view, LinkItem item, int position) {
+        Context wrapper = new ContextThemeWrapper(context, R.style.PopupMenuTheme);
+        PopupMenu popup = new PopupMenu(wrapper, view);
+        popup.getMenu().add(0, 1, 0, "编辑标题");
+        popup.getMenu().add(0, 2, 0, "删除");
+        popup.getMenu().add(0, 3, 0, "分享单条");
+        popup.getMenu().add(0, 4, 0, "多选模式");
         
-        new AlertDialog.Builder(view.getContext())
-                .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // 编辑标题
-                            showEditTitleDialog(view, item);
-                            break;
-                        case 1: // 删除
-                            if (listener != null) {
-                                listener.onDeleteLink(item);
-                                items.remove(position);
-                                notifyItemRemoved(position);
-                            }
-                            break;
-                        case 2: // 切换多选模式
-                            if (isSelectionMode) {
-                                // 退出多选模式
-                                toggleSelectionMode();
-                            } else {
-                                // 进入多选模式并选中当前项
-                                listener.onEnterSelectionMode();
-                                toggleItemSelection(item);
-                            }
-                            break;
+        popup.setOnMenuItemClickListener(menuItem -> {
+            switch (menuItem.getItemId()) {
+                case 1:
+                    showEditTitleDialog(view, item);
+                    return true;
+                case 2:
+                    showDeleteConfirmDialog(item);
+                    return true;
+                case 3:
+                    shareAsText(item);
+                    return true;
+                case 4:
+                    // 进入多选模式并选中当前项
+                    if (listener != null) {
+                        listener.onEnterSelectionMode();
                     }
-                })
-                .show();
+                    toggleItemSelection(item);
+                    return true;
+                default:
+                    return false;
+            }
+        });
+        popup.show();
     }
 
     private void showEditTitleDialog(View view, LinkItem item) {
@@ -255,7 +263,84 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     // 添加获取当前链接列表的方法
     public List<LinkItem> getLinks() {
-        return new ArrayList<>(links);  // 返回副本以避免外部修改
+        List<LinkItem> currentLinks = new ArrayList<>();
+        for (Object item : items) {
+            if (item instanceof LinkItem) {
+                currentLinks.add((LinkItem) item);
+            }
+        }
+        return currentLinks;
+    }
+
+    private void shareAsText(LinkItem item) {
+        StringBuilder shareText = new StringBuilder();
+        shareText.append(item.getTitle()).append("\n");
+        if (item.getRemark() != null && !item.getRemark().isEmpty()) {
+            shareText.append(item.getRemark()).append("\n");
+        }
+        shareText.append(item.getUrl());
+        
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
+        
+        // 创建选择器并排除自己的应用
+        Intent chooserIntent = Intent.createChooser(shareIntent, "分享到");
+        String myPackageName = context.getPackageName();
+        chooserIntent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+        chooserIntent.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, 
+            new ComponentName[]{new ComponentName(myPackageName, myPackageName + ".MainActivity")});
+        
+        context.startActivity(chooserIntent);
+    }
+
+    private void shareAsFile(LinkItem item, boolean isJson) {
+        try {
+            List<LinkItem> singleItemList = Collections.singletonList(item);
+            String filePath = isJson ? 
+                ExportUtil.exportToJson(context, singleItemList) : 
+                ExportUtil.exportToCsv(context, singleItemList);
+            
+            File file = new File(filePath);
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                context, context.getPackageName() + ".provider", file);
+                
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("*/*");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            // 创建选择器并排除自己的应用
+            Intent chooserIntent = Intent.createChooser(shareIntent, "分享文件");
+            String myPackageName = context.getPackageName();
+            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+            chooserIntent.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, 
+                new ComponentName[]{new ComponentName(myPackageName, myPackageName + ".MainActivity")});
+            
+            context.startActivity(chooserIntent);
+            
+        } catch (Exception e) {
+            Toast.makeText(context, "分享失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showDeleteConfirmDialog(LinkItem item) {
+        new AlertDialog.Builder(context)
+                .setTitle("删除确认")
+                .setMessage("确定要删除这个链接吗？")
+                .setPositiveButton("确定", (dialog, which) -> {
+                    if (listener != null) {
+                        listener.onDeleteLink(item);
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    public void selectItem(LinkItem item) {
+        if (!selectedItems.contains(item)) {
+            selectedItems.add(item);
+        }
     }
 
     static class LinkViewHolder extends RecyclerView.ViewHolder {
@@ -276,7 +361,10 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
         void bind(LinkItem item) {
             titleText.setText(item.getTitle());
-            urlText.setText(item.getUrl());
+            
+            // 处理 URL 显示
+            String displayUrl = formatUrlForDisplay(item.getUrl());
+            urlText.setText(displayUrl);
             
             // 显示标签
             tagContainer.removeAllViews();
@@ -307,6 +395,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 });
             } else {
                 itemView.setBackgroundResource(R.drawable.normal_background);
+                // 正常模式下的点击和长按处理
                 itemView.setOnClickListener(v -> {
                     try {
                         String url = adapter.extractRealUrl(item.getUrl());
@@ -374,8 +463,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 });
             }
 
+            // 添加长按处理
             itemView.setOnLongClickListener(v -> {
-                // 直接显示操作对话框，不管是否在多选模式
                 adapter.showActionDialog(v, item, getAdapterPosition());
                 return true;
             });
@@ -415,6 +504,32 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         adapter.updateLinkTags(item);
                     })
                     .show();
+        }
+
+        // 格式化 URL 显示的辅助方法
+        private String formatUrlForDisplay(String url) {
+            final int MAX_URL_LENGTH = 200;
+            if (url == null) return "";
+            
+            if (url.length() > MAX_URL_LENGTH) {
+                // 保留开头的 scheme 和域名
+                int schemeEnd = url.indexOf("://");
+                if (schemeEnd != -1) {
+                    schemeEnd += 3;  // 包含 "://"
+                    int firstSlash = url.indexOf('/', schemeEnd);
+                    if (firstSlash != -1) {
+                        // 显示格式：scheme://domain/...省略部分.../最后一段
+                        String start = url.substring(0, firstSlash);
+                        String end = url.substring(url.length() - 30);  // 保留最后30个字符
+                        return start + "/.../" + end;
+                    }
+                }
+                
+                // 如果 URL 格式不标准，简单截断
+                return url.substring(0, MAX_URL_LENGTH - 3) + "...";
+            }
+            
+            return url;
         }
     }
 
