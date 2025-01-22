@@ -4,6 +4,8 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -11,6 +13,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -42,6 +45,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private boolean isSelectionMode = false;
     private MenuItem shareMenuItem;
     private MenuItem closeSelectionMenuItem;
+    private EditText searchEditText;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -95,9 +99,30 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         recyclerView.setAdapter(adapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
+        // 设置 RecyclerView 的点击事件
+        recyclerView.setOnTouchListener((v, event) -> {
+            searchEditText.clearFocus();  // 让搜索框失去焦点
+            return false;
+        });
+
         // 加载按日期分组的链接
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);
+
+        // 设置搜索框
+        searchEditText = binding.searchEditText;
+        searchEditText.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                adapter.filter(s.toString());
+            }
+        });
 
         return root;
     }

@@ -9,5 +9,12 @@
 
     <string name="menu_home">首页</string>
     <string name="menu_gallery">标签</string>
-    <string name="menu_slideshow">幻灯片</string>
+    <string name="menu_slideshow">设置</string>
+
+    <string-array name="default_tabs_array">
+        <item>首页</item>
+        <item>标签</item>
+    </string-array>
+
+    <string name="fragment_tags">标签</string>
 </resources>

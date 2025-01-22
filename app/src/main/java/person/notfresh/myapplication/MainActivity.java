@@ -53,6 +53,7 @@ import androidx.core.content.ContextCompat;
 import android.app.ActivityManager;
 import androidx.annotation.NonNull;
 import java.net.URLConnection;
+import android.content.SharedPreferences;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -86,6 +87,21 @@ public class MainActivity extends AppCompatActivity {
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
         NavigationUI.setupWithNavController(navigationView, navController);
+
+        // 设置默认启动页
+        SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
+        int defaultTab = prefs.getInt("default_tab", 1);
+        switch (defaultTab) {
+            case 0:
+                navController.navigate(R.id.nav_home);
+                break;
+            case 1:
+                navController.navigate(R.id.nav_gallery);
+                break;
+            case 2:
+                navController.navigate(R.id.nav_slideshow);
+                break;
+        }
 
         checkClipboardPermission();
     }

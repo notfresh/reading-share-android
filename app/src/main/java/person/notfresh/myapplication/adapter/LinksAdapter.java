@@ -48,6 +48,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private static final int TYPE_LINK_ITEM = 1;
     
     private List<Object> items = new ArrayList<>();
+    private List<Object> originalItems = new ArrayList<>();  // 存储原始数据
     private OnLinkActionListener listener;
     private LinkDao linkDao;
     private Context context;  // 添加 context 引用
@@ -108,10 +109,15 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     public void setGroupedLinks(Map<String, List<LinkItem>> groupedLinks) {
         items.clear();
+        originalItems.clear();
+        
         for (Map.Entry<String, List<LinkItem>> entry : groupedLinks.entrySet()) {
             items.add(entry.getKey());
             items.addAll(entry.getValue());
         }
+        
+        // 保存原始数据
+        originalItems.addAll(items);
         notifyDataSetChanged();
     }
 
@@ -341,6 +347,56 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         if (!selectedItems.contains(item)) {
             selectedItems.add(item);
         }
+    }
+
+    // 添加搜索方法
+    public void filter(String query) {
+        query = query.toLowerCase().trim();
+        items.clear();
+        
+        if (query.isEmpty()) {
+            // 如果搜索框为空，显示所有数据
+            items.addAll(originalItems);
+            notifyDataSetChanged();
+            return;
+        }
+
+        Map<String, List<LinkItem>> filteredGroups = new TreeMap<>(Collections.reverseOrder());
+        
+        // 遍历原始数据进行过滤
+        for (Object item : originalItems) {
+            if (item instanceof String) {
+                continue;  // 跳过日期标题
+            }
+            
+            LinkItem linkItem = (LinkItem) item;
+            boolean matchesTitle = linkItem.getTitle().toLowerCase().contains(query);
+            boolean matchesTags = false;
+            
+            // 检查标签
+            for (String tag : linkItem.getTags()) {
+                if (tag.toLowerCase().contains(query)) {
+                    matchesTags = true;
+                    break;
+                }
+            }
+            
+            // 如果标题或标签匹配，添加到过滤结果中
+            if (matchesTitle || matchesTags) {
+                String date = formatDate(linkItem.getTimestamp());
+                filteredGroups.computeIfAbsent(date, k -> new ArrayList<>()).add(linkItem);
+            }
+        }
+        
+        // 将过滤后的结果转换为展平的列表
+        for (Map.Entry<String, List<LinkItem>> entry : filteredGroups.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                items.add(entry.getKey());  // 添加日期标题
+                items.addAll(entry.getValue());  // 添加该日期下的链接
+            }
+        }
+        
+        notifyDataSetChanged();
     }
 
     static class LinkViewHolder extends RecyclerView.ViewHolder {
