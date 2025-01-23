@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "person.notfresh.myapplication"
+    namespace = "person.notfresh.readingshare"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "person.notfresh.myapplication"
+        applicationId = "person.notfresh.readingshare"
         minSdk = 29
         targetSdk = 34
         versionCode = 1

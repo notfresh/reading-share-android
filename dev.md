@@ -2,7 +2,53 @@
 
    git tag -a v1.0 -m "Release version 1.0"
 
-   git tag -a v1.1.0 -m "标签功能搞定"
+## 删除tag
+
+要删除 Git 标签，你可以使用以下步骤：
+
+### 删除本地标签
+
+1. **查看现有标签**：
+
+   ```bash
+   git tag
+   ```
+2. **删除本地标签**：
+
+   - 使用以下命令删除本地标签：
+     ```bash
+     git tag -d <tagname>
+     ```
+   - 例如，要删除名为 `v1.0` 的标签：
+     ```bash
+     git tag -d v1.0
+     ```
+
+### 删除远程标签
+
+1. **删除远程标签**：
+
+   - 使用以下命令删除远程标签：
+     ```bash
+     git push origin --delete <tagname>
+     ```
+   - 例如，要删除远程的 `v1.0` 标签：
+     ```bash
+     git push origin --delete v1.0
+     ```
+2. **验证删除**：
+
+   - 再次查看远程标签，确保标签已被删除：
+     ```bash
+     git ls-remote --tags origin
+     ```
+
+### 注意事项
+
+- **确保正确的标签名称**：在删除标签之前，确保你输入了正确的标签名称，以避免误删。
+- **权限**：确保你有权限对远程仓库进行推送操作。
+
+通过这些步骤，你可以成功删除本地和远程的 Git 标签。
 
 # Android 分享到功能
 
@@ -177,7 +223,7 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "person.notfresh.myapplication"
+        applicationId "person.notfresh.readingshare"
         minSdk 26
         targetSdk 34
         versionCode 1
@@ -282,7 +328,6 @@ if (intent.resolveActivity(getPackageManager()) != null) {
 
 # adb
 
-
 如果你在命令行中收到“无法将‘adb’项识别为 cmdlet、函数、脚本文件或可运行程序的名称”的错误信息，这通常意味着系统找不到 ADB 工具。以下是一些可能的解决方法：
 
 ### 解决方法
@@ -369,5 +414,101 @@ if (intent.resolveActivity(getPackageManager()) != null) {
    - 在 Android Studio 中，选择 `Build > Clean Project`，然后选择 `Build > Rebuild Project`，以确保没有缓存问题。
 
 通过这些步骤，你应该能够找出问题所在。如果问题仍然存在，请提供更多详细的日志信息，以便进一步帮助。
+
+# 增加标签
+
+```
+public void addTagToLink(LinkItem item, String tagName){
+
+    item.addTag(tagName);
+
+    notifyDataSetChanged();
+
+    linkDao.updateLinkTags(item);
+
+    }
+```
+
+# 修改自己的包名
+
+```gradle
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'person.notfresh.readingshare'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "person.notfresh.readingshare"
+
+```
+
+plugins {
+id 'com.android.application'
+}
+
+不能变,但是 applicationId可以变
+
+## 快速修改包名前缀
+
+要进行全局修改以更新包名，请按照以下步骤操作：
+
+### 1. 更新 `build.gradle`
+
+确保 `namespace` 和 `applicationId` 是一致的：
+
+```gradle
+android {
+    namespace 'person.notfresh.readingshare'
+    defaultConfig {
+        applicationId "person.notfresh.readingshare"
+    }
+}
+```
+
+### 2. 更新 Java 文件的包名
+
+将所有 Java 文件的包名从 `person.notfresh.readingshare` 改为 `person.notfresh.readingshare`。
+
+#### 示例修改
+
+```java
+// 修改前
+package person.notfresh.readingshare.ui.gallery;
+
+// 修改后
+package person.notfresh.readingshare.ui.gallery;
+```
+
+### 3. 更新 `import` 语句
+
+确保所有 `import` 语句使用新的包名。
+
+#### 示例修改
+
+```java
+// 修改前
+import person.notfresh.readingshare.R;
+
+// 修改后
+import person.notfresh.readingshare.R;
+```
+
+### 4. 重命名目录结构
+
+在文件系统中，将 `java/person/notfresh/myapplication` 目录重命名为 `java/person/notfresh/readingshare`。
+
+### 5. 清理并重建项目
+
+- 在 Android Studio 中，点击 `Build` 菜单。
+- 选择 `Clean Project`。
+- 然后选择 `Rebuild Project`。
+
+### 6. 检查资源文件
+
+确保所有资源文件没有语法错误或缺失。
+
 
 # @END

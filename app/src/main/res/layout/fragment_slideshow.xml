@@ -17,4 +17,18 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="8dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CSV的格式需要与导出格式匹配"
+        android:textColor="#808080"
+        android:layout_marginTop="16dp"/>
+
+    <Button
+        android:id="@+id/button_import_csv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="从CSV导入分享链接"
+        android:layout_marginTop="8dp"/>
 </LinearLayout>

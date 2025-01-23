@@ -1,4 +1,4 @@
-package person.notfresh.myapplication;
+package person.notfresh.readingshare;
 
 import org.junit.Test;
 
