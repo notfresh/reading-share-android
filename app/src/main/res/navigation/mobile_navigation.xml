@@ -12,7 +12,7 @@
         tools:layout="@layout/fragment_home" />
 
     <fragment
-        android:id="@+id/nav_gallery"
+        android:id="@+id/nav_tags"
         android:name="person.notfresh.myapplication.ui.gallery.TagsFragment"
         android:label="@string/fragment_tags"
         tools:layout="@layout/fragment_tags" />

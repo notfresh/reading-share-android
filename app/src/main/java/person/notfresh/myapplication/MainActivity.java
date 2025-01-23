@@ -54,6 +54,9 @@ import android.app.ActivityManager;
 import androidx.annotation.NonNull;
 import java.net.URLConnection;
 import android.content.SharedPreferences;
+import androidx.core.view.GravityCompat;
+import person.notfresh.myapplication.util.BilibiliUrlConverter;
+import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -81,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.nav_gallery, R.id.nav_slideshow)
+                R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow)
                 .setOpenableLayout(drawer)
                 .build();
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
@@ -90,20 +93,39 @@ public class MainActivity extends AppCompatActivity {
 
         // 设置默认启动页
         SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
-        int defaultTab = prefs.getInt("default_tab", 1);
-        switch (defaultTab) {
-            case 0:
-                navController.navigate(R.id.nav_home);
-                break;
-            case 1:
-                navController.navigate(R.id.nav_gallery);
-                break;
-            case 2:
-                navController.navigate(R.id.nav_slideshow);
-                break;
+        int defaultTab = prefs.getInt("default_tab", 0);
+        Log.d("MainActivity", "Default tab: " + defaultTab);
+        if (defaultTab == 0) {
+            navController.navigate(R.id.nav_home);
+        } else if (defaultTab == 1) {
+            navController.navigate(R.id.nav_tags);
+        } else if (defaultTab == 2) {
+            navController.navigate(R.id.nav_slideshow);
         }
 
         checkClipboardPermission();
+
+        navigationView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                int id = item.getItemId();
+                NavController navController = Navigation.findNavController(MainActivity.this, R.id.nav_host_fragment_content_main);
+
+                if (id == R.id.nav_home) {
+                    navController.navigate(R.id.nav_home);
+                } else if (id == R.id.nav_tags) {
+                    navController.navigate(R.id.nav_tags);
+                } else if (id == R.id.nav_slideshow) {
+                    navController.navigate(R.id.nav_slideshow);
+                }
+                // 可以添加更多的 else if 来处理其他菜单项
+
+                DrawerLayout drawer = binding.drawerLayout;
+                drawer.closeDrawer(GravityCompat.START);
+                return true;
+            }
+        });
+
     }
 
     @Override

@@ -42,6 +42,9 @@ import com.google.android.material.snackbar.Snackbar;
 import com.google.android.flexbox.FlexboxLayout;
 import person.notfresh.myapplication.db.LinkDao;
 import person.notfresh.myapplication.util.ExportUtil;
+import person.notfresh.myapplication.util.BilibiliUrlConverter;
+import java.io.IOException;
+import person.notfresh.myapplication.util.AppUtils;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_DATE_HEADER = 0;
@@ -51,7 +54,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private List<Object> originalItems = new ArrayList<>();  // 存储原始数据
     private OnLinkActionListener listener;
     private LinkDao linkDao;
-    private Context context;  // 添加 context 引用
+    private static Context context;  // 添加 context 引用
     private Set<LinkItem> selectedItems = new HashSet<>();
     private boolean isSelectionMode = false;
     private List<LinkItem> links = new ArrayList<>();
@@ -100,6 +103,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         } else if (holder instanceof LinkViewHolder) {
             ((LinkViewHolder) holder).bind((LinkItem) items.get(position));
         }
+
     }
 
     @Override
@@ -399,6 +403,52 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         notifyDataSetChanged();
     }
 
+    private static void handleBilibiliLink(String shortUrl) {
+        new Thread(() -> {
+            try {
+                String fullUrl = BilibiliUrlConverter.getRedirectedUrl(shortUrl);
+                Log.d("BilibiliLink", "Full URL: " + fullUrl);
+                String schemeUrl = BilibiliUrlConverter.convertToBilibiliScheme(fullUrl);
+                Log.d("BilibiliLink", "Scheme URL: " + schemeUrl);
+                ((AppCompatActivity) context).runOnUiThread(() -> openBilibiliApp(schemeUrl, fullUrl));
+            } catch (IOException e) {
+                Log.e("BilibiliLink", "Error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private static void openBilibiliApp(String schemeUrl, String fallbackUrl) {
+//        Context appContext = context.getApplicationContext(); // the global method
+//        if (AppUtils.isAppInstalled(appContext, "tv.danmaku.bili")) { //TODO There is some wrong with this method
+//            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(schemeUrl));
+//            intent.setPackage("tv.danmaku.bili"); // Bilibili 的包名
+//            context.startActivity(intent);
+//            Log.d("BilibiliLink", "Bilibili app is installed, opening with app.");
+//        } else {
+//            // 如果没有安装 Bilibili 应用，打开浏览器
+//            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl));
+//            context.startActivity(browserIntent);
+//            Log.d("BilibiliLink", "Bilibili app is not installed, opening with browser.");
+//        }
+        try{
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(schemeUrl));
+            intent.setPackage("tv.danmaku.bili"); // Bilibili 的包名
+            context.startActivity(intent);
+        }catch (Exception e){
+            //如果没有安装 Bilibili 应用，打开浏览器
+            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl));
+            context.startActivity(browserIntent);
+            Log.d("BilibiliLink", "Bilibili app is not installed, opening with browser.");
+        }
+    }
+
+    private String getItemUrl(int position) {
+        if (items.get(position) instanceof LinkItem) {
+            return ((LinkItem) items.get(position)).getUrl();
+        }
+        return null;
+    }
+
     static class LinkViewHolder extends RecyclerView.ViewHolder {
         TextView titleText;
         TextView urlText;
@@ -462,55 +512,35 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         Intent intent = new Intent(Intent.ACTION_VIEW);
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-                        if (url.contains("bilibili.com") || url.contains("b23.tv")) {
-                            // B站链接处理
-                            try {
-                                Log.d("LinkOpen", "处理B站链接: " + url);
-                                
-                                // 创建专门的B站Intent
-                                Intent biliIntent = new Intent(Intent.ACTION_VIEW);
-                                biliIntent.setPackage("tv.danmaku.bili");
-                                biliIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                
-                                // 直接使用原始URL
-                                biliIntent.setData(Uri.parse(url));
-                                
-                                // 尝试直接启动B站应用
-                                if (adapter.isIntentAvailable(context, biliIntent)) {
-                                    Log.d("LinkOpen", "启动B站应用");
-                                    context.startActivity(biliIntent);
-                                    return;
-                                }
-                                
-                                Log.d("LinkOpen", "B站应用不可用，尝试其他方式");
-                            } catch (Exception e) {
-                                Log.e("LinkOpen", "B站处理失败: " + e.getMessage());
-                            }
-                        }
-
-                        // 其他应用使用通用处理方式
-                        intent.setData(Uri.parse(url));
-
-                        // 如果有源应用，先尝试用源应用打开
-                        if (sourceApp != null && !sourceApp.isEmpty()) {
-                            try {
-                                intent.setPackage(sourceApp);
-                                if (adapter.isIntentAvailable(context, intent)) {
-                                    context.startActivity(intent);
-                                    return;
-                                }
-                            } catch (Exception ignored) {
-                                // 如果源应用不可用，继续使用通用方式打开
-                            }
-                        }
-
-                        // 如果源应用无法打开，移除包名限制
-                        intent.setPackage(null);
+                        if (url.contains("b23.tv")) {
+                            handleBilibiliLink(url);
+                        }else{
+                            // 其他应用使用通用处理方式
+                            intent.setData(Uri.parse(url));
                         
-                        // 使用系统选择器打开
-                        Intent chooserIntent = Intent.createChooser(intent, "选择打开方式");
-                        chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        context.startActivity(chooserIntent);
+                        
+                            // 如果有源应用，先尝试用源应用打开
+                            if (sourceApp != null && !sourceApp.isEmpty()) {
+                                try {
+                                    intent.setPackage(sourceApp);
+                                    if (adapter.isIntentAvailable(context, intent)) {
+                                        context.startActivity(intent);
+                                        return;
+                                    }
+                                } catch (Exception ignored) {
+                                    // 如果源应用不可用，继续使用通用方式打开
+                                }
+                            }
+
+                            // 如果源应用无法打开，移除包名限制
+                            intent.setPackage(null);
+                        
+                        
+                            // 使用系统选择器打开
+                            Intent chooserIntent = Intent.createChooser(intent, "选择打开方式");
+                            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            context.startActivity(chooserIntent);
+                        }
 
                     } catch (Exception e) {
                         Snackbar.make(v, "无法打开此链接: " + e.getMessage(), 

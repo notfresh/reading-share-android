@@ -24,24 +24,7 @@ APK 文件位置：`app/release/app-release-版本号.apk`
 
    - 支持接收其他应用分享的链接
    - 智能解析分享内容（如小红书分享文本）
-   - 支持打开原始应用查看内容
-
-## 项目结构
-
-    app/src/main/
-    ├── java/person/notfresh/myapplication/
-    │   ├── MainActivity.java              # 主活动
-    │   ├── adapter/
-    │   │   └── LinksAdapter.java         # 链接列表适配器
-    │   ├── model/
-    │   │   └── LinkItem.java             # 链接数据模型
-    │   └── ui/gallery/
-    │       ├── TagsFragment.java         # 标签页面
-    │       ├── GalleryFragment.java      # 画廊页面
-    │       └── GalleryViewModel.java     # 画廊视图模型
-    └── res/
-        └── layout/
-            └── dialog_add_tag.xml        # 添加标签对话框布局
+   - 支持打开原始应用查看内容(目前仅针对B站做了优化)
 
 ## 技术特点
 
