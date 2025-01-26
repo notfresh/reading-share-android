@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
     private LinkDao linkDao;
     private static final int CLIPBOARD_PERMISSION_REQUEST = 100;
     private boolean hasFocus = false;
-    private String lastProcessedClipText = "";  // 添加这个变量来记录上次处理的剪贴板内容
+    private String lastClipboardText = "";  // 添加这个变量来记录上次处理的剪贴板内容
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -117,6 +117,8 @@ public class MainActivity extends AppCompatActivity {
                     navController.navigate(R.id.nav_tags);
                 } else if (id == R.id.nav_slideshow) {
                     navController.navigate(R.id.nav_slideshow);
+                } else if (id == R.id.nav_rss) {
+                    navController.navigate(R.id.nav_rss);
                 }
                 // 可以添加更多的 else if 来处理其他菜单项
 
@@ -308,14 +310,20 @@ public class MainActivity extends AppCompatActivity {
                     Log.d("Clipboard", "Checking clipboard...");
                     ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                     Log.d("Clipboard", "Clipboard manager: " + (clipboard != null));
-                    
+
                     if (clipboard != null && clipboard.hasPrimaryClip()) {
                         ClipData clipData = clipboard.getPrimaryClip();
                         if (clipData != null && clipData.getItemCount() > 0) {
                             ClipData.Item item = clipData.getItemAt(0);
                             CharSequence text = item.getText();
-                            
-                            if (text != null) {
+
+                            SharedPreferences prefs = getSharedPreferences("clipboard_prefs", MODE_PRIVATE);
+                            String savedClipboardText = prefs.getString("last_clipboard_text", "");
+
+                            if (text != null && !text.equals(savedClipboardText)) {
+                                lastClipboardText = text.toString();
+                                // 保存到 SharedPreferences
+                                prefs.edit().putString("last_clipboard_text", lastClipboardText).apply();
                                 handleClipboardText(text.toString());
                             }
                         }
@@ -378,6 +386,12 @@ public class MainActivity extends AppCompatActivity {
         if (urlMatcher.find()) {
             // 获取URL
             String url = urlMatcher.group(0);
+            // 移除URL中可能的查询参数
+            String cleanUrl = url.split("\\?")[0];
+            // 检查是否以.xml结尾（忽略大小写）
+            if (cleanUrl.toLowerCase().endsWith(".xml")) {
+                return;
+            }
             
             // 获取URL之前的内容作为标题
             String title = text.substring(0, urlMatcher.start()).trim();
@@ -429,8 +443,8 @@ public class MainActivity extends AppCompatActivity {
                         linkDao.insertLink(newLink);
                         
                         // 清除剪贴板
-                        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                        clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+                        // ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        // clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
 
                         Snackbar.make(binding.getRoot(), "已保存：" + title, 
                                 Snackbar.LENGTH_LONG).show();
@@ -442,16 +456,16 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("取消", (dialog1, which) -> {
                     // 用户取消时也清除剪贴板，避免再次触发
-                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+                    // ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    // clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
                 })
                 .create();
 
         // 添加对话框关闭监听
         dialog.setOnDismissListener(dialogInterface -> {
             // 对话框关闭时（包括点击外部区域）也清除剪贴板
-            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+            // ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            // clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
         });
 
         dialog.show();

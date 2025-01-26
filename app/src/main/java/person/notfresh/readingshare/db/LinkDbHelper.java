@@ -52,6 +52,24 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     "FOREIGN KEY (" + COLUMN_LINK_ID + ") REFERENCES " + TABLE_LINKS + "(" + COLUMN_ID + "), " +
                     "FOREIGN KEY (" + COLUMN_TAG_ID_REF + ") REFERENCES " + TABLE_TAGS + "(" + COLUMN_TAG_ID + "))";
 
+    private static final String CREATE_RSS_SOURCES_TABLE =
+        "CREATE TABLE rss_sources (" +
+        "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+        "url TEXT NOT NULL," +
+        "name TEXT NOT NULL," +
+        "last_update INTEGER" +
+        ")";
+
+    private static final String CREATE_RSS_ENTRIES_TABLE =
+        "CREATE TABLE rss_entries (" +
+        "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+        "source_id INTEGER," +
+        "title TEXT NOT NULL," +
+        "link TEXT NOT NULL," +
+        "pub_date INTEGER," +
+        "FOREIGN KEY(source_id) REFERENCES rss_sources(id)" +
+        ")";
+
     public LinkDbHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
@@ -61,6 +79,8 @@ public class LinkDbHelper extends SQLiteOpenHelper {
         db.execSQL(SQL_CREATE_LINKS);
         db.execSQL(SQL_CREATE_TAGS);
         db.execSQL(SQL_CREATE_LINK_TAGS);
+        db.execSQL(CREATE_RSS_SOURCES_TABLE);
+        db.execSQL(CREATE_RSS_ENTRIES_TABLE);
     }
 
     @Override
@@ -73,6 +93,8 @@ public class LinkDbHelper extends SQLiteOpenHelper {
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINKS);
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_TAGS);
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINK_TAGS);
+        db.execSQL("DROP TABLE IF EXISTS " + "rss_sources");
+        db.execSQL("DROP TABLE IF EXISTS " + "rss_entries");
         onCreate(db);
     }
 } 
