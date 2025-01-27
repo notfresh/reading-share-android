@@ -3,6 +3,7 @@ package person.notfresh.readingshare.db;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 
 public class LinkDbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "links.db";
@@ -72,29 +73,52 @@ public class LinkDbHelper extends SQLiteOpenHelper {
 
     public LinkDbHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        Log.d("LinkDbHelper", "数据库版本 " + DATABASE_VERSION);
+
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        db.execSQL(SQL_CREATE_LINKS);
-        db.execSQL(SQL_CREATE_TAGS);
-        db.execSQL(SQL_CREATE_LINK_TAGS);
-        db.execSQL(CREATE_RSS_SOURCES_TABLE);
-        db.execSQL(CREATE_RSS_ENTRIES_TABLE);
+        try {
+            Log.d("LinkDbHelper", "Creating database tables");
+            
+            // 创建现有的表
+            db.execSQL(SQL_CREATE_LINKS);
+            db.execSQL(SQL_CREATE_TAGS);
+            db.execSQL(SQL_CREATE_LINK_TAGS);
+            
+            // 创建 RSS 相关的表
+            Log.d("LinkDbHelper", "Creating RSS tables");
+            db.execSQL(CREATE_RSS_SOURCES_TABLE);
+            db.execSQL(CREATE_RSS_ENTRIES_TABLE);
+            
+            Log.d("LinkDbHelper", "Database tables created successfully");
+        } catch (Exception e) {
+            Log.e("LinkDbHelper", "Error creating database tables", e);
+            throw e; // 重新抛出异常，因为没有表将导致应用无法正常工作
+        }
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 2) {  // 假设当前版本为2
-            db.execSQL("ALTER TABLE " + TABLE_LINKS + 
-                      " ADD COLUMN " + COLUMN_REMARK + " TEXT");
+        try {
+            Log.d("LinkDbHelper", "Upgrading database from " + oldVersion + " to " + newVersion);
+            
+            // 备份现有数据（如果需要的话）
+            
+            // 删除旧表
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINKS);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_TAGS);
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINK_TAGS);
+            db.execSQL("DROP TABLE IF EXISTS rss_sources");
+            db.execSQL("DROP TABLE IF EXISTS rss_entries");
+            
+            // 重新创建所有表
+            onCreate(db);
+            
+            Log.d("LinkDbHelper", "Database upgrade completed successfully");
+        } catch (Exception e) {
+            Log.e("LinkDbHelper", "Error upgrading database", e);
         }
-        // 简单处理升级：删除旧表，创建新表
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINKS);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_TAGS);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINK_TAGS);
-        db.execSQL("DROP TABLE IF EXISTS " + "rss_sources");
-        db.execSQL("DROP TABLE IF EXISTS " + "rss_entries");
-        onCreate(db);
     }
 } 

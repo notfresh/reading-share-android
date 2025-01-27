@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,23 +13,42 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.rometools.rome.feed.synd.SyndEntry;
 import java.util.List;
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.model.RssEntry;
 
 public class RSSAdapter extends RecyclerView.Adapter<RSSAdapter.RSSViewHolder> {
 
-    private List<SyndEntry> rssEntries;
+    private List<RssEntry> rssEntries;
     private Context context;
 
-    public RSSAdapter(Context context, List<SyndEntry> rssEntries) {
+    public RSSAdapter(Context context, List<RssEntry> rssEntries) {
         this.context = context;
         this.rssEntries = rssEntries;
     }
 
-    public void updateEntries(List<SyndEntry> entries) {
+    public void updateEntries(List<RssEntry> entries) {
+        if (entries == null) {
+            Log.e("RSSAdapter", "Received null entries list");
+            return;
+        }
         this.rssEntries.clear();
         this.rssEntries.addAll(entries);
+        notifyDataSetChanged();
+    }
+
+    public void addEntries(List<RssEntry> newEntries) {
+        if (newEntries == null) {
+            Log.e("RSSAdapter", "Received null entries list");
+            return;
+        }
+        int startPos = rssEntries.size();
+        rssEntries.addAll(newEntries);
+        notifyItemRangeInserted(startPos, newEntries.size());
+    }
+
+    public void clearEntries() {
+        rssEntries.clear();
         notifyDataSetChanged();
     }
 
@@ -42,7 +62,7 @@ public class RSSAdapter extends RecyclerView.Adapter<RSSAdapter.RSSViewHolder> {
 
     @Override
     public void onBindViewHolder(@NonNull RSSViewHolder holder, int position) {
-        SyndEntry entry = rssEntries.get(position);
+        RssEntry entry = rssEntries.get(position);
         holder.titleTextView.setText(entry.getTitle());
         holder.linkTextView.setText(entry.getLink());
 
@@ -62,7 +82,7 @@ public class RSSAdapter extends RecyclerView.Adapter<RSSAdapter.RSSViewHolder> {
         return rssEntries.size();
     }
 
-    private void showActionDialog(SyndEntry entry, View anchor) {
+    private void showActionDialog(RssEntry entry, View anchor) {
         PopupMenu popupMenu = new PopupMenu(context, anchor);
         popupMenu.getMenuInflater().inflate(R.menu.rss_item_menu, popupMenu.getMenu());
         popupMenu.setOnMenuItemClickListener(item -> {
@@ -79,7 +99,7 @@ public class RSSAdapter extends RecyclerView.Adapter<RSSAdapter.RSSViewHolder> {
         popupMenu.show();
     }
 
-    private void shareEntry(SyndEntry entry) {
+    private void shareEntry(RssEntry entry) {
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
         shareIntent.putExtra(Intent.EXTRA_TEXT, entry.getLink());

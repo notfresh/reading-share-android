@@ -84,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow)
+                R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss)
                 .setOpenableLayout(drawer)
                 .build();
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
@@ -100,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
         } else if (defaultTab == 1) {
             navController.navigate(R.id.nav_tags);
         } else if (defaultTab == 2) {
-            navController.navigate(R.id.nav_slideshow);
+            navController.navigate(R.id.nav_rss);
         }
 
         checkClipboardPermission();

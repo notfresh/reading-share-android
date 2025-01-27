@@ -518,9 +518,7 @@ import person.notfresh.readingshare.R;
 
 想要设计一个自己心仪的图标，去网上找svg格式的图标，在res/drawable里面引入 new vector，然后在对应的位置引用即可。
 
-
 # 循环列表
-
 
 下面简单说明一下：
 
@@ -560,7 +558,6 @@ public class HomeFragment extends Fragment {
 ```
 
 这样，fragment_home.xml 就会成为该 Fragment 对应的布局，而 RecyclerView 会使用 Adapter 去加载“分享条目”的数据，并且在界面上显示这些条目。你可以根据需要添加点击事件、滑动操作等，实现更多功能。
-
 
 每个条目的样式通常会放在单独的布局文件中（比如 item_share.xml），然后在 RecyclerView 的 Adapter 中通过 inflate 的方式来创建和设置 ViewHolder，使得 RecyclerView 能够正确地显示每条数据对应的界面。
 
@@ -644,12 +641,12 @@ public class MyShareAdapter extends RecyclerView.Adapter<MyShareAdapter.ViewHold
 
 这样，每个条目的样式就在 item_share.xml 文件里定义好了，然后通过 Adapter 把对应的数据对象映射到布局中的各个控件上。根据你的项目架构，文件名或路径可能不尽相同，但它们一般都位于“layout”目录中并在 Adapter 的 onCreateViewHolder(...) 中进行填充。
 
-
 # 获得xml文件定位
 
+在Adapter.java中
 
 ```
-在Adapter.java中
+
     @NonNull
     @Override
     public RSSViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -659,5 +656,70 @@ public class MyShareAdapter extends RecyclerView.Adapter<MyShareAdapter.ViewHold
     }
 ```
 
+# 嵌入式数据库版本管理
+
+在使用自定义 LinkDbHelper（通常继承 SQLiteOpenHelper）来维护数据库时，常见的升级流程如下：
+
+1. 在构造函数或静态字段中以 DATABASE_VERSION 来表示当前数据库版本号。每次更改数据库结构（如新增列、修改表等）就将版本号加 1。
+2. 在 onUpgrade(...) 中编写详细的升级或迁移逻辑，而不是直接删库重建。
+3. 如果需要兼容回退（downgrade），则可以在 onDowngrade(...) 或其他地方进行额外处理。
+
+以下示例仅供参考（文件名、包名需根据项目实际情况调整）：
+
+```java:app/src/main/java/person/notfresh/readingshare/db/LinkDbHelper.java
+public class LinkDbHelper extends SQLiteOpenHelper {
+    public static final String DATABASE_NAME = "links.db";
+    // 在数据库结构需要升级时，递增这个版本号
+    public static final int DATABASE_VERSION = 2;
+
+    public LinkDbHelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        // 创建表的示例
+        db.execSQL("CREATE TABLE IF NOT EXISTS links (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "title TEXT," +
+                "url TEXT," +
+                "createTime LONG" +
+                ");");
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        // 如果只经历了从 1 升级到 2，可以直接针对这个版本差进行处理
+        // 例如：给原有 links 表新增一个列
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE links ADD COLUMN extraInfo TEXT");
+        }
+        // 如果还会升级到更高的版本，可再根据 if (oldVersion < 3) ... 等类似逻辑来继续扩展
+    }
+
+    @Override
+    public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        // 如果需要支持版本回退，亦可在这里实现对应逻辑
+        // 可能做法：先备份重要数据，然后删除旧表，再重新创建等
+        super.onDowngrade(db, oldVersion, newVersion);
+    }
+}
+```
+
+要点说明：
+• DATABASE_VERSION 确定当前数据库版本。下次若因业务需求修改了数据库表结构，就把它加 1，并在 onUpgrade(...) 内编写相应的升级逻辑。
+• onUpgrade(...) 中可以根据旧版本号（oldVersion）来判断要执行哪些操作，以实现多次迭代升级。
+• onCreate(...) 在数据库第一次创建时调用，用于建表及初始化数据。
+• 不要随意删除数据库文件，以免导致用户数据丢失。如确需清空部分数据，可精细化编写数据清理逻辑，以保障升级的安全性和连贯性。
+
+
+## 数据库版本号
+
+```
+在 Android 中，SQLiteOpenHelper 会根据你在构造函数中传递给 super(...) 的数据库版本号来进行版本管理。系统会将该版本号写入数据库文件的内部元数据区（可以理解为在数据库文件头或类似位置有记录）。当你下次获取同名数据库并调用 getWritableDatabase() 或 getReadableDatabase() 时，SQLiteOpenHelper 会读取数据库文件内存储的原先版本号（即 oldVersion），然后与当前传入的 DATABASE_VERSION（即 newVersion）进行比较，如果不同，就会回调 onUpgrade(...) 或 onDowngrade(...) 方法。
+
+简而言之，oldVersion 并不在你应用的代码中手动存储，而是由 Android 内部在数据库文件的元数据中进行维护并自动读取。你只需要在 LinkDbHelper 等继承 SQLiteOpenHelper 的类中设置好 DATABASE_VERSION，并在 onUpgrade(...) 内根据 oldVersion 做相应的升级逻辑即可。
+
+```
 
 # @END

@@ -5,11 +5,14 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-import com.rometools.rome.feed.synd.SyndEntry;
 import person.notfresh.readingshare.model.RssSource;
+import android.util.Log;
+import person.notfresh.readingshare.model.RssEntry;
 
 public class RssDao {
+    private static final String TAG = "RssDao";
     private LinkDbHelper dbHelper;
 
     public RssDao(Context context) {
@@ -25,11 +28,28 @@ public class RssDao {
         return db.insert("rss_sources", null, values);
     }
 
-    public void saveEntries(int sourceId, List<SyndEntry> entries) {
+    public long insertEntry(RssEntry entry, int sourceId) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("source_id", sourceId);
+        values.put("title", entry.getTitle());
+        values.put("link", entry.getLink());
+        values.put("pub_date", entry.getPublishedDate() != null ? 
+                entry.getPublishedDate().getTime() : System.currentTimeMillis());
+        
+        try {
+            return db.insert("rss_entries", null, values);
+        } catch (Exception e) {
+            Log.e(TAG, "Error inserting entry: " + entry.getTitle(), e);
+            return -1;
+        }
+    }
+
+    public void saveEntries(int sourceId, List<RssEntry> entries) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         db.beginTransaction();
         try {
-            for (SyndEntry entry : entries) {
+            for (RssEntry entry : entries) {
                 ContentValues values = new ContentValues();
                 values.put("source_id", sourceId);
                 values.put("title", entry.getTitle());
@@ -63,9 +83,49 @@ public class RssDao {
         return sources;
     }
 
-    public List<SyndEntry> getEntriesForSource(int sourceId) {
-        List<SyndEntry> entries = new ArrayList<>();
-        // Implementation for retrieving entries
+    public List<RssEntry> getEntriesForSource(int sourceId, int offset, int limit) {
+        List<RssEntry> entries = new ArrayList<>();
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        
+        try {
+            db = dbHelper.getReadableDatabase(); //@mark
+            
+            // 构建查询
+            String query = "SELECT * FROM rss_entries WHERE source_id = ? ORDER BY pub_date DESC LIMIT ?, ?";
+            String[] selectionArgs = new String[]{
+                String.valueOf(sourceId),
+                String.valueOf(offset),
+                String.valueOf(limit)
+            };
+            
+            cursor = db.rawQuery(query, selectionArgs);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    try {
+                        RssEntry entry = new RssEntry(
+                            cursor.getString(cursor.getColumnIndexOrThrow("title")),
+                            cursor.getString(cursor.getColumnIndexOrThrow("link")),
+                            cursor.getLong(cursor.getColumnIndexOrThrow("pub_date"))
+                        );
+                        entries.add(entry);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error processing entry from cursor", e);
+                    }
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting entries for source " + sourceId, e);
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error closing cursor", e);
+                }
+            }
+        }
         return entries;
     }
 } 
