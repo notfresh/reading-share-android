@@ -105,8 +105,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             return false;
         });
 
-        // 加载按日期分组的链接
+        // 加载置顶链接和普通链接
+        List<LinkItem> pinnedLinks = linkDao.getPinnedLinks(); // 需要在 LinkDao 中添加此方法
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
+        
+        // 设置置顶和普通链接到适配器
+        adapter.setPinnedLinks(pinnedLinks); // 需要在 LinksAdapter 中添加此方法
         adapter.setGroupedLinks(groupedLinks);
 
         // 设置搜索框
@@ -264,5 +268,15 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 "分享失败：" + e.getMessage(), 
                 Snackbar.LENGTH_LONG).show();
         }
+    }
+
+    @Override
+    public void onTogglePin(LinkItem item) {
+        linkDao.togglePinStatus(item.getId());
+        // 刷新列表
+        List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
+        Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
+        adapter.setPinnedLinks(pinnedLinks);
+        adapter.setGroupedLinks(groupedLinks);
     }
 }

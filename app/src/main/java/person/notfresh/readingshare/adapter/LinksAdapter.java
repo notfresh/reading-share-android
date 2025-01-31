@@ -17,6 +17,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.PopupMenu;
 import android.widget.Toast;
+import android.view.Menu;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -444,6 +445,26 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
     }
 
+    private static void handleWereadLink(String url) {
+        try{
+//            url = "weread://reader?bookId=32d32c30813ab96d9g011e41";
+//
+//            url = "https://weread.qq.com/book-detail?type=1&senderVid=2852293&v=32d32c30813ab96d9g011e41&wtheme=white&wfrom=app&wvid=2852293&scene=bottomSheetShare";
+//            url = "weread://reader?bookId=32d32c30813ab96d9g011e41";
+//            url = "https://weread.qq.com/book-detail?v=1e932960813ab7d48g0115ff"; //无用
+//            url = "weread://share?bookId=1e932960813ab7d48g0115ff";
+//            url = "weread://reader?bookId=1e932960813ab7d48g0115ff&type=1&senderVid=2852293&wtheme=white&wfrom=app&wvid=2852293&scene=bottomSheetShare";
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+//            intent.setPackage("com.tencent.weread"); // 微信读书的包名
+            context.startActivity(intent);
+        }catch (Exception e){
+            //如果没有安装 对应的应用，用默认浏览器打开
+            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            context.startActivity(browserIntent);
+            Log.d("WereadLink", "Weread app is not installed, opening with browser.");
+        }
+    }
+
     private String getItemUrl(int position) {
         if (items.get(position) instanceof LinkItem) {
             return ((LinkItem) items.get(position)).getUrl();
@@ -515,7 +536,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
                         if (url.contains("b23.tv")) {
-                            handleBilibiliLink(url);
+                            handleBilibiliLink(url); //@Def Line408
+                        }else if (url.contains("weread.qq.com")) {
+                            handleWereadLink(url);
                         }else{
                             // 其他应用使用通用处理方式
                             intent.setData(Uri.parse(url));

@@ -6,6 +6,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.content.Intent;
 import android.net.Uri;
+
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +58,8 @@ import java.net.URLConnection;
 import android.content.SharedPreferences;
 import androidx.core.view.GravityCompat;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
+import person.notfresh.readingshare.util.CrawlUtil;
+
 import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
@@ -143,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
         
         if (hasFocus) {
             // 当窗口真正获得焦点时检查剪贴板
-            checkClipboard();
+            checkClipboard(); //@Def Line300
         }
     }
 
@@ -325,7 +329,7 @@ public class MainActivity extends AppCompatActivity {
                     String savedText = prefs.getString("last_clipboard_text", "");
                     if (!clipTextSequence.toString().equals(savedText)) {
                         lastClipboardText = clipTextSequence.toString();
-                        handleClipboardText(lastClipboardText);
+                        handleClipboardText(lastClipboardText); //@Def Line376
                     }
                     prefs.edit().putString("last_clipboard_text", clipTextSequence.toString()).apply();
 
@@ -475,41 +479,20 @@ public class MainActivity extends AppCompatActivity {
         fetchTitleFromUrl(url, titleInput);
     }
 
+
+
     private void fetchTitleFromUrl(String url, EditText titleInput) {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Handler handler = new Handler(Looper.getMainLooper());
 
         executor.execute(() -> {
+            
             String title = "";
             try {
-                URL urlObj = new URL(url);
-                URLConnection conn = urlObj.openConnection();
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
-                conn.setRequestProperty("User-Agent", 
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-
-                BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)
-                );
-                
-                StringBuilder html = new StringBuilder();
-                String line;
-                int linesRead = 0;
-                while ((line = reader.readLine()) != null && linesRead < 100) {
-                    html.append(line);
-                    linesRead++;
-                }
-                reader.close();
-
-                Pattern pattern = Pattern.compile("<title>(.*?)</title>", Pattern.CASE_INSENSITIVE);
-                Matcher matcher = pattern.matcher(html.toString());
-                if (matcher.find()) {
-                    title = matcher.group(1).trim();
-                    // 如果标题超过20个字符，截取前20个字符并添加省略号
-                    if (title.length() > 20) {
-                        title = title.substring(0, 20) + "...";
-                    }
+                if (url.contains("weixin.qq.com")) {
+                    title = fetchTitleFromWeixin(url, titleInput);
+                } else {
+                    title = fetchTitleCommon(url, titleInput);
                 }
             } catch (Exception e) {
                 Log.e("FetchTitle", "Error fetching title", e);
@@ -522,6 +505,44 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         });
+    }
+    private String fetchTitleFromWeixin(String url, EditText titleInput) throws IOException {
+        String title = CrawlUtil.getWeixinArticleTitle(url);
+        return title;
+    }
+
+    private String fetchTitleCommon(String url, EditText titleInput) throws IOException {
+        String title = "";
+        URL urlObj = new URL(url);
+        URLConnection conn = urlObj.openConnection();
+        conn.setConnectTimeout(3000);
+        conn.setReadTimeout(3000);
+        conn.setRequestProperty("User-Agent", 
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+
+        BufferedReader reader = new BufferedReader(
+            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)
+        );
+        
+        StringBuilder html = new StringBuilder();
+        String line;
+        int linesRead = 0;
+        while ((line = reader.readLine()) != null && linesRead < 100) {
+            html.append(line);
+            linesRead++;
+        }
+        reader.close();
+
+        Pattern pattern = Pattern.compile("<title>(.*?)</title>", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(html.toString());
+        if (matcher.find()) {
+            title = matcher.group(1).trim();
+            // 如果标题超过20个字符，截取前20个字符并添加省略号
+            if (title.length() > 20) {
+                title = title.substring(0, 20) + "...";
+            }
+        }
+        return title;
     }
 
 

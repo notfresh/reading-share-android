@@ -11,7 +11,7 @@ android {
         minSdk 26
         targetSdk 34
         versionCode 1
-        versionName "1.4.1"
+        versionName "1.4.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -41,6 +41,7 @@ dependencies {
     implementation 'androidx.navigation:navigation-ui:2.7.5'
     implementation 'com.google.android.flexbox:flexbox:3.0.0'
     implementation 'com.rometools:rome:1.18.0'
+    implementation 'org.jsoup:jsoup:1.15.3'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
