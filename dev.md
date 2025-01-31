@@ -722,4 +722,26 @@ public class LinkDbHelper extends SQLiteOpenHelper {
 
 ```
 
+# 华为商店
+
+这条命令是在使用Java运行一个名为`pepk.jar`的工具，并传递了一系列参数用于处理密钥和证书。具体来说：
+
+- `java -jar pepk.jar`：使用Java运行环境执行`pepk.jar`这个JAR（Java ARchive）文件。
+- `--keystore sign.jks`：指定使用的密钥库文件为`sign.jks`，这是一个存储了加密密钥和证书的文件。
+- `--alias sign`：在密钥库中，用来标识特定密钥对的别名是`sign`。
+- `--output=sign.zip`：指定输出结果保存到`sign.zip`文件中，这通常包含了加密后的数据或签名。
+- `--encryptionkey=0342...C3C02`：提供了一个加密密钥，用于加密过程中。这里展示的是一个很长的十六进制字符串，实际应用中应保持秘密。
+- `--include-cert`：指示工具在生成的输出文件中包含证书信息。
+
+`pepk.jar`工具可能是Google Play使用的“Play Encrypt Private Key”工具，用于将应用程序的私钥安全地上传至Google Play开发者控制台。该过程涉及加密您的私钥并打包相关的证书，以便于安全传输和验证应用程序的身份。
+
+
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+# jar 
+
+java -jar pepk.jar --keystore sign.jks --alias key0 --output=sign.zip --encryptionkey=034200041E224EE22B45D19B23DB91BA9F52DE0A06513E03A5821409B34976FDEED6E0A47DBA48CC249DD93734A6C5D9A0F43461F9E140F278A5D2860846C2CF5D2C3C02 --include-cert
+
+
+
 # @END

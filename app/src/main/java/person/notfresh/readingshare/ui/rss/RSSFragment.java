@@ -1,5 +1,10 @@
 package person.notfresh.readingshare.ui.rss;
 
+import static android.content.Context.CLIPBOARD_SERVICE;
+import static androidx.core.content.ContextCompat.getSystemService;
+
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -43,6 +48,7 @@ import java.util.Date;
 import java.util.Locale;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import android.app.AlertDialog;
+import android.content.ComponentName;
 
 public class RSSFragment extends Fragment {
 
@@ -116,7 +122,32 @@ public class RSSFragment extends Fragment {
             });
 
             loadMoreButton = view.findViewById(R.id.load_more_button);
-            loadMoreButton.setOnClickListener(v -> loadMoreEntries());
+            loadMoreButton.setOnClickListener(v -> {
+                loadMoreButton.setEnabled(false); // 防止重复点击
+                loadMoreEntries(); // 不再传递 ID 参数
+            });
+
+            // 初始隐藏加载更多按钮
+            loadMoreButton.setVisibility(View.GONE);
+
+            // 设置RecyclerView滚动监听
+            rssRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+                @Override
+                public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                    super.onScrolled(recyclerView, dx, dy);
+                    
+                    LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                    int visibleItemCount = layoutManager.getChildCount();
+                    int totalItemCount = layoutManager.getItemCount();
+                    int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
+
+                    // 当滚动到最后几项时显示加载更多按钮
+                    if (hasMoreData && !isLoading && 
+                        (visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 3) {
+                        loadMoreButton.setVisibility(View.VISIBLE);
+                    }
+                }
+            });
 
             return view;
         } catch (Exception e) {
@@ -141,6 +172,9 @@ public class RSSFragment extends Fragment {
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == R.id.action_add_rss) {
             showAddRssDialog();
+            return true;
+        } else if (item.getItemId() == R.id.action_share_sources) {
+            shareRssSources();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -302,6 +336,8 @@ public class RSSFragment extends Fragment {
                 String url = urlInput.getText().toString().trim();
                 if (!url.isEmpty()) {
                     fetchRssFeed(url);
+                    // ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    // clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
                 }
             })
             .setNegativeButton("取消", null)
@@ -390,7 +426,7 @@ public class RSSFragment extends Fragment {
 
                 // 更新UI显示
                 rssEntries.clear();
-                rssEntries.addAll(entries);
+                rssEntries.addAll(entries.subList(0, PAGE_SIZE));
 
                 // 更新源列表
                 List<RssSource> updatedSources = rssDao.getAllSources();
@@ -416,5 +452,33 @@ public class RSSFragment extends Fragment {
                 });
             }
         }).start();
+    }
+
+    private void shareRssSources() {
+        List<RssSource> sources = rssDao.getAllSources();
+        if (sources.isEmpty()) {
+            Toast.makeText(requireContext(), "没有RSS源可分享", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StringBuilder shareText = new StringBuilder("RSS源列表：\n\n");
+        for (RssSource source : sources) {
+            shareText.append(source.getName())
+                    .append("\n")
+                    .append(source.getUrl())
+                    .append("\n\n");
+        }
+
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
+        
+        // 创建选择器并排除自己的应用
+        Intent chooserIntent = Intent.createChooser(shareIntent, "分享RSS源");
+        String myPackageName = requireContext().getPackageName();
+        chooserIntent.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, 
+            new ComponentName[]{new ComponentName(myPackageName, myPackageName + ".MainActivity")});
+        
+        startActivity(chooserIntent);
     }
 } 

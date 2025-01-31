@@ -6,4 +6,10 @@
         android:icon="@drawable/ic_add"
         android:title="添加RSS源"
         app:showAsAction="always"/>
+    
+    <item
+        android:id="@+id/action_share_sources"
+        android:icon="@drawable/ic_share"
+        android:title="分享RSS源"
+        app:showAsAction="ifRoom"/>
 </menu> 

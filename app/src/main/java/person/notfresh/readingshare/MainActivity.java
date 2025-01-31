@@ -79,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
 
         setSupportActionBar(binding.appBarMain.toolbar);
         
-        handleIntent(getIntent());
+        handleIntent(getIntent()); //@Def Line 160
 
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
@@ -136,10 +136,11 @@ public class MainActivity extends AppCompatActivity {
         handleIntent(intent);
     }
 
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
+    @Override 
+    public void onWindowFocusChanged(boolean hasFocus) { //@mark
         super.onWindowFocusChanged(hasFocus);
         this.hasFocus = hasFocus;
+        
         if (hasFocus) {
             // 当窗口真正获得焦点时检查剪贴板
             checkClipboard();
@@ -309,25 +310,25 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     Log.d("Clipboard", "Checking clipboard...");
                     ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    Log.d("Clipboard", "Clipboard manager: " + (clipboard != null));
-
-                    if (clipboard != null && clipboard.hasPrimaryClip()) {
-                        ClipData clipData = clipboard.getPrimaryClip();
-                        if (clipData != null && clipData.getItemCount() > 0) {
-                            ClipData.Item item = clipData.getItemAt(0);
-                            CharSequence text = item.getText();
-
-                            SharedPreferences prefs = getSharedPreferences("clipboard_prefs", MODE_PRIVATE);
-                            String savedClipboardText = prefs.getString("last_clipboard_text", "");
-
-                            if (text != null && !text.equals(savedClipboardText)) {
-                                lastClipboardText = text.toString();
-                                // 保存到 SharedPreferences
-                                prefs.edit().putString("last_clipboard_text", lastClipboardText).apply();
-                                handleClipboardText(text.toString());
-                            }
-                        }
+                    if (clipboard == null || !clipboard.hasPrimaryClip()) {
+                        return;
                     }
+                    ClipData clipData = clipboard.getPrimaryClip();
+                    if (clipData == null || clipData.getItemCount() == 0) {
+                        return;
+                    }
+                    CharSequence clipTextSequence = clipData.getItemAt(0).getText();
+                    if (clipTextSequence == null) {
+                        return;
+                    }
+                    SharedPreferences prefs = getSharedPreferences("clipboard_prefs", MODE_PRIVATE);
+                    String savedText = prefs.getString("last_clipboard_text", "");
+                    if (!clipTextSequence.toString().equals(savedText)) {
+                        lastClipboardText = clipTextSequence.toString();
+                        handleClipboardText(lastClipboardText);
+                    }
+                    prefs.edit().putString("last_clipboard_text", clipTextSequence.toString()).apply();
+
                 } catch (Exception e) {
                     Log.e("Clipboard", "Error checking clipboard", e);
                     e.printStackTrace();
@@ -443,8 +444,8 @@ public class MainActivity extends AppCompatActivity {
                         linkDao.insertLink(newLink);
                         
                         // 清除剪贴板
-                        // ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                        // clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+                        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
 
                         Snackbar.make(binding.getRoot(), "已保存：" + title, 
                                 Snackbar.LENGTH_LONG).show();
