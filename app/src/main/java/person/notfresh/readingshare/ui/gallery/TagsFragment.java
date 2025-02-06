@@ -448,6 +448,11 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
+    @Override
+    public void onPinStatusChanged() {
+
+    }
+
     private void toggleSelectionMode() {
         isSelectionMode = !isSelectionMode;
         linksAdapter.toggleSelectionMode();

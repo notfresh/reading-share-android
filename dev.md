@@ -714,6 +714,34 @@ public class LinkDbHelper extends SQLiteOpenHelper {
 • onCreate(...) 在数据库第一次创建时调用，用于建表及初始化数据。
 • 不要随意删除数据库文件，以免导致用户数据丢失。如确需清空部分数据，可精细化编写数据清理逻辑，以保障升级的安全性和连贯性。
 
+## 版本号管理
+
+在 Android SQLite 数据库中，`DATABASE_VERSION` 是一个非常重要的常量，用于管理数据库的版本控制。让我为您详细解释：
+
+1. 作用：
+
+   - 这个常量用来标识数据库的版本号
+   - 当你需要修改数据库结构（比如添加新表、添加新列等）时，需要增加这个版本号
+2. 工作机制：
+
+   - 当应用首次安装时，Android 会调用 `onCreate()` 方法创建数据库
+   - 当应用更新且 `DATABASE_VERSION` 增加时，Android 会自动调用 `onUpgrade()` 方法
+   - 在这个文件中，当前数据库版本是 3，说明这个数据库已经经过了两次更新
+3. 实际应用：
+
+   ```java:app/src/main/java/person/notfresh/readingshare/db/LinkDbHelper.java
+   // 从版本 1 升级到版本 2 可能添加了新的表
+   // 从版本 2 升级到版本 3 可能又进行了其他修改
+   private static final int DATABASE_VERSION = 3;
+   ```
+4. 注意事项：
+
+   - 版本号只能增加，不能减少
+   - 每次修改数据库结构时都应该增加版本号
+   - 需要在 `onUpgrade()` 方法中正确处理版本升级逻辑，确保用户数据不会丢失
+
+在您的代码中，当数据库版本从旧版本升级到版本 3 时，会执行 `onUpgrade()` 方法，重新创建所有的表结构。
+
 ## 数据库版本号
 
 ```
@@ -741,5 +769,40 @@ public class LinkDbHelper extends SQLiteOpenHelper {
 # jar
 
 java -jar pepk.jar --keystore sign.jks --alias key0 --output=sign.zip --encryptionkey=034200041E224EE22B45D19B23DB91BA9F52DE0A06513E03A5821409B34976FDEED6E0A47DBA48CC249DD93734A6C5D9A0F43461F9E140F278A5D2860846C2CF5D2C3C02 --include-cert
+
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+# RSS源
+
+RSS源列表：
+
+Decohack
+https://www.decohack.com/feed
+
+Decohack
+https://www.decohack.com/feed
+
+让小产品的独立变现更简单 - ezindie.com
+https://www.ezindie.com/feed/rss.xml
+
+Apptisan
+https://quail.ink/apptisan/feed/atom
+
+后互联网时代的乱弹
+https://proxy.wavpub.com/pie.xml
+
+DEX 周刊
+https://quail.ink/dingyi/feed/atom
+
+Hacker News: Newest
+https://hnrss.org/newest
+
+目前没有RSS源
+https://www.cnblogs.com/tuyile006/p/3691024.html
+
+
+
+# Intent
+
 
 # @END

@@ -14,6 +14,7 @@ public class LinkItem {
     private String originalIntent;
     private String targetActivity;
     private List<String> tags;
+    private boolean isPinned;
 
     public LinkItem(String title, String url, String sourceApp, String originalIntent, String targetActivity) {
         this.title = title;
@@ -97,6 +98,14 @@ public class LinkItem {
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public boolean isPinned() {
+        return isPinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        isPinned = pinned;
     }
 
     @Override

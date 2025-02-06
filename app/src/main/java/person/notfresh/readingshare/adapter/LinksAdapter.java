@@ -36,6 +36,7 @@ import java.util.Locale;
 import java.io.File;
 import java.util.Arrays;
 import android.content.ComponentName;
+import java.util.stream.Collectors;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.model.LinkItem;
@@ -48,6 +49,7 @@ import java.io.IOException;
 import person.notfresh.readingshare.util.AppUtils;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+    private static final int TYPE_PINNED_HEADER = -1;
     private static final int TYPE_DATE_HEADER = 0;
     private static final int TYPE_LINK_ITEM = 1;
     
@@ -59,6 +61,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private Set<LinkItem> selectedItems = new HashSet<>();
     private boolean isSelectionMode = false;
     private List<LinkItem> links = new ArrayList<>();
+    private List<LinkItem> pinnedLinks = new ArrayList<>();
 
     public interface OnLinkActionListener {
         void onDeleteLink(LinkItem link);
@@ -66,6 +69,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         void addTagToLink(LinkItem item, String tag);
         void updateLinkTags(LinkItem item);
         void onEnterSelectionMode();  // 添加新的回调方法
+        void onPinStatusChanged();
     }
 
     public LinksAdapter(Context context) {
@@ -102,9 +106,16 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         if (holder instanceof DateHeaderViewHolder) {
             ((DateHeaderViewHolder) holder).bind((String) items.get(position));
         } else if (holder instanceof LinkViewHolder) {
-            ((LinkViewHolder) holder).bind((LinkItem) items.get(position));
+            LinkItem item = (LinkItem) items.get(position);
+            ((LinkViewHolder) holder).bind(item);
+            
+            // 设置不同的背景色
+            if (item.isPinned()) {
+                holder.itemView.setBackgroundResource(R.drawable.pinned_item_background);
+            } else {
+                holder.itemView.setBackgroundResource(R.drawable.normal_background);
+            }
         }
-
     }
 
     @Override
@@ -116,14 +127,28 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         items.clear();
         originalItems.clear();
         
+        // 首先添加置顶链接区域
+        if (!pinnedLinks.isEmpty()) {
+            items.add("置顶");  // 添加置顶区域的标题
+            items.addAll(pinnedLinks);
+        }
+        
+        // 然后添加按日期分组的普通链接
         for (Map.Entry<String, List<LinkItem>> entry : groupedLinks.entrySet()) {
             items.add(entry.getKey());
-            items.addAll(entry.getValue());
+            // 过滤掉已经在置顶区域显示的链接
+            List<LinkItem> normalLinks = entry.getValue().stream()
+                    .filter(link -> !pinnedLinks.contains(link))
+                    .collect(Collectors.toList());
+            items.addAll(normalLinks);
         }
         
         // 保存原始数据
         originalItems.addAll(items);
         notifyDataSetChanged();
+        
+        Log.d("LinksAdapter", "设置数据: 置顶链接数=" + pinnedLinks.size() + 
+                ", 总项目数=" + items.size());
     }
 
     public void addTagToLink(LinkItem item, String tagName) {
@@ -163,7 +188,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         popup.getMenu().add(0, 1, 0, "编辑标题");
         popup.getMenu().add(0, 2, 0, "删除");
         popup.getMenu().add(0, 3, 0, "分享单条");
-        popup.getMenu().add(0, 4, 0, "多选模式");
+        popup.getMenu().add(0, 4, 0, "切换置顶");
+        popup.getMenu().add(0, 5, 0, "多选模式");
         
         popup.setOnMenuItemClickListener(menuItem -> {
             switch (menuItem.getItemId()) {
@@ -179,16 +205,30 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     shareAsText(item);
                     return true;
                 case 4:
+                    Log.d("LinksAdapter", "切换置顶被点击, linkId: " + item.getId() + ", 当前置顶状态: " + item.isPinned());
+                    linkDao.togglePinStatus(item.getId());
+                    // 通知 Fragment 刷新数据
+                    if (listener != null) {
+                        Log.d("LinksAdapter", "调用 onPinStatusChanged");
+                        listener.onPinStatusChanged();
+                    }
+                    return true;
+                case 5:
                     // 进入多选模式并选中当前项
+                    Log.d("LinksAdapter", "进入多选模式");
                     if (listener != null) {
                         listener.onEnterSelectionMode();
+                        // Log.d("LinksAdapter", "添加当前项到选中集合: " + item.getTitle());
+                        //selectedItems.add(item);
+                        Log.d("LinksAdapter", "刷新位置: " + position);
+                        //notifyItemChanged(position);
                     }
-                    toggleItemSelection(item);
                     return true;
                 default:
                     return false;
             }
         });
+        
         popup.show();
     }
 
@@ -221,7 +261,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     public void toggleSelectionMode() {
         Log.d("LinksAdapter", "Toggling selection mode. Current: " + isSelectionMode);  // 添加日志
-        isSelectionMode = !isSelectionMode;
+        isSelectionMode = !isSelectionMode; //@mark.4
         if (!isSelectionMode) {
             selectedItems.clear();
         }
@@ -229,7 +269,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         Log.d("LinksAdapter", "Selection mode toggled to: " + isSelectionMode);  // 添加日志
     }
 
-    public void toggleItemSelection(LinkItem item) {
+    public void toggleItemSelection(LinkItem item) { //@mark.5
         if (selectedItems.contains(item)) {
             selectedItems.remove(item);
         } else {
@@ -472,7 +512,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return null;
     }
 
-    static class LinkViewHolder extends RecyclerView.ViewHolder {
+    static class LinkViewHolder extends RecyclerView.ViewHolder { //@mark.6
         TextView titleText;
         TextView urlText;
         FlexboxLayout tagContainer;
@@ -490,13 +530,10 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
         void bind(LinkItem item) {
             titleText.setText(item.getTitle());
-            
-            // 处理 URL 显示
-            String displayUrl = formatUrlForDisplay(item.getUrl());
-            urlText.setText(displayUrl);
-            
-            // 显示标签
+            urlText.setText(formatUrlForDisplay(item.getUrl()));
             tagContainer.removeAllViews();
+            
+            // 添加标签
             for (String tag : item.getTags()) {
                 addTagView(tag, item);
             }
@@ -505,25 +542,35 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             addTagButton.setOnClickListener(v -> showAddTagDialog(v.getContext(), item));
 
             // 添加选择模式的视觉反馈
-            if (adapter.isSelectionMode) {
+            if (adapter.isSelectionMode) {  //@mark.1
                 itemView.setBackgroundResource(
                     adapter.selectedItems.contains(item) ? 
                     R.drawable.selected_background : 
                     R.drawable.normal_background
                 );
                 
-                // 在选择模式下，点击切换选中状态
+                // 在选择模式下的点击处理
                 itemView.setOnClickListener(v -> {
-                    adapter.toggleItemSelection(item);
-                    // 更新视觉效果
-                    itemView.setBackgroundResource(
-                        adapter.selectedItems.contains(item) ? 
-                        R.drawable.selected_background : 
-                        R.drawable.normal_background
-                    );
+                    Log.d("LinkViewHolder", "项目被点击");
+                    if (adapter.selectedItems.contains(item)) {
+                        Log.d("LinkViewHolder", "移除选中项目");
+                        adapter.selectedItems.remove(item);
+                        itemView.setBackgroundResource(R.drawable.normal_background);
+                    } else {
+                        Log.d("LinkViewHolder", "添加选中项目");
+                        adapter.selectedItems.add(item);
+                        itemView.setBackgroundResource(R.drawable.selected_background);
+                    }
                 });
+                
             } else {
-                itemView.setBackgroundResource(R.drawable.normal_background);
+                // 正常模式下的背景
+                if (item.isPinned()) {
+                    itemView.setBackgroundResource(R.drawable.pinned_item_background);
+                } else {
+                    //itemView.setBackgroundResource(android.R.color.transparent);
+                }
+                
                 // 正常模式下的点击和长按处理
                 itemView.setOnClickListener(v -> {
                     try {
@@ -655,5 +702,10 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         void bind(String date) {
             dateText.setText(date);
         }
+    }
+
+    public void setPinnedLinks(List<LinkItem> pinnedLinks) {
+        this.pinnedLinks = pinnedLinks;
+        notifyDataSetChanged();
     }
 } 

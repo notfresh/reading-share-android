@@ -338,4 +338,62 @@ public class LinkDao {
         }
         return sb.toString();
     }
+
+    public void togglePinStatus(long linkId) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        Log.d("LinkDao", "开始切换置顶状态, linkId: " + linkId);
+        
+        Cursor cursor = db.query(LinkDbHelper.TABLE_LINKS, new String[]{"is_pinned"}, 
+                "_id = ?", new String[]{String.valueOf(linkId)}, null, null, null);
+        
+        int currentStatus = 0;
+        if (cursor.moveToFirst()) {
+            currentStatus = cursor.getInt(0);
+            Log.d("LinkDao", "当前置顶状态: " + currentStatus);
+        }
+        cursor.close();
+        
+        ContentValues values = new ContentValues();
+        values.put("is_pinned", currentStatus == 0 ? 1 : 0);
+        
+        int updatedRows = db.update(LinkDbHelper.TABLE_LINKS, values, "_id = ?", 
+                new String[]{String.valueOf(linkId)});
+        Log.d("LinkDao", "更新结果: " + updatedRows + " 行受影响");
+    }
+
+    public List<LinkItem> getPinnedLinks() {
+        List<LinkItem> pinnedLinks = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        
+        Log.d("LinkDao", "获取置顶链接");
+        Cursor cursor = db.query(LinkDbHelper.TABLE_LINKS, null, "is_pinned = 1", null, 
+                null, null, "timestamp DESC");
+        
+        Log.d("LinkDao", "找到 " + cursor.getCount() + " 个置顶链接");
+        if (cursor.moveToFirst()) {
+            do {
+                LinkItem item = cursorToLinkItem(cursor);
+                pinnedLinks.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        
+        return pinnedLinks;
+    }
+
+    private LinkItem cursorToLinkItem(Cursor cursor) {
+        long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
+        String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
+        String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+        String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
+        String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
+        String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
+        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TIMESTAMP));
+        boolean isPinned = cursor.getInt(cursor.getColumnIndexOrThrow("is_pinned")) == 1;
+
+        LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
+        item.setId(id);
+        item.setPinned(isPinned);
+        return item;
+    }
 } 

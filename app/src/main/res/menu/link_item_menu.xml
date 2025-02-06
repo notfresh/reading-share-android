@@ -1,6 +1,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 其他菜单项保持不变 -->
     <item
         android:id="@+id/action_toggle_pin"
         android:title="置顶" />
-    <!-- ... 其他菜单项保持不变 ... -->
 </menu> 

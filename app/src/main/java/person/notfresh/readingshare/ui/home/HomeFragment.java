@@ -271,11 +271,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     }
 
     @Override
-    public void onTogglePin(LinkItem item) {
-        linkDao.togglePinStatus(item.getId());
-        // 刷新列表
+    public void onPinStatusChanged() {
+        Log.d("HomeFragment", "onPinStatusChanged 被调用");
+        // 重新加载数据
         List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
+        
+        Log.d("HomeFragment", "置顶链接数量: " + pinnedLinks.size());
         adapter.setPinnedLinks(pinnedLinks);
         adapter.setGroupedLinks(groupedLinks);
     }

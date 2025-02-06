@@ -15,6 +15,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.Button;
+import android.app.AlertDialog;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
@@ -30,12 +31,14 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.io.File;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.db.LinkDao;
 import com.google.android.material.snackbar.Snackbar;
+import person.notfresh.readingshare.util.ExportUtil;
 
 public class SlideshowFragment extends Fragment {
 
@@ -82,6 +85,11 @@ public class SlideshowFragment extends Fragment {
         // 添加导入 CSV 按钮
         root.findViewById(R.id.button_import_csv).setOnClickListener(v -> {
             importCsv();  // 直接调用本地的 importCsv 方法
+        });
+
+        // 添加导出按钮的点击事件
+        root.findViewById(R.id.button_export).setOnClickListener(v -> {
+            showExportDialog();
         });
 
         return root;
@@ -191,6 +199,52 @@ public class SlideshowFragment extends Fragment {
             Snackbar.make(requireView(), "CSV 导入成功", Snackbar.LENGTH_LONG).show();
         } catch (Exception e) {
             Snackbar.make(requireView(), "导入失败：" + e.getMessage(), Snackbar.LENGTH_LONG).show();
+        }
+    }
+
+    private void showExportDialog() {
+        String[] items = {"导出为CSV", "导出为JSON"};
+        new AlertDialog.Builder(requireContext())
+            .setTitle("选择导出格式")
+            .setItems(items, (dialog, which) -> {
+                switch (which) {
+                    case 0:
+                        exportToFile(false); // CSV
+                        break;
+                    case 1:
+                        exportToFile(true);  // JSON
+                        break;
+                }
+            })
+            .show();
+    }
+
+    private void exportToFile(boolean isJson) {
+        try {
+            String filePath;
+            if (isJson) {
+                filePath = ExportUtil.exportToJson(requireContext(), linkDao.getAllLinks());
+            } else {
+                filePath = ExportUtil.exportToCsv(requireContext(), linkDao.getAllLinks());
+            }
+            
+            File file = new File(filePath);
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                requireContext(),
+                requireContext().getPackageName() + ".provider",
+                file);
+            
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("*/*");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            startActivity(Intent.createChooser(shareIntent, "分享导出文件"));
+            
+        } catch (Exception e) {
+            Snackbar.make(requireView(), 
+                "导出失败：" + e.getMessage(), 
+                Snackbar.LENGTH_LONG).show();
         }
     }
 }

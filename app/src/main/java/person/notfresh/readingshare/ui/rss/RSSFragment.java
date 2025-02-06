@@ -49,6 +49,7 @@ import java.util.Locale;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import android.app.AlertDialog;
 import android.content.ComponentName;
+import java.io.IOException;
 
 public class RSSFragment extends Fragment {
 
@@ -349,9 +350,10 @@ public class RSSFragment extends Fragment {
             return;
         }
 
-        Log.d("ABC", "fetchRssFeed: Starting to fetch from URL: " + urlString);
+        Log.d("RSSFragment", "fetchRssFeed: Starting to fetch from URL: " + urlString);
         new Thread(() -> {
             try {
+                Log.d("RSSFragment", "开始获取RSS源: " + urlString);
                 URL url = new URL(urlString);
                 // 使用 HttpURLConnection 获取 RSS 内容
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -359,7 +361,15 @@ public class RSSFragment extends Fragment {
                 conn.setConnectTimeout(15000);
                 conn.setRequestMethod("GET");
                 conn.setDoInput(true);
+                
+                Log.d("RSSFragment", "开始连接...");
                 conn.connect();
+                int responseCode = conn.getResponseCode();
+                Log.d("RSSFragment", "HTTP响应码: " + responseCode);
+                
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    throw new IOException("HTTP error code: " + responseCode);
+                }
 
                 InputStream inputStream = conn.getInputStream();
                 // 使用 XML Pull Parser 解析 RSS
@@ -371,11 +381,15 @@ public class RSSFragment extends Fragment {
                 String feedTitle = "";
                 String currentTag = "";
                 RssEntry currentEntry = null;
-
+                
+                Log.d("RSSFragment", "开始解析XML...");
+                
                 int eventType = parser.getEventType();
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     if (eventType == XmlPullParser.START_TAG) {
                         currentTag = parser.getName();
+                        Log.d("RSSFragment", "解析标签: " + currentTag);
+                        
                         if ("item".equals(currentTag) || "entry".equals(currentTag)) {
                             currentEntry = new RssEntry();
                         } else if ("title".equals(currentTag)) {
@@ -403,6 +417,7 @@ public class RSSFragment extends Fragment {
                     } else if (eventType == XmlPullParser.END_TAG) {
                         if ("item".equals(parser.getName()) || "entry".equals(parser.getName())) {
                             if (currentEntry != null) {
+                                Log.d("RSSFragment", "添加条目: " + currentEntry.getTitle());
                                 entries.add(currentEntry);
                                 currentEntry = null;
                             }
@@ -410,7 +425,9 @@ public class RSSFragment extends Fragment {
                     }
                     eventType = parser.next();
                 }
-
+                
+                Log.d("RSSFragment", "解析完成，找到 " + entries.size() + " 个条目");
+                
                 // 保存RSS源
                 RssSource newSource = new RssSource(urlString, feedTitle.isEmpty() ? urlString : feedTitle);
                 long sourceId = rssDao.insertSource(newSource);
@@ -426,7 +443,8 @@ public class RSSFragment extends Fragment {
 
                 // 更新UI显示
                 rssEntries.clear();
-                rssEntries.addAll(entries.subList(0, PAGE_SIZE));
+                int itemsToShow = Math.min(entries.size(), PAGE_SIZE);
+                rssEntries.addAll(entries.subList(0, itemsToShow));
 
                 // 更新源列表
                 List<RssSource> updatedSources = rssDao.getAllSources();
@@ -446,9 +464,11 @@ public class RSSFragment extends Fragment {
                     Toast.makeText(getContext(), "RSS源添加成功!", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
-                Log.e("ABC", "fetchRssFeed: Error fetching feed", e);
+                Log.e("RSSFragment", "RSS源获取失败", e);
                 getActivity().runOnUiThread(() -> {
-                    Toast.makeText(getContext(), "获取RSS源失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), 
+                        "获取RSS源失败: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show();
                 });
             }
         }).start();
