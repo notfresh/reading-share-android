@@ -115,7 +115,10 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.action_close_selection) {
+        if (id == R.id.action_add_tag) {
+            showAddTagDialog();
+            return true;
+        } else if (id == R.id.action_close_selection) {
             toggleSelectionMode();
             return true;
         } else if (id == R.id.action_select_all) {
