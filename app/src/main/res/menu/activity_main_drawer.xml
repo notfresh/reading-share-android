@@ -7,19 +7,22 @@
         <item
             android:id="@+id/nav_home"
             android:icon="@drawable/ic_home"
-            android:title="@string/menu_home" />
+            android:title="@string/menu_home"
+            android:textAppearance="@style/NavigationDrawerText"/>
         <item
             android:id="@+id/nav_tags"
             android:icon="@drawable/ic_menu_gallery"
-            android:title="@string/menu_gallery" />
+            android:title="@string/menu_gallery" 
+            android:textAppearance="@style/NavigationDrawerText"/>
         <item
             android:id="@+id/nav_rss"
             android:icon="@drawable/rss"
-            android:title="@string/menu_rss" />
+            android:title="@string/menu_rss" 
+            android:textAppearance="@style/NavigationDrawerText"/>
         <item
             android:id="@+id/nav_slideshow"
             android:icon="@drawable/ic_settings"
-            android:title="@string/menu_slideshow" />
-        
+            android:title="@string/menu_slideshow"
+            android:textAppearance="@style/NavigationDrawerText"/>
     </group>
 </menu>

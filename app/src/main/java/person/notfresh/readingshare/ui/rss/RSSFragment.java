@@ -138,14 +138,21 @@ public class RSSFragment extends Fragment {
                     super.onScrolled(recyclerView, dx, dy);
                     
                     LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
-                    int visibleItemCount = layoutManager.getChildCount();
+                    int lastVisibleItemPosition = layoutManager.findLastVisibleItemPosition();
                     int totalItemCount = layoutManager.getItemCount();
-                    int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
 
-                    // 当滚动到最后几项时显示加载更多按钮
-                    if (hasMoreData && !isLoading && 
-                        (visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 3) {
+                    // 只有在以下条件都满足时才显示加载更多按钮：
+                    // 1. 有更多数据可加载
+                    // 2. 当前不在加载中
+                    // 3. 最后一个可见项是列表中的最后一项
+                    // 4. 当前有足够的数据
+                    if (hasMoreData 
+                        && !isLoading 
+                        && lastVisibleItemPosition == totalItemCount - 1  // 滑到了最后一项
+                        && totalItemCount >= PAGE_SIZE) {
                         loadMoreButton.setVisibility(View.VISIBLE);
+                    } else {
+                        loadMoreButton.setVisibility(View.GONE);
                     }
                 }
             });
@@ -232,19 +239,64 @@ public class RSSFragment extends Fragment {
         if (source == null) return;
         
         try {
-            // 重置分页状态
+            // 重置状态
             currentPage = 0;
+            isLoading = true;
             hasMoreData = true;
-            rssEntries.clear();
-            rssAdapter.notifyDataSetChanged();
-            loadMoreButton.setVisibility(View.GONE); // 重置时隐藏按钮
+            loadMoreButton.setVisibility(View.GONE);
             
-            loadMoreEntries();
+            // 获取第一页数据
+            new Thread(() -> {
+                try {
+                    List<RssEntry> entries = rssDao.getEntriesForSource(
+                        source.getId(), 
+                        0,  // 从第一条开始
+                        PAGE_SIZE
+                    );
+
+                    if (entries.size() < PAGE_SIZE) {
+                        hasMoreData = false;
+                    }
+
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            rssEntries.clear();
+                            rssEntries.addAll(entries);
+                            rssAdapter.notifyDataSetChanged();
+                            isLoading = false;
+                            loadMoreButton.setEnabled(true);
+                            
+                            // 如果没有数据，显示提示
+                            if (entries.isEmpty()) {
+                                Toast.makeText(getContext(), 
+                                    "没有找到RSS内容", 
+                                    Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "loadEntriesForSource: Error", e);
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            Toast.makeText(getContext(), 
+                                "加载RSS内容失败: " + e.getMessage(), 
+                                Toast.LENGTH_SHORT).show();
+                            isLoading = false;
+                            loadMoreButton.setEnabled(true);
+                        });
+                    }
+                }
+            }).start();
+
         } catch (Exception e) {
-            Log.e(TAG, "loadEntriesForSource: Error loading entries", e);
+            Log.e(TAG, "loadEntriesForSource: Error", e);
+            isLoading = false;
+            loadMoreButton.setEnabled(true);
             if (getActivity() != null) {
                 getActivity().runOnUiThread(() -> 
-                    Toast.makeText(getContext(), "加载RSS内容失败", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(getContext(), 
+                        "加载失败: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show()
                 );
             }
         }
@@ -252,13 +304,9 @@ public class RSSFragment extends Fragment {
 
     private void loadMoreEntries() {
         if (isLoading || !hasMoreData) return;
-        if (sourceSpinner == null || sourceSpinner.getSelectedItemPosition() < 0 || 
-            rssSources == null || rssSources.isEmpty()) {
-            return;
-        }
-
+        
         isLoading = true;
-        loadMoreButton.setEnabled(false); // 禁用按钮防止重复点击
+        loadMoreButton.setVisibility(View.GONE);  // 加载时隐藏按钮
         
         try {
             RssSource currentSource = rssSources.get(sourceSpinner.getSelectedItemPosition());
