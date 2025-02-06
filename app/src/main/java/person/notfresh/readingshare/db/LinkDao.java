@@ -396,4 +396,20 @@ public class LinkDao {
         item.setPinned(isPinned);
         return item;
     }
+
+    public void deleteTag(String tag) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            // 从链接-标签关系表中删除该标签的所有关联
+            db.delete(
+                LinkDbHelper.TABLE_LINK_TAGS,
+                LinkDbHelper.COLUMN_TAG + " = ?",  // 使用正确的列名
+                new String[]{tag}
+            );
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
 } 

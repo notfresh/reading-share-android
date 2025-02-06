@@ -42,6 +42,13 @@ import java.util.TreeMap;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.io.File;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
     private static final String PREF_NAME = "TagsPreferences";
@@ -189,15 +196,172 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 添加其他标签
         for (String tag : tags) {
             Log.d("TagsFragment", "Adding tag: " + tag);
-            TextView tagView = (TextView) getLayoutInflater()
-                    .inflate(R.layout.item_tag, tagsContainer, false);
-            tagView.setText(tag);
-            tagView.setBackgroundResource(R.drawable.tag_background_normal);
-            tagView.setOnClickListener(v -> {
-                updateTagSelection(tagView);
-            });
-            tagView.setTag(tag);
-            tagsContainer.addView(tagView);
+            addTagView(tag, selectedTags.contains(noTagView));
+        }
+    }
+
+    private void addTagView(String tag, boolean isSelected) {
+        TextView tagView = (TextView) getLayoutInflater().inflate(R.layout.item_tag, tagsContainer, false);
+        tagView.setText(tag);
+        tagView.setBackgroundResource(isSelected ? R.drawable.tag_background_selected : R.drawable.tag_background_normal);
+        tagView.setTag(tag);  // 设置tag属性
+        
+        // 点击处理
+        tagView.setOnClickListener(v -> handleTagClick(tag, tagView));
+        
+        // 添加长按处理
+        tagView.setOnLongClickListener(v -> {
+            showTagOptionsDialog(tag);
+            return true;
+        });
+        
+        tagsContainer.addView(tagView);
+    }
+
+    private void showTagOptionsDialog(String tag) {
+        String[] options = {"删除标签", "发布到网站"};
+        
+        new AlertDialog.Builder(requireContext())
+            .setTitle("标签操作")
+            .setItems(options, (dialog, which) -> {
+                switch (which) {
+                    case 0: // 删除标签
+                        confirmDeleteTag(tag);
+                        break;
+                    case 1: // 发布到网站
+                        publishTagContent(tag);
+                        break;
+                }
+            })
+            .show();
+    }
+
+    private void confirmDeleteTag(String tag) {
+        try {
+            new AlertDialog.Builder(requireContext())
+                .setTitle("确认删除")
+                .setMessage("确定要删除标签 \"" + tag + "\" 吗？")
+                .setPositiveButton("删除", (dialog, which) -> {
+                    try {
+                        Log.d("TagsFragment", "开始删除标签: " + tag);
+                        
+                        // 从数据库中删除标签
+                        linkDao.deleteTag(tag);
+                        Log.d("TagsFragment", "标签已从数据库删除");
+                        
+                        // 从当前选中的标签集合中移除
+                        for (TextView tagView : new HashSet<>(selectedTags)) {
+                            if (tag.equals(tagView.getTag())) {
+                                selectedTags.remove(tagView);
+                                break;
+                            }
+                        }
+                        Log.d("TagsFragment", "标签已从选中集合移除");
+                        
+                        // 重新加载标签
+                        loadTags();
+                        Log.d("TagsFragment", "标签列表已重新加载");
+                        
+                        // 更新链接列表
+                        List<LinkItem> allLinks = linkDao.getAllLinks();
+                        linksAdapter.setLinks(allLinks);
+                        linksAdapter.notifyDataSetChanged();
+                        Log.d("TagsFragment", "链接列表已更新");
+                        
+                        // 显示成功提示
+                        Toast.makeText(requireContext(), 
+                            "标签已删除", 
+                            Toast.LENGTH_SHORT).show();
+                        
+                    } catch (Exception e) {
+                        Log.e("TagsFragment", "删除标签时出错", e);
+                        Toast.makeText(requireContext(), 
+                            "删除标签失败: " + e.getMessage(), 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+        } catch (Exception e) {
+            Log.e("TagsFragment", "显示确认对话框时出错", e);
+            Toast.makeText(requireContext(), 
+                "操作失败: " + e.getMessage(), 
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void publishTagContent(String tag) {
+        // 获取该标签下的所有链接
+        Set<String> tagSet = new HashSet<>();
+        tagSet.add(tag);
+        List<LinkItem> links = linkDao.getLinksByTags(tagSet);
+        
+        if (links.isEmpty()) {
+            Toast.makeText(requireContext(), "该标签下没有链接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 构建要发布的数据
+        JSONObject postData = new JSONObject();
+        try {
+            SharedPreferences prefs = requireActivity().getPreferences(Context.MODE_PRIVATE);
+            String username = prefs.getString("username", "anonymous");
+            
+            postData.put("username", username);
+            
+            JSONArray linksArray = new JSONArray();
+            for (LinkItem link : links) {
+                JSONObject linkObj = new JSONObject();
+                linkObj.put("title", link.getTitle());
+                linkObj.put("url", link.getUrl());
+                linkObj.put("timestamp", link.getTimestamp());
+                linksArray.put(linkObj);
+            }
+            postData.put("links", linksArray);
+            
+            // 发起网络请求
+            new Thread(() -> {
+                try {
+                    URL url = new URL("https://duxiang.ai/tags/publish");
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("Content-Type", "application/json");
+                    conn.setDoOutput(true);
+
+                    try (OutputStream os = conn.getOutputStream()) {
+                        byte[] input = postData.toString().getBytes(StandardCharsets.UTF_8);
+                        os.write(input, 0, input.length);
+                    }
+
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        requireActivity().runOnUiThread(() -> 
+                            Toast.makeText(requireContext(), 
+                                "发布成功", 
+                                Toast.LENGTH_SHORT).show()
+                        );
+                    } else {
+                        requireActivity().runOnUiThread(() -> 
+                            Toast.makeText(requireContext(), 
+                                "发布失败: " + responseCode, 
+                                Toast.LENGTH_SHORT).show()
+                        );
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    requireActivity().runOnUiThread(() -> 
+                        Toast.makeText(requireContext(), 
+                            "发布失败: " + e.getMessage(), 
+                            Toast.LENGTH_SHORT).show()
+                    );
+                }
+            }).start();
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+            Toast.makeText(requireContext(), 
+                "准备数据失败: " + e.getMessage(), 
+                Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -565,6 +729,61 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         for (LinkItem item : links) {
             linksAdapter.selectItem(item);
         }
+        linksAdapter.notifyDataSetChanged();
+    }
+
+    
+    /**
+     * 处理标签点击事件
+     * @param tag 标签名称
+     * @param tagView 标签视图组件
+     */
+    private void handleTagClick(String tag, TextView tagView) {
+        if (tag.equals(NO_TAG)) {
+            Log.d("TagsFragment", "Clicked no tags");
+        }
+        updateTagSelection(tagView);
+        
+        // 保存选择状态
+        SharedPreferences prefs = requireActivity().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString(KEY_LAST_TAG, tag);
+        editor.apply();
+    }
+
+    private void updateLinksList() {
+        // 根据当前选中的标签更新链接列表
+        Set<String> selectedTagNames = new HashSet<>();
+        boolean hasNoTagFilter = false;
+
+        // 收集选中的标签名称
+        for (TextView tagView : selectedTags) {
+            String tag = (String) tagView.getTag();
+            if (NO_TAG.equals(tag)) {
+                hasNoTagFilter = true;
+            } else {
+                selectedTagNames.add(tag);
+            }
+        }
+
+        List<LinkItem> links = new ArrayList<>();
+        
+        if (selectedTags.isEmpty()) {
+            // 如果没有选中任何标签，显示所有链接
+            links = linkDao.getAllLinks();
+        } else {
+            // 如果选中了"无标签"选项
+            if (hasNoTagFilter) {
+                links.addAll(linkDao.getLinksWithoutTags());
+            }
+            // 如果有选中的标签
+            if (!selectedTagNames.isEmpty()) {
+                links.addAll(linkDao.getLinksByTags(selectedTagNames));
+            }
+        }
+
+        // 更新适配器数据
+        linksAdapter.setLinks(links);
         linksAdapter.notifyDataSetChanged();
     }
 } 
