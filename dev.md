@@ -804,5 +804,10 @@ https://www.cnblogs.com/tuyile006/p/3691024.html
 
 # Intent
 
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Icon设置
+
+举个例子  profileImage.setImageResource(R.drawable.default_avatar);
+
 
 # @END

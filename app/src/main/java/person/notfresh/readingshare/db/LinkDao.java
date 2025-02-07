@@ -404,7 +404,7 @@ public class LinkDao {
             // 从链接-标签关系表中删除该标签的所有关联
             db.delete(
                 LinkDbHelper.TABLE_LINK_TAGS,
-                LinkDbHelper.COLUMN_TAG + " = ?",  // 使用正确的列名
+                "tag = ?",
                 new String[]{tag}
             );
             db.setTransactionSuccessful();

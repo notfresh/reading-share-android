@@ -27,7 +27,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     // 链接-标签关联表
     public static final String TABLE_LINK_TAGS = "link_tags";
     public static final String COLUMN_LINK_ID = "link_id";
-    public static final String COLUMN_TAG = "tag_name";
+    public static final String COLUMN_TAG_ID_REF = "tag_id";
 
     private static final String SQL_CREATE_LINKS =
             "CREATE TABLE " + TABLE_LINKS + " (" +

@@ -1,5 +1,6 @@
 package person.notfresh.readingshare;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Menu;
@@ -61,6 +62,10 @@ import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import person.notfresh.readingshare.util.CrawlUtil;
 
 import java.io.IOException;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
+import java.io.File;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -70,68 +75,81 @@ public class MainActivity extends AppCompatActivity {
     private static final int CLIPBOARD_PERMISSION_REQUEST = 100;
     private boolean hasFocus = false;
     private String lastClipboardText = "";  // 添加这个变量来记录上次处理的剪贴板内容
+    private NavController navController;  // 将 navController 声明为类成员变量
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        try {
+            binding = ActivityMainBinding.inflate(getLayoutInflater());
+            setContentView(binding.getRoot());
 
-        linkDao = new LinkDao(this);
-        linkDao.open();
+            linkDao = new LinkDao(this);
+            linkDao.open();
 
-        setSupportActionBar(binding.appBarMain.toolbar);
-        
-        handleIntent(getIntent()); //@Def Line 160
+            setSupportActionBar(binding.appBarMain.toolbar);
+            
+            DrawerLayout drawer = binding.drawerLayout;
+            NavigationView navigationView = binding.navView;
+            
+            // 先设置导航控制器
+            navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
+            
+            // 然后设置 AppBarConfiguration
+            mAppBarConfiguration = new AppBarConfiguration.Builder(
+                    R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss)
+                    .setOpenableLayout(drawer)
+                    .build();
 
-        DrawerLayout drawer = binding.drawerLayout;
-        NavigationView navigationView = binding.navView;
-        mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss)
-                .setOpenableLayout(drawer)
-                .build();
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
-        NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
-        NavigationUI.setupWithNavController(navigationView, navController);
+            NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
+            NavigationUI.setupWithNavController(navigationView, navController);
 
-        // 设置默认启动页
-        SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
-        int defaultTab = prefs.getInt("default_tab", 0);
-        Log.d("MainActivity", "Default tab: " + defaultTab);
-        if (defaultTab == 0) {
-            navController.navigate(R.id.nav_home);
-        } else if (defaultTab == 1) {
-            navController.navigate(R.id.nav_tags);
-        } else if (defaultTab == 2) {
-            navController.navigate(R.id.nav_rss);
-        }
-
-        checkClipboardPermission();
-
-        navigationView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
-            @Override
-            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-                int id = item.getItemId();
-                NavController navController = Navigation.findNavController(MainActivity.this, R.id.nav_host_fragment_content_main);
-
-                if (id == R.id.nav_home) {
-                    navController.navigate(R.id.nav_home);
-                } else if (id == R.id.nav_tags) {
-                    navController.navigate(R.id.nav_tags);
-                } else if (id == R.id.nav_slideshow) {
-                    navController.navigate(R.id.nav_slideshow);
-                } else if (id == R.id.nav_rss) {
-                    navController.navigate(R.id.nav_rss);
-                }
-                // 可以添加更多的 else if 来处理其他菜单项
-
-                DrawerLayout drawer = binding.drawerLayout;
+            // 设置导航头部点击事件
+            View headerView = navigationView.getHeaderView(0);
+            headerView.setOnClickListener(v -> {
                 drawer.closeDrawer(GravityCompat.START);
-                return true;
-            }
-        });
+                new Handler().postDelayed(() -> {
+                    Intent intent = new Intent(this, UserProfileActivity.class);
+                    startActivity(intent);
+                }, 250);
+            });
 
+            // 处理分享意图
+            handleIntent(getIntent());
+
+            // 设置导航项点击事件
+            navigationView.setNavigationItemSelectedListener(item -> {
+                int id = item.getItemId();
+                drawer.closeDrawer(GravityCompat.START);
+
+                new Handler().postDelayed(() -> {
+                    try {
+                        if (id == R.id.nav_home) {
+                            navController.navigate(R.id.nav_home);
+                        } else if (id == R.id.nav_tags) {
+                            navController.navigate(R.id.nav_tags);
+                        } else if (id == R.id.nav_slideshow) {
+                            navController.navigate(R.id.nav_slideshow);
+                        } else if (id == R.id.nav_rss) {
+                            navController.navigate(R.id.nav_rss);
+                        }
+                    } catch (Exception e) {
+                        Log.e("MainActivity", "Navigation failed", e);
+                        Toast.makeText(this, "导航失败", Toast.LENGTH_SHORT).show();
+                    }
+                }, 250);
+
+                return true;
+            });
+
+            checkClipboardPermission();
+            
+        } catch (Exception e) {
+            Log.e("MainActivity", "onCreate failed", e);
+            Toast.makeText(this, "应用启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            finish();
+        }
     }
 
     @Override
@@ -154,8 +172,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // 不在这里检查剪贴板，改为在获得焦点时检查
-        // checkClipboardPermission();
+        updateNavHeader();
     }
 
     private void handleIntent(Intent intent) {
@@ -291,7 +308,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onSupportNavigateUp() {
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
         return NavigationUI.navigateUp(navController, mAppBarConfiguration)
                 || super.onSupportNavigateUp();
     }
@@ -545,5 +561,44 @@ public class MainActivity extends AppCompatActivity {
         return title;
     }
 
+    @SuppressLint("ResourceType")
+    private void updateNavHeader() {
+        try {
+            NavigationView navigationView = binding.navView;
+            View headerView = navigationView.getHeaderView(0);
+            ImageView profileImage = headerView.findViewById(R.id.nav_header_image);
+            TextView usernameText = headerView.findViewById(R.id.nav_header_username);
+            TextView emailText = headerView.findViewById(R.id.nav_header_email);
+
+            SharedPreferences prefs = getSharedPreferences("UserProfile", MODE_PRIVATE);
+            String username = prefs.getString("username", getString(R.string.nav_header_title));
+            String email = prefs.getString("email", getString(R.string.nav_header_subtitle));
+            String imageUri = prefs.getString("profile_image", "");
+
+            usernameText.setText(username);
+            emailText.setText(email);
+
+            // 检查是否有自定义头像
+            if (!TextUtils.isEmpty(imageUri)) {
+                try {
+                    Uri uri = Uri.parse(imageUri);
+                    if (uri.getPath() != null && new File(uri.getPath()).exists()) {
+                        profileImage.setImageURI(null); // 清除之前的图片
+                        profileImage.setImageURI(uri);
+                    } else {
+                        // 如果自定义头像文件不存在，清除URI并使用默认logo
+                        prefs.edit().remove("profile_image").apply();
+                        profileImage.setImageResource(R.mipmap.ic_launcher);
+                    }
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error loading profile image", e);
+                    profileImage.setImageResource(R.mipmap.ic_launcher);
+                }
+            }
+            // 如果没有设置自定义头像，保持使用默认的ic_launcher（在XML中已设置）
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error updating nav header", e);
+        }
+    }
 
 }

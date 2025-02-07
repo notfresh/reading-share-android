@@ -47,6 +47,7 @@ import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import java.io.IOException;
 import person.notfresh.readingshare.util.AppUtils;
+import person.notfresh.readingshare.WebViewActivity;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_PINNED_HEADER = -1;
@@ -575,45 +576,18 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 itemView.setOnClickListener(v -> {
                     try {
                         String url = adapter.extractRealUrl(item.getUrl());
-                        String sourceApp = item.getSourceApp();
-                        Context context = v.getContext();
-
                         // 创建基础 Intent
                         Intent intent = new Intent(Intent.ACTION_VIEW);
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
                         if (url.contains("b23.tv")) {
                             handleBilibiliLink(url); //@Def Line408
-                        }else if (url.contains("weread.qq.com")) {
+                        } else if (url.contains("weread.qq.com")) {
                             handleWereadLink(url);
-                        }else{
-                            // 其他应用使用通用处理方式
-                            intent.setData(Uri.parse(url));
-                        
-                        
-                            // 如果有源应用，先尝试用源应用打开
-                            if (sourceApp != null && !sourceApp.isEmpty()) {
-                                try {
-                                    intent.setPackage(sourceApp);
-                                    if (adapter.isIntentAvailable(context, intent)) {
-                                        context.startActivity(intent);
-                                        return;
-                                    }
-                                } catch (Exception ignored) {
-                                    // 如果源应用不可用，继续使用通用方式打开
-                                }
-                            }
-
-                            // 如果源应用无法打开，移除包名限制
-                            intent.setPackage(null);
-                        
-                        
-                            // 使用系统选择器打开
-                            Intent chooserIntent = Intent.createChooser(intent, "选择打开方式");
-                            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            context.startActivity(chooserIntent);
+                        } else {
+                            // 使用内置 WebView 打开普通链接
+                            adapter.openLink(v.getContext(), url);
                         }
-
                     } catch (Exception e) {
                         Snackbar.make(v, "无法打开此链接: " + e.getMessage(), 
                                 Snackbar.LENGTH_LONG).show();
@@ -707,5 +681,11 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     public void setPinnedLinks(List<LinkItem> pinnedLinks) {
         this.pinnedLinks = pinnedLinks;
         notifyDataSetChanged();
+    }
+
+    private void openLink(Context context, String url) {
+        Intent intent = new Intent(context, WebViewActivity.class);
+        intent.putExtra("url", url);
+        context.startActivity(intent);
     }
 } 

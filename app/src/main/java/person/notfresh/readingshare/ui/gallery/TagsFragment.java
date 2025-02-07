@@ -31,6 +31,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.ExportUtil;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -229,7 +230,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         confirmDeleteTag(tag);
                         break;
                     case 1: // 发布到网站
-                        publishTagContent(tag);
+                        publishTagToWebsite(tag);
                         break;
                 }
             })
@@ -290,24 +291,17 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
-    private void publishTagContent(String tag) {
-        // 获取该标签下的所有链接
-        Set<String> tagSet = new HashSet<>();
-        tagSet.add(tag);
-        List<LinkItem> links = linkDao.getLinksByTags(tagSet);
+    private void publishTagToWebsite(String tag) {
+        Log.d("TagsFragment", "开始发布标签到网站: " + tag);
         
-        if (links.isEmpty()) {
-            Toast.makeText(requireContext(), "该标签下没有链接", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        // 获取该标签下的所有链接
+        List<LinkItem> links = linkDao.getLinksByTag(tag);
+        Log.d("TagsFragment", "获取到标签相关链接数量: " + links.size());
 
-        // 构建要发布的数据
-        JSONObject postData = new JSONObject();
+        // 创建 JSON 数据
         try {
-            SharedPreferences prefs = requireActivity().getPreferences(Context.MODE_PRIVATE);
-            String username = prefs.getString("username", "anonymous");
-            
-            postData.put("username", username);
+            JSONObject jsonData = new JSONObject();
+            jsonData.put("tag", tag);
             
             JSONArray linksArray = new JSONArray();
             for (LinkItem link : links) {
@@ -317,51 +311,51 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 linkObj.put("timestamp", link.getTimestamp());
                 linksArray.put(linkObj);
             }
-            postData.put("links", linksArray);
+            jsonData.put("links", linksArray);
             
-            // 发起网络请求
+            Log.d("TagsFragment", "构建的 JSON 数据: " + jsonData.toString());
+
+            // 在后台线程执行网络请求
             new Thread(() -> {
                 try {
-                    URL url = new URL("https://duxiang.ai/tags/publish");
+                    URL url = new URL("https://duxiang.ai/api/publishTaggedLinks");
                     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("POST");
                     conn.setRequestProperty("Content-Type", "application/json");
                     conn.setDoOutput(true);
+                    
+                    Log.d("TagsFragment", "开始发送数据...");
 
                     try (OutputStream os = conn.getOutputStream()) {
-                        byte[] input = postData.toString().getBytes(StandardCharsets.UTF_8);
+                        byte[] input = jsonData.toString().getBytes(StandardCharsets.UTF_8);
                         os.write(input, 0, input.length);
                     }
 
                     int responseCode = conn.getResponseCode();
+                    Log.d("TagsFragment", "服务器响应码: " + responseCode);
+
                     if (responseCode == HttpURLConnection.HTTP_OK) {
-                        requireActivity().runOnUiThread(() -> 
-                            Toast.makeText(requireContext(), 
-                                "发布成功", 
-                                Toast.LENGTH_SHORT).show()
-                        );
+                        getActivity().runOnUiThread(() -> {
+                            Snackbar.make(requireView(), "发布成功", Snackbar.LENGTH_LONG).show();
+                        });
+                        Log.d("TagsFragment", "发布成功");
                     } else {
-                        requireActivity().runOnUiThread(() -> 
-                            Toast.makeText(requireContext(), 
-                                "发布失败: " + responseCode, 
-                                Toast.LENGTH_SHORT).show()
-                        );
+                        throw new IOException("服务器返回错误: " + responseCode);
                     }
+
                 } catch (Exception e) {
-                    e.printStackTrace();
-                    requireActivity().runOnUiThread(() -> 
-                        Toast.makeText(requireContext(), 
-                            "发布失败: " + e.getMessage(), 
-                            Toast.LENGTH_SHORT).show()
-                    );
+                    Log.e("TagsFragment", "发布失败", e);
+                    getActivity().runOnUiThread(() -> {
+                        Snackbar.make(requireView(), "发布失败: " + e.getMessage(), 
+                            Snackbar.LENGTH_LONG).show();
+                    });
                 }
             }).start();
 
         } catch (JSONException e) {
-            e.printStackTrace();
-            Toast.makeText(requireContext(), 
-                "准备数据失败: " + e.getMessage(), 
-                Toast.LENGTH_SHORT).show();
+            Log.e("TagsFragment", "JSON 构建失败", e);
+            Snackbar.make(requireView(), "准备数据失败: " + e.getMessage(), 
+                Snackbar.LENGTH_LONG).show();
         }
     }
 
