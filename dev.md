@@ -809,5 +809,16 @@ https://www.cnblogs.com/tuyile006/p/3691024.html
 
 举个例子  profileImage.setImageResource(R.drawable.default_avatar);
 
+# 信任所有证书
+
+这是因为服务器使用的是自签名证书或证书不被 Android 系统信任。我们有两种解决方案：
+使用 HTTP 而不是 HTTPS（不推荐，仅用于测试）
+添加网络安全配置来信任特定域名的证书（推荐）
+
+这些修改会：
+在网络安全配置中添加对 duxiang.ai 域名的支持
+添加调试时信任用户证书的配置
+在代码中添加信任所有证书的配置
+请注意，在生产环境中应该使用正式的 SSL 证书，而不是信任所有证书，这种方式仅用于开发测试。
 
 # @END
