@@ -1,13 +1,17 @@
 package person.notfresh.readingshare;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.MenuItem;
 import android.widget.Button;
@@ -21,11 +25,17 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.textfield.TextInputEditText;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import org.json.JSONArray;
+import org.json.JSONException;
+
+import person.notfresh.readingshare.adapter.PublishedTagsAdapter;
 
 public class UserProfileActivity extends AppCompatActivity {
     private static final int REQUEST_IMAGE_CAPTURE = 1;
@@ -36,33 +46,71 @@ public class UserProfileActivity extends AppCompatActivity {
     private TextInputEditText usernameEdit;
     private TextInputEditText emailEdit;
     private Uri currentPhotoUri;
+    private RecyclerView publishedTagsRecycler;
+    private PublishedTagsAdapter publishedTagsAdapter;
+    private BroadcastReceiver updateReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_user_profile);
+        try {
+            Log.d("UserProfileActivity", "开始创建活动");
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_user_profile);
 
-        // 设置 Toolbar
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setTitle("个人信息");
+            // 设置 Toolbar
+            Log.d("UserProfileActivity", "开始设置Toolbar");
+            Toolbar toolbar = findViewById(R.id.toolbar);
+            setSupportActionBar(toolbar);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("个人信息");
 
-        // 初始化视图
-        profileImage = findViewById(R.id.profile_image);
-        usernameEdit = findViewById(R.id.edit_username);
-        emailEdit = findViewById(R.id.edit_email);
-        Button saveButton = findViewById(R.id.btn_save);
-        ImageView editAvatar = findViewById(R.id.edit_avatar);
+            // 初始化视图
+            Log.d("UserProfileActivity", "开始初始化视图");
+            profileImage = findViewById(R.id.profile_image);
+            usernameEdit = findViewById(R.id.edit_username);
+            emailEdit = findViewById(R.id.edit_email);
+            Button saveButton = findViewById(R.id.btn_save);
+            ImageView editAvatar = findViewById(R.id.edit_avatar);
 
-        // 加载保存的用户信息
-        loadUserProfile();
+            // 加载保存的用户信息
+            Log.d("UserProfileActivity", "开始加载用户信息");
+            loadUserProfile();
 
-        // 设置头像编辑点击事件
-        editAvatar.setOnClickListener(v -> showImagePickerDialog());
+            // 设置头像编辑点击事件
+            editAvatar.setOnClickListener(v -> {
+                Log.d("UserProfileActivity", "点击了编辑头像按钮");
+                showImagePickerDialog();
+            });
 
-        // 设置保存按钮点击事件
-        saveButton.setOnClickListener(v -> saveUserProfile());
+            // 设置保存按钮点击事件
+            saveButton.setOnClickListener(v -> {
+                Log.d("UserProfileActivity", "点击了保存按钮");
+                saveUserProfile();
+            });
+
+            // 初始化 RecyclerView
+            Log.d("UserProfileActivity", "开始初始化RecyclerView");
+            publishedTagsRecycler = findViewById(R.id.published_tags_recycler);
+            publishedTagsRecycler.setLayoutManager(new LinearLayoutManager(this));
+            publishedTagsAdapter = new PublishedTagsAdapter();
+            publishedTagsRecycler.setAdapter(publishedTagsAdapter);
+
+            // 注册广播接收器
+            Log.d("UserProfileActivity", "开始注册广播接收器");
+            updateReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Log.d("UserProfileActivity", "收到更新广播");
+                    loadPublishedTags();
+                }
+            };
+            registerReceiver(updateReceiver, new IntentFilter("UPDATE_PUBLISHED_TAGS"));
+
+            loadPublishedTags();
+            Log.d("UserProfileActivity", "活动创建完成");
+        } catch (Exception e) {
+            Log.e("UserProfileActivity", "onCreate发生错误", e);
+        }
     }
 
     private void showImagePickerDialog() {
@@ -179,12 +227,44 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void loadUserProfile() {
-        SharedPreferences prefs = getSharedPreferences("UserProfile", MODE_PRIVATE);
-        usernameEdit.setText(prefs.getString("username", ""));
-        emailEdit.setText(prefs.getString("email", ""));
-        String imageUri = prefs.getString("profile_image", "");
-        if (!imageUri.isEmpty()) {
-            profileImage.setImageURI(Uri.parse(imageUri));
+        try {
+            Log.d("UserProfileActivity", "开始加载用户配置");
+            SharedPreferences prefs = getSharedPreferences("UserProfile", MODE_PRIVATE);
+            String username = prefs.getString("username", "");
+            String email = prefs.getString("email", "");
+            String imageUri = prefs.getString("profile_image", "");
+
+            Log.d("UserProfileActivity", "获取到的用户名: " + username);
+            Log.d("UserProfileActivity", "获取到的邮箱: " + email);
+            Log.d("UserProfileActivity", "获取到的头像URI: " + imageUri);
+
+            usernameEdit.setText(username);
+            emailEdit.setText(email);
+
+            if (!TextUtils.isEmpty(imageUri)) {
+                try {
+                    Uri uri = Uri.parse(imageUri);
+                    Log.d("UserProfileActivity", "解析的URI路径: " + uri.getPath());
+                    
+                    if (uri.getPath() != null && new File(uri.getPath()).exists()) {
+                        Log.d("UserProfileActivity", "头像文件存在，开始设置");
+                        profileImage.setImageURI(null);
+                        profileImage.setImageURI(uri);
+                    } else {
+                        Log.d("UserProfileActivity", "头像文件不存在，使用默认图标");
+                        prefs.edit().remove("profile_image").apply();
+                        profileImage.setImageResource(R.mipmap.ic_launcher);
+                    }
+                } catch (Exception e) {
+                    Log.e("UserProfileActivity", "设置头像时出错", e);
+                    profileImage.setImageResource(R.mipmap.ic_launcher);
+                }
+            } else {
+                Log.d("UserProfileActivity", "没有保存的头像，使用默认图标");
+                profileImage.setImageResource(R.mipmap.ic_launcher);
+            }
+        } catch (Exception e) {
+            Log.e("UserProfileActivity", "loadUserProfile发生错误", e);
         }
     }
 
@@ -227,5 +307,47 @@ public class UserProfileActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void loadPublishedTags() {
+        try {
+            Log.d("UserProfileActivity", "开始加载已发布标签");
+            SharedPreferences prefs = getSharedPreferences("UserProfile", MODE_PRIVATE);
+            String publishedTagsStr = prefs.getString("published_tags", "[]");
+            Log.d("UserProfileActivity", "获取到的标签数据: " + publishedTagsStr);
+            
+            JSONArray publishedTags = new JSONArray(publishedTagsStr);
+            if (publishedTagsAdapter != null) {
+                publishedTagsAdapter.updateData(publishedTags);
+                Log.d("UserProfileActivity", "更新适配器数据成功");
+            } else {
+                Log.e("UserProfileActivity", "适配器为null");
+            }
+        } catch (Exception e) {
+            Log.e("UserProfileActivity", "loadPublishedTags发生错误", e);
+            if (publishedTagsAdapter != null) {
+                publishedTagsAdapter.updateData(new JSONArray());
+            }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadPublishedTags(); // 每次恢复时重新加载数据
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            Log.d("UserProfileActivity", "开始销毁活动");
+            super.onDestroy();
+            if (updateReceiver != null) {
+                unregisterReceiver(updateReceiver);
+                Log.d("UserProfileActivity", "注销广播接收器成功");
+            }
+        } catch (Exception e) {
+            Log.e("UserProfileActivity", "onDestroy发生错误", e);
+        }
     }
 } 

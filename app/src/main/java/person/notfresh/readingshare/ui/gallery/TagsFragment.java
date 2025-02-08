@@ -1,5 +1,6 @@
 package person.notfresh.readingshare.ui.gallery;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.Intent;
@@ -31,7 +32,9 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.ExportUtil;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -297,6 +300,10 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 获取该标签下的所有链接
         List<LinkItem> links = linkDao.getLinksByTag(tag);
         Log.d("TagsFragment", "获取到标签相关链接数量: " + links.size());
+        
+        SharedPreferences prefs = requireActivity().getSharedPreferences("UserProfile", Context.MODE_PRIVATE);
+        String username = prefs.getString("username", "anonymous"); // 如果没有设置用户名，使用 "anonymous"
+        
 
         // 创建 JSON 数据
         try {
@@ -308,10 +315,13 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 JSONObject linkObj = new JSONObject();
                 linkObj.put("title", link.getTitle());
                 linkObj.put("url", link.getUrl());
-                linkObj.put("timestamp", link.getTimestamp());
+                SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+                linkObj.put("timestamp", isoFormat.format(new Date(link.getTimestamp())));
                 linksArray.put(linkObj);
             }
+            Log.d("TagsFragment", "linksArray Item0  " + linksArray.get(0).toString());
             jsonData.put("links", linksArray);
+            jsonData.put("username", username);
             
             Log.d("TagsFragment", "构建的 JSON 数据: " + jsonData.toString());
 
@@ -320,25 +330,129 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 try {
                     URL url = new URL("https://duxiang.ai/api/publishTaggedLinks");
                     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    
+                    // 添加信任所有证书的配置
+                    if (conn instanceof javax.net.ssl.HttpsURLConnection) {
+                        javax.net.ssl.HttpsURLConnection httpsConn = (javax.net.ssl.HttpsURLConnection) conn;
+                        javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[]{
+                            new javax.net.ssl.X509TrustManager() {
+                                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                                    return null;
+                                }
+                                public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                                }
+                                public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                                }
+                            }
+                        };
+
+                        javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("SSL");
+                        sc.init(null, trustAllCerts, new java.security.SecureRandom());
+                        httpsConn.setSSLSocketFactory(sc.getSocketFactory());
+                        httpsConn.setHostnameVerifier((hostname, session) -> true);
+                    }
+
                     conn.setRequestMethod("POST");
                     conn.setRequestProperty("Content-Type", "application/json");
                     conn.setDoOutput(true);
                     
                     Log.d("TagsFragment", "开始发送数据...");
 
-                    try (OutputStream os = conn.getOutputStream()) {
-                        byte[] input = jsonData.toString().getBytes(StandardCharsets.UTF_8);
-                        os.write(input, 0, input.length);
-                    }
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonData.toString().getBytes(StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
+                }
 
                     int responseCode = conn.getResponseCode();
                     Log.d("TagsFragment", "服务器响应码: " + responseCode);
 
                     if (responseCode == HttpURLConnection.HTTP_OK) {
-                        getActivity().runOnUiThread(() -> {
-                            Snackbar.make(requireView(), "发布成功", Snackbar.LENGTH_LONG).show();
-                        });
-                        Log.d("TagsFragment", "发布成功");
+                        try {
+                            // 读取服务器返回的数据
+                            BufferedReader reader = new BufferedReader(
+                                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
+                            StringBuilder response = new StringBuilder();
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                response.append(line);
+                            }
+                            reader.close();
+
+                            // 解析返回的数据
+                            JSONObject jsonResponse = new JSONObject(response.toString());
+                            String publishUrl = jsonResponse.optString("url");
+                            if (publishUrl.isEmpty()) {
+                                throw new JSONException("服务器返回的URL为空");
+                            }
+                            
+                            // 保存发布记录到 SharedPreferences
+                            SharedPreferences.Editor editor = prefs.edit();
+                            String publishedTagsStr = prefs.getString("published_tags", "[]");
+                            JSONArray publishedTags;
+                            try {
+                                publishedTags = new JSONArray(publishedTagsStr);
+                            } catch (JSONException e) {
+                                publishedTags = new JSONArray();
+                            }
+                            
+                            // 检查是否已经发布过这个标签
+                            boolean isTagExists = false;
+                            for (int i = 0; i < publishedTags.length(); i++) {
+                                JSONObject existingTag = publishedTags.optJSONObject(i);
+                                if (existingTag != null && tag.equals(existingTag.optString("tag"))) {
+                                    existingTag.put("url", publishUrl);
+                                    existingTag.put("timestamp", System.currentTimeMillis());
+                                    isTagExists = true;
+                                    break;
+                                }
+                            }
+                            
+                            // 如果是新标签，添加到数组中
+                            if (!isTagExists) {
+                                JSONObject publishRecord = new JSONObject();
+                                publishRecord.put("tag", tag);
+                                publishRecord.put("url", publishUrl);
+                                publishRecord.put("timestamp", System.currentTimeMillis());
+                                publishedTags.put(publishRecord);
+                            }
+                            
+                            editor.putString("published_tags", publishedTags.toString());
+                            editor.apply();
+
+                            Activity activity = getActivity();
+                            if (activity != null && !activity.isFinishing()) {
+                                activity.runOnUiThread(() -> {
+                                    try {
+                                        // 显示成功消息和访问链接
+                                        View view = getView();
+                                        if (view != null) {
+                                            Snackbar snackbar = Snackbar.make(view, "发布成功", Snackbar.LENGTH_LONG)
+                                                .setAction("访问", v -> {
+                                                    try {
+                                                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(publishUrl));
+                                                        startActivity(intent);
+                                                    } catch (Exception e) {
+                                                        Toast.makeText(requireContext(), "无法打开链接", Toast.LENGTH_SHORT).show();
+                                                    }
+                                                });
+                                            snackbar.show();
+                                        }
+                                        
+                                        // 通知 UserProfileActivity 更新
+                                        Context context = getContext();
+                                        if (context != null) {
+                                            Intent updateIntent = new Intent("UPDATE_PUBLISHED_TAGS");
+                                            context.sendBroadcast(updateIntent);
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e("TagsFragment", "UI更新失败", e);
+                                    }
+                                });
+                            }
+                        } catch (Exception e) {
+                            Log.e("TagsFragment", "处理服务器响应失败", e);
+                            throw e;
+                        }
                     } else {
                         throw new IOException("服务器返回错误: " + responseCode);
                     }

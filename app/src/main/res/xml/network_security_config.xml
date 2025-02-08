@@ -3,5 +3,12 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">www.ruanyifeng.com</domain>
         <domain includeSubdomains="true">101.201.175.127</domain>
+        <domain includeSubdomains="true">duxiang.ai</domain>
     </domain-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
 </network-security-config> 
