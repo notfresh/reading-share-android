@@ -1,8 +1,25 @@
 package person.notfresh.readingshare.util;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import javax.net.ssl.HttpsURLConnection;
 
 public class CrawlUtil {
 
@@ -33,5 +50,70 @@ public class CrawlUtil {
 
         // 如果所有方法都无法获取标题，返回空字符串
         return title;
+    }
+
+    public static String getUrlSummary(String url, int timeoutSeconds) throws IOException, JSONException, KeyManagementException, NoSuchAlgorithmException {
+        // 构建API请求URL
+        String apiUrl = "https://duxiang.ai/api/abstract";
+        
+        // 创建连接
+        URL apiUrlObj = new URL(apiUrl);
+        HttpURLConnection conn = (HttpURLConnection) apiUrlObj.openConnection();
+
+        // 添加信任所有证书的配置
+        if (conn instanceof javax.net.ssl.HttpsURLConnection) {
+            javax.net.ssl.HttpsURLConnection httpsConn = (javax.net.ssl.HttpsURLConnection) conn;
+            javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[]{
+                new javax.net.ssl.X509TrustManager() {
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return null;
+                    }
+                    public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                    }
+                    public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                    }
+                }
+            };
+
+            javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("SSL");
+            sc.init(null, trustAllCerts, new java.security.SecureRandom());
+            httpsConn.setSSLSocketFactory(sc.getSocketFactory());
+            httpsConn.setHostnameVerifier((hostname, session) -> true);
+        }
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(3 * 1000);
+        conn.setReadTimeout(timeoutSeconds * 1000);
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/json");
+        
+        // 构建请求JSON
+        JSONObject requestJson = new JSONObject();
+        requestJson.put("url", url);
+        requestJson.put("key", "notfresh@duxiang.ai");
+        
+        // 写入请求体
+        try (java.io.OutputStream os = conn.getOutputStream()) {
+            byte[] input = requestJson.toString().getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+
+        // 读取响应
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+        }
+
+        // 解析JSON响应
+        JSONObject jsonResponse = new JSONObject(response.toString());
+        if (jsonResponse.getBoolean("success")) {
+            JSONObject data = jsonResponse.getJSONObject("data");
+            return data.getString("summary");
+        }
+
+        throw new IOException("Failed to get summary from API");
     }
 }

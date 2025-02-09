@@ -7,7 +7,8 @@ import android.util.Log;
 
 public class LinkDbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "links.db";
-    private static final int DATABASE_VERSION = 4;
+    //private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5; // 添加summary字段
 
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
@@ -18,6 +19,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String COLUMN_ORIGINAL_INTENT = "original_intent";
     public static final String COLUMN_TARGET_ACTIVITY = "target_activity";
     public static final String COLUMN_REMARK = "remark";
+    public static final String COLUMN_SUMMARY = "summary";
 
     // 标签表
     public static final String TABLE_TAGS = "tags";
@@ -39,6 +41,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     COLUMN_ORIGINAL_INTENT + " TEXT, " +
                     COLUMN_TARGET_ACTIVITY + " TEXT, " +
                     COLUMN_TIMESTAMP + " INTEGER, " +
+                    COLUMN_SUMMARY + " TEXT, " +
                     "is_pinned INTEGER DEFAULT 0)";
 
     private static final String SQL_CREATE_TAGS =

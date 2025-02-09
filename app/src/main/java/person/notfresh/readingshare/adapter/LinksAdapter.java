@@ -1,6 +1,7 @@
 package person.notfresh.readingshare.adapter;
 
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -18,6 +19,10 @@ import android.widget.TextView;
 import android.widget.PopupMenu;
 import android.widget.Toast;
 import android.view.Menu;
+import android.view.MenuItem;
+import android.os.Handler;
+import android.os.Looper;
+import android.app.Activity;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -48,6 +53,7 @@ import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import java.io.IOException;
 import person.notfresh.readingshare.util.AppUtils;
 import person.notfresh.readingshare.WebViewActivity;
+import person.notfresh.readingshare.util.CrawlUtil;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_PINNED_HEADER = -1;
@@ -191,6 +197,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         popup.getMenu().add(0, 3, 0, "分享单条");
         popup.getMenu().add(0, 4, 0, "切换置顶");
         popup.getMenu().add(0, 5, 0, "多选模式");
+        popup.getMenu().add(0, 6, 0, "获取摘要");
         
         popup.setOnMenuItemClickListener(menuItem -> {
             switch (menuItem.getItemId()) {
@@ -224,6 +231,54 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         Log.d("LinksAdapter", "刷新位置: " + position);
                         //notifyItemChanged(position);
                     }
+                    return true;
+                case 6:
+                    // 获取摘要
+                    Log.d("LinksAdapter", "获取摘要");
+                    // 防止重复点击
+                    popup.getMenu().findItem(6).setEnabled(false);
+                    
+                    // 显示加载对话框
+                    ProgressDialog progressDialog = new ProgressDialog(view.getContext());
+                    progressDialog.setMessage("正在获取摘要...");
+                    progressDialog.setCancelable(true);
+                    progressDialog.show();
+                    
+                    // 异步获取摘要
+                    new Thread(() -> {
+                        try {
+                            String summary = CrawlUtil.getUrlSummary(item.getUrl(), 60);
+                            // 在主线程更新UI
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                progressDialog.dismiss();
+                                if (summary != null && !summary.isEmpty()) {
+                                    item.setSummary(summary);
+                                    notifyItemChanged(position);
+                                    Toast.makeText(view.getContext(), "摘要获取成功", Toast.LENGTH_SHORT).show();
+                                } else {
+                                    Toast.makeText(view.getContext(), "获取摘要失败：网页内容无法解析", Toast.LENGTH_SHORT).show();
+                                }
+                                // 重新启用菜单项
+                                popup.getMenu().findItem(6).setEnabled(true);
+                            });
+                        } catch (Exception e) {
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                progressDialog.dismiss();
+                                String errorMsg = e.getMessage();
+                                // 处理特定错误情况
+                                if (errorMsg != null && errorMsg.contains("302")) {
+                                    errorMsg = "该链接可能需要登录或无法直接访问";
+                                }
+                                Log.e("LinksAdapter", "获取摘要失败: " + errorMsg);
+                                Toast.makeText(view.getContext(), 
+                                    "获取摘要失败：" + errorMsg, 
+                                    Toast.LENGTH_SHORT).show();
+                                // 重新启用菜单项
+                                popup.getMenu().findItem(6).setEnabled(true);
+                            });
+                        }
+                    }).start();
+                    notifyItemChanged(position);
                     return true;
                 default:
                     return false;
@@ -513,9 +568,11 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return null;
     }
 
-    static class LinkViewHolder extends RecyclerView.ViewHolder { //@mark.6
+    static class LinkViewHolder extends RecyclerView.ViewHolder {
         TextView titleText;
         TextView urlText;
+        TextView summaryText;
+        TextView showMoreText;
         FlexboxLayout tagContainer;
         Button addTagButton;
         private final LinksAdapter adapter;
@@ -525,6 +582,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             this.adapter = adapter;
             titleText = view.findViewById(R.id.text_title);
             urlText = view.findViewById(R.id.text_url);
+            summaryText = view.findViewById(R.id.text_summary);
+            showMoreText = view.findViewById(R.id.text_show_more);
             tagContainer = view.findViewById(R.id.tag_container);
             addTagButton = view.findViewById(R.id.btn_add_tag);
         }
@@ -600,6 +659,31 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 adapter.showActionDialog(v, item, getAdapterPosition());
                 return true;
             });
+
+            // 处理摘要显示
+            String summary = item.getSummary();
+            if (summary != null && !summary.isEmpty()) {
+                summaryText.setVisibility(View.VISIBLE);
+                showMoreText.setVisibility(View.VISIBLE);
+                
+                // 默认只显示1行
+                summaryText.setMaxLines(1);
+                summaryText.setText(summary);
+                
+                showMoreText.setText("显示更多");
+                showMoreText.setOnClickListener(v -> {
+                    if (summaryText.getMaxLines() == 1) {
+                        summaryText.setMaxLines(Integer.MAX_VALUE);
+                        showMoreText.setText("收起");
+                    } else {
+                        summaryText.setMaxLines(1);
+                        showMoreText.setText("显示更多");
+                    }
+                });
+            } else {
+                summaryText.setVisibility(View.GONE);
+                showMoreText.setVisibility(View.GONE);
+            }
         }
 
         private void addTagView(String tag, LinkItem item) {

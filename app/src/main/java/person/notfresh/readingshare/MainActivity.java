@@ -96,6 +96,24 @@ public class MainActivity extends AppCompatActivity {
             // 先设置导航控制器
             navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
             
+            // 读取默认Tab设置并导航
+            SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
+            int defaultTab = prefs.getInt("default_tab", 0); // 默认为0，即首页
+            
+            // 根据设置选择目标页面ID
+            int destinationId;
+            switch (defaultTab) {
+                case 1: // 标签页
+                    destinationId = R.id.nav_tags;
+                    break;
+                default: // 首页
+                    destinationId = R.id.nav_home;
+                    break;
+            }
+            
+            // 导航到默认页面
+            navController.navigate(destinationId);
+            
             // 然后设置 AppBarConfiguration
             mAppBarConfiguration = new AppBarConfiguration.Builder(
                     R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss)
@@ -129,10 +147,10 @@ public class MainActivity extends AppCompatActivity {
                             navController.navigate(R.id.nav_home);
                         } else if (id == R.id.nav_tags) {
                             navController.navigate(R.id.nav_tags);
-                        } else if (id == R.id.nav_slideshow) {
-                            navController.navigate(R.id.nav_slideshow);
                         } else if (id == R.id.nav_rss) {
                             navController.navigate(R.id.nav_rss);
+                        } else if (id == R.id.nav_slideshow) {
+                            navController.navigate(R.id.nav_slideshow);
                         }
                     } catch (Exception e) {
                         Log.e("MainActivity", "Navigation failed", e);

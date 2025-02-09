@@ -15,6 +15,7 @@ public class LinkItem {
     private String targetActivity;
     private List<String> tags;
     private boolean isPinned;
+    private String summary;
 
     public LinkItem(String title, String url, String sourceApp, String originalIntent, String targetActivity) {
         this.title = title;
@@ -107,6 +108,9 @@ public class LinkItem {
     public void setPinned(boolean pinned) {
         isPinned = pinned;
     }
+
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
 
     @Override
     public boolean equals(Object o) {

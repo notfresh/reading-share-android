@@ -44,7 +44,8 @@ public class LinkDao {
         values.put(LinkDbHelper.COLUMN_TIMESTAMP, item.getTimestamp());
         values.put(LinkDbHelper.COLUMN_ORIGINAL_INTENT, item.getOriginalIntent());
         values.put(LinkDbHelper.COLUMN_TARGET_ACTIVITY, item.getTargetActivity());
-        values.put(LinkDbHelper.COLUMN_REMARK, item.getRemark()); // 添加备注列
+        values.put(LinkDbHelper.COLUMN_REMARK, item.getRemark());
+        values.put(LinkDbHelper.COLUMN_SUMMARY, item.getSummary());
 
         long linkId = database.insert(LinkDbHelper.TABLE_LINKS, null, values);
         item.setId(linkId);
@@ -411,5 +412,13 @@ public class LinkDao {
         } finally {
             db.endTransaction();
         }
+    }
+
+    public void updateSummary(long linkId, String summary) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_SUMMARY, summary);
+        database.update(LinkDbHelper.TABLE_LINKS, values, 
+            LinkDbHelper.COLUMN_ID + " = ?", 
+            new String[]{String.valueOf(linkId)});
     }
 } 
