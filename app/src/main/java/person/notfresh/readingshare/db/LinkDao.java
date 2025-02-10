@@ -71,6 +71,7 @@ public class LinkDao {
                 long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
                 String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
                 String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+                String summary = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUMMARY));
                 String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
                 String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
                 String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
@@ -78,6 +79,7 @@ public class LinkDao {
                 
                 LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
                 item.setId(id);  // 设置 id
+                item.setSummary(summary);
                 
                 // 加载该链接的标签
                 List<String> tags = getLinkTags(id);
@@ -374,6 +376,10 @@ public class LinkDao {
         if (cursor.moveToFirst()) {
             do {
                 LinkItem item = cursorToLinkItem(cursor);
+                List<String> tags = getLinkTags(item.getId());
+                for (String tag : tags) {
+                    item.addTag(tag);
+                }
                 pinnedLinks.add(item);
             } while (cursor.moveToNext());
         }
@@ -386,6 +392,7 @@ public class LinkDao {
         long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
         String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
         String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+        String summary = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUMMARY));
         String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
         String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
         String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
@@ -394,6 +401,7 @@ public class LinkDao {
 
         LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
         item.setId(id);
+        item.setSummary(summary);
         item.setPinned(isPinned);
         return item;
     }
