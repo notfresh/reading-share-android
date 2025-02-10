@@ -253,6 +253,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                                 progressDialog.dismiss();
                                 if (summary != null && !summary.isEmpty()) {
                                     item.setSummary(summary);
+                                    linkDao.updateSummary(item.getId(), summary);
                                     notifyItemChanged(position);
                                     Toast.makeText(view.getContext(), "摘要获取成功", Toast.LENGTH_SHORT).show();
                                 } else {
