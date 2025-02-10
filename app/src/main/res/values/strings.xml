@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">读享</string>
     <string name="navigation_drawer_open">打开导航抽屉</string>
@@ -28,4 +29,6 @@
     <string name="publishing">正在发布...</string>
     <string name="publish_success">发布成功</string>
     <string name="publish_failed">发布失败</string>
+
+    <string name="open_in_browser">Open in system browser</string>
 </resources>

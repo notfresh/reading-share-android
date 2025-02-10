@@ -120,12 +120,12 @@ def generate_report(stats):
         report.append(f"{file_detail['path']} ({file_detail['stats']['code']} 行代码)")
     
     # 全局单词统计
-    report.append("\n全局单词统计:")
-    report.append("-" * 50)
-    report.append("最常用的单词 (出现次数 > 10):")
-    for word, count in stats['word_stats'].most_common():
-        if count > 10:
-            report.append(f"  {word}: {count}")
+    # report.append("\n全局单词统计:")
+    # report.append("-" * 50)
+    # report.append("最常用的单词 (出现次数 > 10):")
+    # for word, count in stats['word_stats'].most_common():
+    #     if count > 10:
+    #         report.append(f"  {word}: {count}")
     
     return "\n".join(report)
 
