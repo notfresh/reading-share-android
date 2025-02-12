@@ -138,7 +138,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     @Override
     public void onDeleteLink(LinkItem link) {
-        linkDao.deleteLink(link.getUrl());
+        //linkDao.deleteLink(link.getUrl());
+        linkDao.deleteLink(link.getId());
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);

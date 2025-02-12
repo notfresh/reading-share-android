@@ -103,6 +103,14 @@ public class LinkDao {
         );
     }
 
+    public void deleteLink(long id) {
+        database.delete(
+                LinkDbHelper.TABLE_LINKS,
+                LinkDbHelper.COLUMN_ID + " = ?",
+                new String[]{String.valueOf(id)}
+        );
+    }
+
     public void updateLinkTitle(String url, String newTitle) {
         ContentValues values = new ContentValues();
         values.put(LinkDbHelper.COLUMN_TITLE, newTitle);

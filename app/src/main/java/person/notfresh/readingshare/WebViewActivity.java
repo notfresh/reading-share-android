@@ -50,10 +50,8 @@ public class WebViewActivity extends AppCompatActivity {
         // 添加调试代码
         MenuItem item = menu.findItem(R.id.action_open_browser);
         if (item == null) {
-            Toast.makeText(this, "菜单项加载失败", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this, "菜单项加载成功", Toast.LENGTH_SHORT).show();
-        }
+            Log.e("WebViewActivityMenu", "菜单项加载失败");
+        } 
         return true;
     }
 
@@ -62,7 +60,7 @@ public class WebViewActivity extends AppCompatActivity {
         if (item.getItemId() == R.id.action_open_browser) {
             // 添加日志打印
             String menuTitle = item.getTitle().toString();
-            Log.d("WebViewActivity", "点击了菜单项: " + menuTitle);
+            Log.d("WebViewActivityMenu", "点击了菜单项: " + menuTitle);
             
             try {
                 Intent intent = new Intent(Intent.ACTION_VIEW);
