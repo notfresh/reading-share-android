@@ -612,7 +612,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 
                 // 在选择模式下的点击处理
                 itemView.setOnClickListener(v -> {
-                    Log.d("LinkViewHolder", "项目被点击");
+                    Log.d("LinkViewHolder", "选择模式点击 - 项目: " + item.getTitle());
                     if (adapter.selectedItems.contains(item)) {
                         Log.d("LinkViewHolder", "移除选中项目");
                         adapter.selectedItems.remove(item);
