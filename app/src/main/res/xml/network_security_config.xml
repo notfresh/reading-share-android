@@ -3,6 +3,7 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">www.ruanyifeng.com</domain>
         <domain includeSubdomains="true">101.201.175.127</domain>
+        <domain includeSubdomains="true">xhslink.com</domain>
         <domain includeSubdomains="true">duxiang.ai</domain>
     </domain-config>
     <debug-overrides>

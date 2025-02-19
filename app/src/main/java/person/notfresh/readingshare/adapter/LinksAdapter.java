@@ -115,12 +115,13 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         } else if (holder instanceof LinkViewHolder) {
             LinkItem item = (LinkItem) items.get(position);
             ((LinkViewHolder) holder).bind(item);
-            
-            // 设置不同的背景色
             if (item.isPinned()) {
                 holder.itemView.setBackgroundResource(R.drawable.pinned_item_background);
-            } else {
+            }else{
                 holder.itemView.setBackgroundResource(R.drawable.normal_background);
+            }
+            if (selectedItems.contains(item)){
+                holder.itemView.setBackgroundResource(R.drawable.selected_background);
             }
         }
     }
@@ -590,6 +591,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
 
         void bind(LinkItem item) {
+            Log.i("LinkViewHolder", item.getTitle() + "调用bind方法");
             titleText.setText(item.getTitle());
             urlText.setText(formatUrlForDisplay(item.getUrl()));
             tagContainer.removeAllViews();
@@ -604,34 +606,31 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
             // 添加选择模式的视觉反馈
             if (adapter.isSelectionMode) {  //@mark.1
-                itemView.setBackgroundResource(
-                    adapter.selectedItems.contains(item) ? 
-                    R.drawable.selected_background : 
-                    R.drawable.normal_background
-                );
-                
+//                itemView.setBackgroundResource(
+//                    adapter.selectedItems.contains(item) ?
+//                    R.drawable.selected_background :
+//                    R.drawable.normal_background
+//                ); TODO 未解之谜，放在这里无法生效
+                String title = item.getTitle();
+                String color = adapter.selectedItems.contains(item) ?
+                        "Selected" :"Normal";
+                Log.i("LinkViewHolder", "当前项目" + title + "设置背景色为" + color);
+
                 // 在选择模式下的点击处理
                 itemView.setOnClickListener(v -> {
                     Log.d("LinkViewHolder", "选择模式点击 - 项目: " + item.getTitle());
                     if (adapter.selectedItems.contains(item)) {
-                        Log.d("LinkViewHolder", "移除选中项目");
+                        Log.d("LinkViewHolder", "移除选中项目" + title);
                         adapter.selectedItems.remove(item);
                         itemView.setBackgroundResource(R.drawable.normal_background);
                     } else {
-                        Log.d("LinkViewHolder", "添加选中项目");
+                        Log.d("LinkViewHolder", "添加选中项目" + title);
                         adapter.selectedItems.add(item);
                         itemView.setBackgroundResource(R.drawable.selected_background);
                     }
                 });
                 
             } else {
-                // 正常模式下的背景
-                if (item.isPinned()) {
-                    itemView.setBackgroundResource(R.drawable.pinned_item_background);
-                } else {
-                    //itemView.setBackgroundResource(android.R.color.transparent);
-                }
-                
                 // 正常模式下的点击和长按处理
                 itemView.setOnClickListener(v -> {
                     try {

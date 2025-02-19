@@ -1,4 +1,4 @@
-package person.notfresh.readingshare.ui.slideshow;
+package person.notfresh.readingshare.ui.settings;
 
 import static android.app.Activity.RESULT_OK;
 
@@ -14,7 +14,6 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
-import android.widget.Button;
 import android.app.AlertDialog;
 
 import androidx.annotation.NonNull;
@@ -23,7 +22,6 @@ import androidx.fragment.app.Fragment;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -34,18 +32,20 @@ import java.util.stream.Collectors;
 import java.io.File;
 
 import person.notfresh.readingshare.R;
-import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.db.LinkDao;
 import com.google.android.material.snackbar.Snackbar;
 import person.notfresh.readingshare.util.ExportUtil;
+import com.google.android.material.textfield.TextInputEditText;
 
-public class SlideshowFragment extends Fragment {
+public class SettingFragment extends Fragment {
 
     private static final int REQUEST_CODE_IMPORT_CSV = 1; // 定义常量
+    private static final String DEFAULT_SERVER_URL = "https://duxiang.ai";
 
     private Spinner defaultTabSpinner;
     private LinkDao linkDao; // 声明 LinkDao
+    private TextInputEditText serverUrlInput;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -80,6 +80,28 @@ public class SlideshowFragment extends Fragment {
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        // 初始化服务器URL输入框
+        serverUrlInput = root.findViewById(R.id.server_url_input);
+        
+        // 从 SharedPreferences 加载保存的URL
+        String savedUrl = prefs.getString("server_url", DEFAULT_SERVER_URL);
+        serverUrlInput.setText(savedUrl);
+
+        // 监听输入框内容变化
+        serverUrlInput.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                String newUrl = serverUrlInput.getText().toString().trim();
+                if (newUrl.isEmpty()) {
+                    newUrl = DEFAULT_SERVER_URL;
+                    serverUrlInput.setText(newUrl);
+                }
+                // 保存新的URL
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.putString("server_url", newUrl);
+                editor.apply();
+            }
         });
 
         // 添加导入 CSV 按钮
@@ -136,7 +158,7 @@ public class SlideshowFragment extends Fragment {
             Log.d("importCsvFromUri", "Line123");
             reader.readLine(); //
             while ((line = reader.readLine()) != null) {
-                Log.d("importCsvFromUri", "read line");
+                Log.d("importCsvFromUri", "read line: " + line);
                 try {
                     // 使用正则表达式来处理逗号分隔的问题
                     String[] columns = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
@@ -169,29 +191,41 @@ public class SlideshowFragment extends Fragment {
                         }
                         long timestamp = date.getTime();
                         
-                        // 处理标签，如果没有第4列则设为空列表
+                        // 处理标签列
                         List<String> tags = new ArrayList<>();
                         if (columns.length >= 4) {
-                            String tagsString = columns[3].trim().replaceFirst("^\"|\"$", "");
+                            String tagsString = columns[3].trim();
                             if (!tagsString.isEmpty()) {
-                                tags = Arrays.asList(tagsString.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"));
-                                tags = tags.stream()
-                                    .map(String::trim)
-                                    .map(tag -> tag.replaceFirst("^\"|\"$", ""))
-                                    .collect(Collectors.toList());
+                                if (tagsString.startsWith("\"") && tagsString.endsWith("\"")) {
+                                    // 如果标签字符串被双引号包围，说明可能包含多个标签
+                                    // 去掉首尾的双引号
+                                    tagsString = tagsString.substring(1, tagsString.length() - 1);
+                                    // 按逗号分割，并处理每个标签
+                                    String[] tagArray = tagsString.split(",");
+                                    for (String tag : tagArray) {
+                                        String cleanTag = tag.trim();
+                                        if (!cleanTag.isEmpty()) {
+                                            tags.add(cleanTag);
+                                        }
+                                    }
+                                } else {
+                                    // 如果没有双引号包围，说明只有一个标签
+                                    tags.add(tagsString);
+                                }
                             }
+                            Log.d("importCsvFromUri", "处理标签: 原始值=" + columns[3] + 
+                                  ", 解析结果=" + tags.toString());
                         }
                         
-                        Log.d("importCsvFromUriTag", "TagRaw: " + (columns.length >= 4 ? columns[3] : "无标签") + " tags: " + tags.toString());
                         LinkItem newLink = new LinkItem(title, url, "imported", "", "");
                         newLink.setTimestamp(timestamp);
                         newLink.setTags(tags);
-                        Log.d("importCsvFromUri", "newLink: " + newLink.toString());
+                        Log.d("importCsvFromUri", "创建新链接: " + newLink.toString() + 
+                              ", 标签数量=" + tags.size());
                         linkDao.insertLink(newLink);
                     }
                 } catch (Exception e) {
-                    // 遇到错误的行直接跳过
-                    Log.d("importCsvFromUriError", "error: " + e.getMessage());
+                    Log.e("importCsvFromUri", "处理行时出错: " + line + ", 错误: " + e.getMessage());
                     continue;
                 }
             }
@@ -246,5 +280,14 @@ public class SlideshowFragment extends Fragment {
                 "导出失败：" + e.getMessage(), 
                 Snackbar.LENGTH_LONG).show();
         }
+    }
+
+    // 添加获取服务器URL的公共方法
+    public static String getServerUrl(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(
+            context.getPackageName() + "_preferences",
+            Context.MODE_PRIVATE
+        );
+        return prefs.getString("server_url", DEFAULT_SERVER_URL);
     }
 }

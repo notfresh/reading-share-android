@@ -1,4 +1,4 @@
-package person.notfresh.readingshare.ui.gallery;
+package person.notfresh.readingshare.ui.tag;
 
 import android.content.Context;
 import android.content.SharedPreferences;
