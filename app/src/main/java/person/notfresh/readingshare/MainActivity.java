@@ -459,15 +459,22 @@ public class MainActivity extends AppCompatActivity {
         EditText titleInput = dialogView.findViewById(R.id.edit_title);
         EditText urlInput = dialogView.findViewById(R.id.edit_url);
 
-        // 设置初始值
-        titleInput.setText(initialTitle);
+        // 设置初始值和提示
+        titleInput.setHint(initialTitle);  // 使用 hint 显示灰色提示文字
         urlInput.setText(url);
+
+        // 让标题输入框获得焦点
+        titleInput.requestFocus();
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("保存链接")
                 .setView(dialogView)
                 .setPositiveButton("保存", (d, which) -> {
+                    // 如果用户没有输入，使用 hint 中的默认值
                     String title = titleInput.getText().toString();
+                    if (TextUtils.isEmpty(title)) {
+                        title = initialTitle;
+                    }
                     String finalUrl = urlInput.getText().toString();
                     
                     if (!TextUtils.isEmpty(title) && !TextUtils.isEmpty(finalUrl)) {
