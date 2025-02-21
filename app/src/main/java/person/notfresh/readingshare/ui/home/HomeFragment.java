@@ -62,6 +62,16 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         inflater.inflate(R.menu.home_menu, menu);
         shareMenuItem = menu.findItem(R.id.action_share);
         closeSelectionMenuItem = menu.findItem(R.id.action_close_selection);
+        MenuItem statisticsMenuItem = menu.findItem(R.id.action_statistics);
+
+        // 获取统计按钮的视图
+        View actionView = requireActivity().findViewById(statisticsMenuItem.getItemId());
+        if (actionView != null) {
+            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) actionView.getLayoutParams();
+            params.rightMargin = getResources().getDimensionPixelSize(R.dimen.statistics_button_margin);
+            actionView.setLayoutParams(params);
+        }
+
         shareMenuItem.setVisible(isSelectionMode);
         closeSelectionMenuItem.setVisible(isSelectionMode);
     }
@@ -96,6 +106,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         binding = FragmentHomeBinding.inflate(inflater, container, false);
         View root = binding.getRoot();
 
+        // 检查是否有选定的日期
+        String selectedDate = null;
+        if (getArguments() != null) {
+            selectedDate = getArguments().getString("selected_date");
+        }
+
         linkDao = new LinkDao(requireContext());
         linkDao.open();
 
@@ -118,6 +134,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 设置置顶和普通链接到适配器
         adapter.setPinnedLinks(pinnedLinks); // 需要在 LinksAdapter 中添加此方法
         adapter.setGroupedLinks(groupedLinks);
+
+        // 如果有选定日期，滚动到对应位置
+        if (selectedDate != null) {
+            scrollToDate(recyclerView, selectedDate);
+        }
 
         // 设置搜索框
         searchEditText = binding.searchEditText;
@@ -286,5 +307,22 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         Log.d("HomeFragment", "置顶链接数量: " + pinnedLinks.size());
         adapter.setPinnedLinks(pinnedLinks);
         adapter.setGroupedLinks(groupedLinks);
+    }
+
+    private void scrollToDate(RecyclerView recyclerView, String date) {
+        // 找到日期对应的位置
+        int position = adapter.getPositionForDate(date);
+        if (position != -1) {
+            recyclerView.post(() -> {
+                // 获取 LinearLayoutManager
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (layoutManager != null) {
+                    // 获取搜索框的高度
+                    int searchBoxHeight = binding.searchEditText.getHeight();
+                    // 滚动到指定位置，offset 为搜索框高度
+                    layoutManager.scrollToPositionWithOffset(position, searchBoxHeight);
+                }
+            });
+        }
     }
 }

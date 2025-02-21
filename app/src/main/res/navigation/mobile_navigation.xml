@@ -38,4 +38,10 @@
     <action
         android:id="@+id/action_nav_home_to_nav_statistics"
         app:destination="@id/nav_statistics" />
+
+    <action
+        android:id="@+id/action_nav_statistics_to_nav_home"
+        app:destination="@id/nav_home"
+        app:popUpTo="@id/nav_home"
+        app:popUpToInclusive="true" />
 </navigation>

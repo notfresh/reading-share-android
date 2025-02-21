@@ -9,10 +9,12 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 
 import com.kizitonwose.calendarview.CalendarView;
 import com.kizitonwose.calendarview.model.CalendarDay;
 import com.kizitonwose.calendarview.model.CalendarMonth;
+import com.kizitonwose.calendarview.model.DayOwner;
 import com.kizitonwose.calendarview.ui.DayBinder;
 import com.kizitonwose.calendarview.ui.MonthHeaderFooterBinder;
 import com.kizitonwose.calendarview.ui.ViewContainer;
@@ -81,6 +83,16 @@ public class StatisticsFragment extends Fragment {
             @Override
             public void bind(DayViewContainer container, CalendarDay day) {
                 Log.d(TAG, "bind: 绑定日期 " + day.getDate());
+                container.day = day;  // 保存日期到容器中
+                // 检查日期是否属于当前月份
+                if (day.getOwner() != DayOwner.THIS_MONTH) {
+                    container.dayText.setVisibility(View.INVISIBLE);
+                    container.countText.setVisibility(View.GONE);
+                    return;
+                }
+
+                // 显示当月日期
+                container.dayText.setVisibility(View.VISIBLE);
                 container.dayText.setText(String.valueOf(day.getDate().getDayOfMonth()));
                 
                 // 获取当天的统计数据
@@ -114,11 +126,22 @@ public class StatisticsFragment extends Fragment {
     static class DayViewContainer extends ViewContainer {
         TextView dayText;
         TextView countText;
+        private CalendarDay day;
 
         DayViewContainer(View view) {
             super(view);
             dayText = view.findViewById(R.id.dayText);
             countText = view.findViewById(R.id.countText);
+            
+            view.setOnClickListener(v -> {
+                if (day != null && day.getOwner() == DayOwner.THIS_MONTH) {
+                    // 返回首页并传递日期参数
+                    Bundle args = new Bundle();
+                    args.putString("selected_date", day.getDate().format(DateTimeFormatter.ISO_DATE));
+                    Navigation.findNavController(view)
+                            .navigate(R.id.action_nav_statistics_to_nav_home, args);
+                }
+            });
         }
     }
 

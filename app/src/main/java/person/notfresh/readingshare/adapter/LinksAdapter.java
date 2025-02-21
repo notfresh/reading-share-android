@@ -69,6 +69,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private boolean isSelectionMode = false;
     private List<LinkItem> links = new ArrayList<>();
     private List<LinkItem> pinnedLinks = new ArrayList<>();
+    private Map<String, List<LinkItem>> groupedLinks = new TreeMap<>(Collections.reverseOrder());
 
     public interface OnLinkActionListener {
         void onDeleteLink(LinkItem link);
@@ -134,6 +135,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     public void setGroupedLinks(Map<String, List<LinkItem>> groupedLinks) {
         items.clear();
         originalItems.clear();
+        this.groupedLinks = groupedLinks;  // 保存分组数据
         
         // 首先添加置顶链接区域
         if (!pinnedLinks.isEmpty()) {
@@ -771,5 +773,21 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         Intent intent = new Intent(context, WebViewActivity.class);
         intent.putExtra("url", url);
         context.startActivity(intent);
+    }
+
+    public int getPositionForDate(String date) {
+        int position = 0;
+        // 如果有置顶链接，需要加上置顶区域的位置
+        if (!pinnedLinks.isEmpty()) {
+            position += pinnedLinks.size() + 1;  // +1 for "置顶" header
+        }
+
+        for (Map.Entry<String, List<LinkItem>> entry : groupedLinks.entrySet()) {
+            if (entry.getKey().equals(date)) {
+                return position;
+            }
+            position += entry.getValue().size() + 1; // +1 for header
+        }
+        return -1;
     }
 } 
