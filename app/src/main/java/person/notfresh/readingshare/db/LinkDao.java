@@ -17,12 +17,14 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Set;
 import java.util.Arrays;
+import java.util.HashMap;
 
 import person.notfresh.readingshare.model.LinkItem;
 
 public class LinkDao {
     private LinkDbHelper dbHelper;
     private SQLiteDatabase database;
+    private static final String TAG = "LinkDao";
 
     public LinkDao(Context context) {
         dbHelper = new LinkDbHelper(context);
@@ -438,5 +440,31 @@ public class LinkDao {
         database.update(LinkDbHelper.TABLE_LINKS, values, 
             LinkDbHelper.COLUMN_ID + " = ?", 
             new String[]{String.valueOf(linkId)});
+    }
+
+    public Map<String, Integer> getDailyStatistics() {
+        Log.d(TAG, "getDailyStatistics: 开始查询每日统计数据");
+        Map<String, Integer> statistics = new HashMap<>();
+        Cursor cursor = null;
+        try {
+            String query = "SELECT date(timestamp/1000, 'unixepoch') as date, COUNT(*) as count " +
+                          "FROM links GROUP BY date(timestamp/1000, 'unixepoch')";
+            Log.d(TAG, "getDailyStatistics: SQL查询: " + query);
+            cursor = database.rawQuery(query, null);
+            
+            Log.d(TAG, "getDailyStatistics: 查询结果行数: " + cursor.getCount());
+            while (cursor.moveToNext()) {
+                String date = cursor.getString(0);
+                int count = cursor.getInt(1);
+                Log.d(TAG, "getDailyStatistics: 统计数据: " + date + " -> " + count);
+                statistics.put(date, count);
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        Log.d(TAG, "getDailyStatistics: 统计完成，共 " + statistics.size() + " 条数据");
+        return statistics;
     }
 } 

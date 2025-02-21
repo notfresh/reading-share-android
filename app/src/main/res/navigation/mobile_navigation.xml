@@ -28,4 +28,14 @@
         android:name="person.notfresh.readingshare.ui.rss.RSSFragment"
         android:label="@string/menu_rss"
         tools:layout="@layout/fragment_rss" />
+
+    <fragment
+        android:id="@+id/nav_statistics"
+        android:name="person.notfresh.readingshare.ui.statistics.StatisticsFragment"
+        android:label="统计"
+        tools:layout="@layout/fragment_statistics" />
+
+    <action
+        android:id="@+id/action_nav_home_to_nav_statistics"
+        app:destination="@id/nav_statistics" />
 </navigation>

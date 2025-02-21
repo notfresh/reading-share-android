@@ -11,4 +11,5 @@
     <color name="popup_text">#333333</color>        <!-- 深灰色文字 -->
     <color name="text_secondary">#666666</color>
     <color name="link_color">#2196F3</color>
+    <color name="purple_500">#FF6200EE</color>
 </resources>

@@ -19,6 +19,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -79,6 +80,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             return true;
         } else if (id == R.id.action_share_csv) {
             shareAsFile(false);  // false 表示 CSV
+            return true;
+        } else if (id == R.id.action_statistics) {
+            // 导航到统计页面
+            Navigation.findNavController(requireView())
+                     .navigate(R.id.action_nav_home_to_nav_statistics);
             return true;
         }
         return super.onOptionsItemSelected(item);
