@@ -1,3 +1,7 @@
+# 目录
+
+- 查看手机内置数据库
+
 # 版本标记
 
    git tag -a v1.0 -m "Release version 1.0"
@@ -912,6 +916,58 @@ public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int positi
 建议你可以把所有与 item 状态相关的视觉更新（比如背景色、选中状态等）都放在 `onBindViewHolder` 中处理，这样可以确保在视图回收重用时状态能够正确恢复。
 
 
+# 查看手机内置数据库
+
+要查看安卓手机内置的 SQLite 数据库，你可以使用以下几种方法：
+
+### 方法 1：使用 Android Studio 的 Device Explorer
+
+1. **连接设备**：将你的安卓设备通过 USB 连接到电脑，并确保 USB 调试已开启。
+2. **打开 Android Studio**：启动 Android Studio。
+3. **打开 Device File Explorer**：
+   - 在 Android Studio 中，点击右下角的 "Device File Explorer" 选项。
+4. **导航到数据库文件**：
+   - 在 Device File Explorer 中，导航到你的应用的数据库目录，通常路径为：
+     ```
+     /data/data/<your.package.name>/databases/
+     ```
+   - 这里 `<your.package.name>` 是你的应用的包名。
+5. **查看数据库**：
+   - 找到你想查看的数据库文件，右键点击并选择 "Save As" 将其保存到本地。
+   - 使用 SQLite 浏览器（如 DB Browser for SQLite）打开保存的数据库文件。
+
+### 方法 2：使用 ADB 命令
+
+1. **连接设备**：确保你的设备通过 USB 连接并开启 USB 调试。
+2. **打开命令行**：在你的电脑上打开命令行工具（如 Terminal 或 Command Prompt）。
+3. **进入 ADB shell**：
+   ```bash
+   adb shell
+   ```
+4. **导航到数据库目录**：
+   ```bash
+   cd /data/data/<your.package.name>/databases/
+   ```
+5. **使用 SQLite 命令行工具查看数据库**：
+   ```bash
+   sqlite3 your_database_name.db
+   ```
+   - 进入 SQLite 命令行后，你可以使用 SQL 查询来查看数据，例如：
+     ```sql
+     .tables  -- 查看所有表
+     SELECT * FROM your_table_name;  -- 查询某个表的数据
+     ```
+
+### 方法 3：使用第三方应用
+
+你也可以在设备上安装一些第三方应用，如 "SQLite Viewer" 或 "SQLite Database Editor"，这些应用可以直接在手机上查看和编辑 SQLite 数据库。
+
+### 注意事项
+
+- 访问 `/data/data/` 目录需要 root 权限，某些设备可能需要进行 root 操作才能访问。
+- 在生产环境中，确保遵循数据隐私和安全性原则，不要随意修改数据库内容。
+
+通过以上方法，你可以方便地查看安卓手机内置的 SQLite 数据库。
 
 
 
