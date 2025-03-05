@@ -467,4 +467,28 @@ public class LinkDao {
         Log.d(TAG, "getDailyStatistics: 统计完成，共 " + statistics.size() + " 条数据");
         return statistics;
     }
+
+    public void updateClickCount(long id, int count) {
+        ContentValues values = new ContentValues();
+        values.put("click_count", count);
+        database.update("links", values, "id = ?", new String[]{String.valueOf(id)});
+    }
+
+    public Cursor getClickStatistics(String period) {
+        String query = "SELECT strftime('%Y-%m', datetime(timestamp/1000, 'unixepoch')) as period, " +
+                "SUM(click_count) as total_clicks " +
+                "FROM links " +
+                "GROUP BY period " +
+                "ORDER BY period DESC";
+        
+        if ("week".equals(period)) {
+            query = "SELECT strftime('%Y-%W', datetime(timestamp/1000, 'unixepoch')) as period, " +
+                    "SUM(click_count) as total_clicks " +
+                    "FROM links " +
+                    "GROUP BY period " +
+                    "ORDER BY period DESC";
+        }
+        
+        return database.rawQuery(query, null);
+    }
 } 

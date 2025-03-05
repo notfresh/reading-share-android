@@ -5,7 +5,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
@@ -52,6 +51,10 @@
             android:name=".UserProfileActivity"
             android:label="个人信息"
             android:theme="@style/Theme.MyApplication.NoActionBar"/>
+        <activity
+            android:name=".ClickStatisticsActivity"
+            android:label="@string/click_statistics"
+            android:theme="@style/Theme.MyApplication.NoActionBar" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

@@ -647,7 +647,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                             handleWereadLink(url);
                         } else {
                             // 使用内置 WebView 打开普通链接
-                            adapter.openLink(v.getContext(), url);
+                            adapter.openLink(v.getContext(), url, getAdapterPosition());
                         }
                     } catch (Exception e) {
                         Snackbar.make(v, "无法打开此链接: " + e.getMessage(), 
@@ -769,10 +769,41 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         notifyDataSetChanged();
     }
 
-    private void openLink(Context context, String url) {
-        Intent intent = new Intent(context, WebViewActivity.class);
-        intent.putExtra("url", url);
-        context.startActivity(intent);
+    private void openLink(Context context, String url, int position) {
+        try {
+            Log.d("LinksAdapter", "openLink called, position: " + position + ", url: " + url);
+            
+            // 检查位置是否有效
+            if (position < 0 || position >= items.size()) {
+                Log.e("LinksAdapter", "Invalid position: " + position);
+                return;
+            }
+
+            // 获取当前点击的LinkItem
+            Object item = items.get(position);
+            if (!(item instanceof LinkItem)) {
+                Log.e("LinksAdapter", "Item at position " + position + " is not a LinkItem");
+                return;
+            }
+
+            LinkItem linkItem = (LinkItem) item;
+            Log.d("LinksAdapter", "LinkItem found: " + linkItem.getTitle());
+
+            // 更新点击次数
+            linkItem.incrementClickCount();
+            Log.d("LinksAdapter", "Click count updated to: " + linkItem.getClickCount());
+            linkDao.updateClickCount(linkItem.getId(), linkItem.getClickCount());
+
+            // 打开链接
+            Log.d("LinksAdapter", "Starting WebViewActivity with url: " + url);
+            Intent intent = new Intent(context, WebViewActivity.class);
+            intent.putExtra("url", url);
+            context.startActivity(intent);
+            
+        } catch (Exception e) {
+            Log.e("LinksAdapter", "Error in openLink: " + e.getMessage(), e);
+            Toast.makeText(context, "无法打开链接: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     public int getPositionForDate(String date) {

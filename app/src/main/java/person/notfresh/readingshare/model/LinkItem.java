@@ -16,6 +16,7 @@ public class LinkItem {
     private List<String> tags;
     private boolean isPinned;
     private String summary;
+    private int clickCount;  // 新增点击次数字段
 
     public LinkItem(String title, String url, String sourceApp, String originalIntent, String targetActivity) {
         this.title = title;
@@ -111,6 +112,18 @@ public class LinkItem {
 
     public String getSummary() { return summary; }
     public void setSummary(String summary) { this.summary = summary; }
+
+    public int getClickCount() {
+        return clickCount;
+    }
+
+    public void setClickCount(int clickCount) {
+        this.clickCount = clickCount;
+    }
+
+    public void incrementClickCount() {
+        this.clickCount++;
+    }
 
     @Override
     public boolean equals(Object o) {

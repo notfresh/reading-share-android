@@ -14,14 +14,17 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.appcompat.widget.Toolbar;
 
 import com.google.android.material.snackbar.Snackbar;
 
@@ -31,6 +34,7 @@ import person.notfresh.readingshare.databinding.FragmentHomeBinding;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.ExportUtil;
+import person.notfresh.readingshare.ClickStatisticsActivity;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -74,6 +78,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
         shareMenuItem.setVisible(isSelectionMode);
         closeSelectionMenuItem.setVisible(isSelectionMode);
+
+        super.onCreateOptionsMenu(menu, inflater);
     }
 
     @Override
@@ -155,6 +161,14 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             }
         });
 
+        // 新增的阅读量统计按钮
+//        ImageButton clickStatsButton = root.findViewById(R.id.action_click_statistics);
+//        clickStatsButton.setOnClickListener(v -> {
+//            // 打开阅读量统计页面
+//            Intent intent = new Intent(getActivity(), ClickStatisticsActivity.class);
+//            startActivity(intent);
+//        });
+
         return root;
     }
 
@@ -169,7 +183,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     @Override
     public void onDeleteLink(LinkItem link) {
-        linkDao.deleteLink(link.getUrl());
+        // linkDao.deleteLink(link.getUrl());
+        linkDao.deleteLink(link.getId());
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);

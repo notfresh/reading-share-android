@@ -31,4 +31,10 @@
     <string name="publish_failed">发布失败</string>
 
     <string name="open_in_browser">在系统浏览器打开</string>
+    <string name="click_statistics">点击统计</string>
+    <string name="monthly_statistics">按月统计</string>
+    <string name="weekly_statistics">按周统计</string>
+    <string name="total_clicks">总点击次数</string>
+    <string name="statistics_title">链接点击统计</string>
+    <string name="no_data_available">暂无数据</string>
 </resources>

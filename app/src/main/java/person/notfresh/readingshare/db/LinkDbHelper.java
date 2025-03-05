@@ -8,7 +8,8 @@ import android.util.Log;
 public class LinkDbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "links.db";
     //private static final int DATABASE_VERSION = 4;
-    private static final int DATABASE_VERSION = 5; // 添加summary字段
+    // private static final int DATABASE_VERSION = 5; // 添加summary字段
+    private static final int DATABASE_VERSION = 6; // 添加点击数量字段
 
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
