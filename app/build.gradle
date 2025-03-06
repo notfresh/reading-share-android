@@ -5,7 +5,6 @@ plugins {
 android {
     namespace 'person.notfresh.readingshare'
     compileSdk 34
-
     defaultConfig {
         applicationId "person.notfresh.readingshare"
         minSdk 26

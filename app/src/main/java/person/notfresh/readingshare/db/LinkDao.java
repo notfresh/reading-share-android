@@ -55,6 +55,79 @@ public class LinkDao {
         return linkId;
     }
 
+    public void deleteLink(String url) {
+        database.delete(
+                LinkDbHelper.TABLE_LINKS,
+                LinkDbHelper.COLUMN_URL + " = ?",
+                new String[]{url}
+        );
+    }
+
+    public void deleteLink(long id) {
+        database.delete(
+                LinkDbHelper.TABLE_LINKS,
+                LinkDbHelper.COLUMN_ID + " = ?",
+                new String[]{String.valueOf(id)}
+        );
+    }
+
+    public void updateLinkTitle(String url, String newTitle) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_TITLE, newTitle);
+
+        database.update(
+                LinkDbHelper.TABLE_LINKS,
+                values,
+                LinkDbHelper.COLUMN_URL + " = ?",
+                new String[]{url}
+        );
+    }
+
+    public void togglePinStatus(long linkId) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        Log.d("LinkDao", "开始切换置顶状态, linkId: " + linkId);
+
+        Cursor cursor = db.query(LinkDbHelper.TABLE_LINKS, new String[]{"is_pinned"},
+                "_id = ?", new String[]{String.valueOf(linkId)}, null, null, null);
+
+        int currentStatus = 0;
+        if (cursor.moveToFirst()) {
+            currentStatus = cursor.getInt(0);
+            Log.d("LinkDao", "当前置顶状态: " + currentStatus);
+        }
+        cursor.close();
+
+        ContentValues values = new ContentValues();
+        values.put("is_pinned", currentStatus == 0 ? 1 : 0);
+
+        int updatedRows = db.update(LinkDbHelper.TABLE_LINKS, values, "_id = ?",
+                new String[]{String.valueOf(linkId)});
+        Log.d("LinkDao", "更新结果: " + updatedRows + " 行受影响");
+    }
+
+    public void updateSummary(long linkId, String summary) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_SUMMARY, summary);
+        database.update(LinkDbHelper.TABLE_LINKS, values,
+                LinkDbHelper.COLUMN_ID + " = ?",
+                new String[]{String.valueOf(linkId)});
+    }
+
+    public void updateClickCount(long id, int count) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentValues values = new ContentValues();
+            values.put("click_count", count);
+            db.update("links", values, "_id = ?", new String[]{String.valueOf(id)});
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    public void _________(){}
+
     public List<LinkItem> getAllLinks() {
         List<LinkItem> links = new ArrayList<>();
 
@@ -78,10 +151,12 @@ public class LinkDao {
                 String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
                 String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
                 long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TIMESTAMP));
+                int clickCount = cursor.getInt(cursor.getColumnIndexOrThrow("click_count"));  // 读取 click_count 字段
                 
                 LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
                 item.setId(id);  // 设置 id
                 item.setSummary(summary);
+                item.setClickCount(clickCount);  // 设置 clickCount
                 
                 // 加载该链接的标签
                 List<String> tags = getLinkTags(id);
@@ -95,34 +170,6 @@ public class LinkDao {
         cursor.close();
 
         return links;
-    }
-
-    public void deleteLink(String url) {
-        database.delete(
-                LinkDbHelper.TABLE_LINKS,
-                LinkDbHelper.COLUMN_URL + " = ?",
-                new String[]{url}
-        );
-    }
-
-    public void deleteLink(long id) {
-        database.delete(
-                LinkDbHelper.TABLE_LINKS,
-                LinkDbHelper.COLUMN_ID + " = ?",
-                new String[]{String.valueOf(id)}
-        );
-    }
-
-    public void updateLinkTitle(String url, String newTitle) {
-        ContentValues values = new ContentValues();
-        values.put(LinkDbHelper.COLUMN_TITLE, newTitle);
-        
-        database.update(
-                LinkDbHelper.TABLE_LINKS,
-                values,
-                LinkDbHelper.COLUMN_URL + " = ?",
-                new String[]{url}
-        );
     }
 
     // 获取按日期分组的链接
@@ -139,28 +186,122 @@ public class LinkDao {
         return groupedLinks;
     }
 
-    // 添加标签
-    public long addTag(String tagName) {
-        ContentValues values = new ContentValues();
-        values.put(LinkDbHelper.COLUMN_TAG_NAME, tagName);
-        return database.insert(LinkDbHelper.TABLE_TAGS, null, values);
+    public List<LinkItem> getLinksWithoutTags() {
+        List<LinkItem> links = new ArrayList<>();
+
+        // 查找没有任何标签的链接，按时间戳降序排序
+        String query = "SELECT * FROM " + LinkDbHelper.TABLE_LINKS + " l " +
+                "WHERE NOT EXISTS (SELECT 1 FROM " + LinkDbHelper.TABLE_LINK_TAGS +
+                " lt WHERE l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + ") " +
+                "ORDER BY " + LinkDbHelper.COLUMN_TIMESTAMP + " DESC";
+
+        Cursor cursor = database.rawQuery(query, null);
+        if (cursor.moveToFirst()) {
+            do {
+                LinkItem item = createLinkItemFromCursor(cursor);
+                links.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return links;
     }
 
-    // 私有方法：使用ID添加标签
-    private void addTagToLink(long linkId, long tagId) {
-        ContentValues values = new ContentValues();
-        values.put(LinkDbHelper.COLUMN_LINK_ID, linkId);
-        values.put(LinkDbHelper.COLUMN_TAG_ID_REF, tagId);
-        database.insert(LinkDbHelper.TABLE_LINK_TAGS, null, values);
+    public List<LinkItem> getLinksByTag(String tag) {
+        List<LinkItem> links = new ArrayList<>();
+        String query = "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l " +
+                "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + " " +
+                "JOIN " + LinkDbHelper.TABLE_TAGS + " t ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID + " " +
+                "WHERE t." + LinkDbHelper.COLUMN_TAG_NAME + " = ?";
+
+        Cursor cursor = database.rawQuery(query, new String[]{tag});
+
+        if (cursor.moveToFirst()) {
+            do {
+                long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
+                String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
+                String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+                String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
+                String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
+                String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
+
+                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity);
+                item.setId(id);
+
+                // 加载该链接的所有标签
+                List<String> tags = getLinkTags(id);
+                for (String t : tags) {
+                    item.addTag(t);
+                }
+
+                links.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+
+        return links;
     }
 
-    // 公开方法：使用标签名称添加标签
-    public void addTagToLink(long linkId, String tagName) {
-        // 先确保标签存在，并获取标签ID
-        long tagId = getOrCreateTag(tagName);
-        // 添加链接-标签关联
-        addTagToLink(linkId, tagId);
+    public List<LinkItem> getLinksByTags(Set<String> tags) {
+        List<LinkItem> links = new ArrayList<>();
+
+        // 构建查询语句，按时间戳降序排序
+        String query = "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l " +
+                "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + " " +
+                "JOIN " + LinkDbHelper.TABLE_TAGS + " t ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID + " " +
+                "WHERE t." + LinkDbHelper.COLUMN_TAG_NAME + " IN (" + makePlaceholders(tags.size()) + ") " +
+                "ORDER BY l." + LinkDbHelper.COLUMN_TIMESTAMP + " DESC";
+
+        String[] selectionArgs = tags.toArray(new String[0]);
+        Cursor cursor = database.rawQuery(query, selectionArgs);
+
+        if (cursor.moveToFirst()) {
+            do {
+                LinkItem item = createLinkItemFromCursor(cursor);
+                links.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return links;
     }
+
+    public List<LinkItem> getPinnedLinks() {
+        List<LinkItem> pinnedLinks = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+
+        Log.d("LinkDao", "获取置顶链接");
+        Cursor cursor = db.query(LinkDbHelper.TABLE_LINKS, null, "is_pinned = 1", null,
+                null, null, "timestamp DESC");
+
+        Log.d("LinkDao", "找到 " + cursor.getCount() + " 个置顶链接");
+        if (cursor.moveToFirst()) {
+            do {
+                LinkItem item = cursorToLinkItem(cursor);
+                List<String> tags = getLinkTags(item.getId());
+                for (String tag : tags) {
+                    item.addTag(tag);
+                }
+                pinnedLinks.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+
+        return pinnedLinks;
+    }
+
+
+
+    public void ___________________________________(){}
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
 
     // 获取链接的所有标签
     public List<String> getLinkTags(long linkId) {
@@ -241,83 +382,46 @@ public class LinkDao {
         return addTag(tagName);
     }
 
-    public List<LinkItem> getLinksByTag(String tag) {
-        List<LinkItem> links = new ArrayList<>();
-        String query = "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l " +
-                "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + " " +
-                "JOIN " + LinkDbHelper.TABLE_TAGS + " t ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID + " " +
-                "WHERE t." + LinkDbHelper.COLUMN_TAG_NAME + " = ?";
-        
-        Cursor cursor = database.rawQuery(query, new String[]{tag});
-        
-        if (cursor.moveToFirst()) {
-            do {
-                long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
-                String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
-                String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
-                String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
-                String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
-                String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
-                
-                LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity);
-                item.setId(id);
-                
-                // 加载该链接的所有标签
-                List<String> tags = getLinkTags(id);
-                for (String t : tags) {
-                    item.addTag(t);
-                }
-                
-                links.add(item);
-            } while (cursor.moveToNext());
+    public void deleteTag(String tag) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            // 从链接-标签关系表中删除该标签的所有关联
+            db.delete(
+                    LinkDbHelper.TABLE_LINK_TAGS,
+                    "tag = ?",
+                    new String[]{tag}
+            );
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
         }
-        cursor.close();
-        
-        return links;
     }
 
-    public List<LinkItem> getLinksWithoutTags() {
-        List<LinkItem> links = new ArrayList<>();
-        
-        // 查找没有任何标签的链接，按时间戳降序排序
-        String query = "SELECT * FROM " + LinkDbHelper.TABLE_LINKS + " l " +
-                "WHERE NOT EXISTS (SELECT 1 FROM " + LinkDbHelper.TABLE_LINK_TAGS + 
-                " lt WHERE l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + ") " +
-                "ORDER BY " + LinkDbHelper.COLUMN_TIMESTAMP + " DESC";
-
-        Cursor cursor = database.rawQuery(query, null);
-        if (cursor.moveToFirst()) {
-            do {
-                LinkItem item = createLinkItemFromCursor(cursor);
-                links.add(item);
-            } while (cursor.moveToNext());
-        }
-        cursor.close();
-        return links;
+    // 添加标签
+    public long addTag(String tagName) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_TAG_NAME, tagName);
+        return database.insert(LinkDbHelper.TABLE_TAGS, null, values);
     }
 
-    public List<LinkItem> getLinksByTags(Set<String> tags) {
-        List<LinkItem> links = new ArrayList<>();
-        
-        // 构建查询语句，按时间戳降序排序
-        String query = "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l " +
-                "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + " " +
-                "JOIN " + LinkDbHelper.TABLE_TAGS + " t ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID + " " +
-                "WHERE t." + LinkDbHelper.COLUMN_TAG_NAME + " IN (" + makePlaceholders(tags.size()) + ") " +
-                "ORDER BY l." + LinkDbHelper.COLUMN_TIMESTAMP + " DESC";
-
-        String[] selectionArgs = tags.toArray(new String[0]);
-        Cursor cursor = database.rawQuery(query, selectionArgs);
-
-        if (cursor.moveToFirst()) {
-            do {
-                LinkItem item = createLinkItemFromCursor(cursor);
-                links.add(item);
-            } while (cursor.moveToNext());
-        }
-        cursor.close();
-        return links;
+    // 私有方法：使用ID添加标签
+    private void addTagToLink(long linkId, long tagId) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_LINK_ID, linkId);
+        values.put(LinkDbHelper.COLUMN_TAG_ID_REF, tagId);
+        database.insert(LinkDbHelper.TABLE_LINK_TAGS, null, values);
     }
+
+    // 公开方法：使用标签名称添加标签
+    public void addTagToLink(long linkId, String tagName) {
+        // 先确保标签存在，并获取标签ID
+        long tagId = getOrCreateTag(tagName);
+        // 添加链接-标签关联
+        addTagToLink(linkId, tagId);
+    }
+
+    public void __________________________________(){}
 
     // 辅助方法：从游标创建 LinkItem 对象
     private LinkItem createLinkItemFromCursor(Cursor cursor) {
@@ -329,10 +433,13 @@ public class LinkDao {
         String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
         String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
         long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TIMESTAMP));
+        int clickCount = cursor.getInt(cursor.getColumnIndexOrThrow("click_count"));  // 读取 click_count 字段
 
+        // mark
         LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
         item.setId(id);
         item.setSummary(summary);
+        item.setClickCount(clickCount);
         
         // 加载该链接的标签
         List<String> tags = getLinkTags(id);
@@ -340,6 +447,27 @@ public class LinkDao {
             item.addTag(tag);
         }
         
+        return item;
+    }
+
+    private LinkItem cursorToLinkItem(Cursor cursor) {
+        long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
+        String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
+        String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
+        String summary = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUMMARY));
+        String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
+        String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
+        String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
+        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TIMESTAMP));
+        boolean isPinned = cursor.getInt(cursor.getColumnIndexOrThrow("is_pinned")) == 1;
+        int clickCount = cursor.getInt(cursor.getColumnIndexOrThrow("click_count"));  // 读取 click_count 字段
+
+
+        LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
+        item.setId(id);
+        item.setSummary(summary);
+        item.setPinned(isPinned);
+        item.setClickCount(clickCount);
         return item;
     }
 
@@ -354,93 +482,7 @@ public class LinkDao {
         return sb.toString();
     }
 
-    public void togglePinStatus(long linkId) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        Log.d("LinkDao", "开始切换置顶状态, linkId: " + linkId);
-        
-        Cursor cursor = db.query(LinkDbHelper.TABLE_LINKS, new String[]{"is_pinned"}, 
-                "_id = ?", new String[]{String.valueOf(linkId)}, null, null, null);
-        
-        int currentStatus = 0;
-        if (cursor.moveToFirst()) {
-            currentStatus = cursor.getInt(0);
-            Log.d("LinkDao", "当前置顶状态: " + currentStatus);
-        }
-        cursor.close();
-        
-        ContentValues values = new ContentValues();
-        values.put("is_pinned", currentStatus == 0 ? 1 : 0);
-        
-        int updatedRows = db.update(LinkDbHelper.TABLE_LINKS, values, "_id = ?", 
-                new String[]{String.valueOf(linkId)});
-        Log.d("LinkDao", "更新结果: " + updatedRows + " 行受影响");
-    }
 
-    public List<LinkItem> getPinnedLinks() {
-        List<LinkItem> pinnedLinks = new ArrayList<>();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        
-        Log.d("LinkDao", "获取置顶链接");
-        Cursor cursor = db.query(LinkDbHelper.TABLE_LINKS, null, "is_pinned = 1", null, 
-                null, null, "timestamp DESC");
-        
-        Log.d("LinkDao", "找到 " + cursor.getCount() + " 个置顶链接");
-        if (cursor.moveToFirst()) {
-            do {
-                LinkItem item = cursorToLinkItem(cursor);
-                List<String> tags = getLinkTags(item.getId());
-                for (String tag : tags) {
-                    item.addTag(tag);
-                }
-                pinnedLinks.add(item);
-            } while (cursor.moveToNext());
-        }
-        cursor.close();
-        
-        return pinnedLinks;
-    }
-
-    private LinkItem cursorToLinkItem(Cursor cursor) {
-        long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
-        String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
-        String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
-        String summary = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUMMARY));
-        String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
-        String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
-        String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
-        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TIMESTAMP));
-        boolean isPinned = cursor.getInt(cursor.getColumnIndexOrThrow("is_pinned")) == 1;
-
-        LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
-        item.setId(id);
-        item.setSummary(summary);
-        item.setPinned(isPinned);
-        return item;
-    }
-
-    public void deleteTag(String tag) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        db.beginTransaction();
-        try {
-            // 从链接-标签关系表中删除该标签的所有关联
-            db.delete(
-                LinkDbHelper.TABLE_LINK_TAGS,
-                "tag = ?",
-                new String[]{tag}
-            );
-            db.setTransactionSuccessful();
-        } finally {
-            db.endTransaction();
-        }
-    }
-
-    public void updateSummary(long linkId, String summary) {
-        ContentValues values = new ContentValues();
-        values.put(LinkDbHelper.COLUMN_SUMMARY, summary);
-        database.update(LinkDbHelper.TABLE_LINKS, values, 
-            LinkDbHelper.COLUMN_ID + " = ?", 
-            new String[]{String.valueOf(linkId)});
-    }
 
     public Map<String, Integer> getDailyStatistics() {
         Log.d(TAG, "getDailyStatistics: 开始查询每日统计数据");
@@ -466,12 +508,6 @@ public class LinkDao {
         }
         Log.d(TAG, "getDailyStatistics: 统计完成，共 " + statistics.size() + " 条数据");
         return statistics;
-    }
-
-    public void updateClickCount(long id, int count) {
-        ContentValues values = new ContentValues();
-        values.put("click_count", count);
-        database.update("links", values, "id = ?", new String[]{String.valueOf(id)});
     }
 
     public Cursor getClickStatistics(String period) {

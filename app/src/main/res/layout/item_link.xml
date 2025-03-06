@@ -14,14 +14,34 @@
         android:orientation="vertical"
         android:padding="8dp">
 
-        <TextView
-            android:id="@+id/text_title"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:maxLines="2"
-            android:ellipsize="end"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/text_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:maxLines="2"
+                android:ellipsize="end"/>
+
+            <TextView
+                android:id="@+id/click_count_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="阅读 0 次"
+                android:textSize="12sp"
+                android:textColor="@android:color/darker_gray"
+                android:background="@drawable/click_count_background"
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="2dp"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
 
         <TextView
             android:id="@+id/text_url"
@@ -87,6 +107,7 @@
                 android:textColor="@color/primary"
                 android:stateListAnimator="@null" />
         </com.google.android.flexbox.FlexboxLayout>
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

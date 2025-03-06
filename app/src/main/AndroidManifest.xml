@@ -53,7 +53,7 @@
             android:theme="@style/Theme.MyApplication.NoActionBar"/>
         <activity
             android:name=".ClickStatisticsActivity"
-            android:label="@string/click_statistics"
+            android:label="@string/read_statistics"
             android:theme="@style/Theme.MyApplication.NoActionBar" />
         <provider
             android:name="androidx.core.content.FileProvider"

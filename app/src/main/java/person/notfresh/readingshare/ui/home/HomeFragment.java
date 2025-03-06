@@ -66,15 +66,23 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         inflater.inflate(R.menu.home_menu, menu);
         shareMenuItem = menu.findItem(R.id.action_share);
         closeSelectionMenuItem = menu.findItem(R.id.action_close_selection);
-        MenuItem statisticsMenuItem = menu.findItem(R.id.action_statistics);
+        MenuItem statisticsMenuItem = menu.findItem(R.id.action_statistics);  // 新增的统计
 
-        // 获取统计按钮的视图
+        // 调整新增统计按钮的位置
         View actionView = requireActivity().findViewById(statisticsMenuItem.getItemId());
         if (actionView != null) {
             ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) actionView.getLayoutParams();
             params.rightMargin = getResources().getDimensionPixelSize(R.dimen.statistics_button_margin);
             actionView.setLayoutParams(params);
         }
+
+       //新增的阅读量统计按钮
+    //     MenuItem clickStatsButton = menu.findItem(R.id.action_statistics_read);
+    //    clickStatsButton.setOnClickListener(v -> {
+    //        // 打开阅读量统计页面
+    //        Intent intent = new Intent(getActivity(), ClickStatisticsActivity.class);
+    //        startActivity(intent);
+    //    });
 
         shareMenuItem.setVisible(isSelectionMode);
         closeSelectionMenuItem.setVisible(isSelectionMode);
@@ -101,6 +109,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             // 导航到统计页面
             Navigation.findNavController(requireView())
                      .navigate(R.id.action_nav_home_to_nav_statistics);
+            return true;
+        } else if (id == R.id.action_statistics_read) {
+            // 打开阅读量统计页面
+            Intent intent = new Intent(getActivity(), ClickStatisticsActivity.class);
+            startActivity(intent);
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -160,14 +173,6 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 adapter.filter(s.toString());
             }
         });
-
-        // 新增的阅读量统计按钮
-//        ImageButton clickStatsButton = root.findViewById(R.id.action_click_statistics);
-//        clickStatsButton.setOnClickListener(v -> {
-//            // 打开阅读量统计页面
-//            Intent intent = new Intent(getActivity(), ClickStatisticsActivity.class);
-//            startActivity(intent);
-//        });
 
         return root;
     }

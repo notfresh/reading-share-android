@@ -9,7 +9,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "links.db";
     //private static final int DATABASE_VERSION = 4;
     // private static final int DATABASE_VERSION = 5; // 添加summary字段
-    private static final int DATABASE_VERSION = 6; // 添加点击数量字段
+    private static final int DATABASE_VERSION = 8; // 添加点击数量字段
 
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
@@ -43,7 +43,8 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     COLUMN_TARGET_ACTIVITY + " TEXT, " +
                     COLUMN_TIMESTAMP + " INTEGER, " +
                     COLUMN_SUMMARY + " TEXT, " +
-                    "is_pinned INTEGER DEFAULT 0)";
+                    "is_pinned INTEGER DEFAULT 0, " +
+                    "click_count INTEGER DEFAULT 0)";
 
     private static final String SQL_CREATE_TAGS =
             "CREATE TABLE " + TABLE_TAGS + " (" +
@@ -108,8 +109,8 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
             Log.d("LinkDbHelper", "Upgrading database from " + oldVersion + " to " + newVersion);
-            
-            // 备份现有数据（如果需要的话）
+
+            // 备份现有数据（如果需要的话） TODO
             
             // 删除旧表
             db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINKS);

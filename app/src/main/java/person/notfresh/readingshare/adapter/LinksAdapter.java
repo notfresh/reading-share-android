@@ -577,6 +577,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         TextView urlText;
         TextView summaryText;
         TextView showMoreText;
+        TextView clickCountText;  // 阅读次数显示
         FlexboxLayout tagContainer;
         Button addTagButton;
         private final LinksAdapter adapter;
@@ -590,6 +591,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             showMoreText = view.findViewById(R.id.text_show_more);
             tagContainer = view.findViewById(R.id.tag_container);
             addTagButton = view.findViewById(R.id.btn_add_tag);
+            clickCountText = view.findViewById(R.id.click_count_text);  // 绑定阅读次数控件
         }
 
         void bind(LinkItem item) {
@@ -605,6 +607,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
             // 添加标签按钮
             addTagButton.setOnClickListener(v -> showAddTagDialog(v.getContext(), item));
+
+            // 显示阅读次数
+            clickCountText.setText("阅读 " + item.getClickCount() + " 次");  // 设置阅读次数
 
             // 添加选择模式的视觉反馈
             if (adapter.isSelectionMode) {  //@mark.1
@@ -793,6 +798,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             linkItem.incrementClickCount();
             Log.d("LinksAdapter", "Click count updated to: " + linkItem.getClickCount());
             linkDao.updateClickCount(linkItem.getId(), linkItem.getClickCount());
+
+            // 刷新当前项
+            notifyItemChanged(position);
 
             // 打开链接
             Log.d("LinksAdapter", "Starting WebViewActivity with url: " + url);

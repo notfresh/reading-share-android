@@ -28,6 +28,12 @@
     <item
         android:id="@+id/action_statistics"
         android:icon="@drawable/ic_statistics"
-        android:title="@string/click_statistics"
+        android:title="@string/add_statistics"
         app:showAsAction="always"/>
+    
+    <item
+        android:id="@+id/action_statistics_read"
+        android:icon="@drawable/ic_gallery"
+        android:title="@string/read_statistics"
+        android:visible="false" />
 </menu> 
