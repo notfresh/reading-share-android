@@ -7,11 +7,13 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import android.view.View;
 
 public class WebViewActivity extends AppCompatActivity {
     private WebView webView;
@@ -71,6 +73,11 @@ public class WebViewActivity extends AppCompatActivity {
                 Toast.makeText(this, "无法打开浏览器", Toast.LENGTH_SHORT).show();
                 return true;
             }
+        } else if (item.getItemId() == R.id.action_force_back) {
+            // 强制返回，直接关闭当前 WebView
+            Log.d("WebViewActivityMenu", "点击了强制返回");
+            finish();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -85,6 +92,22 @@ public class WebViewActivity extends AppCompatActivity {
         
         // 启用 DOM storage
         webView.getSettings().setDomStorageEnabled(true);
+        
+        // 允许混合内容（HTTP和HTTPS）
+        webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        
+        // 允许自动播放媒体
+        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        
+        // 设置WebView在后台继续播放音频
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            webView.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        }
+        
+        // 设置WebView在后台继续播放音频
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        }
         
         // 设置 WebViewClient 处理页面加载
         webView.setWebViewClient(new WebViewClient() {
@@ -148,5 +171,44 @@ public class WebViewActivity extends AppCompatActivity {
             webView.destroy();
         }
         super.onDestroy();
+    }
+
+    @Override
+    protected void onPause() {
+        if (isAudioPlaying()) {
+            // 创建并启动前台服务
+            Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        // 使用setWillNotDraw(false)确保WebView即使在后台也能继续渲染
+        if (webView != null) {
+            webView.setWillNotDraw(false);
+        }
+        super.onStop();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+        }
+    }
+
+    // 检查是否有音频正在播放的辅助方法
+    private boolean isAudioPlaying() {
+        // 这个方法需要您根据应用的具体情况来实现
+        // 可以使用JavaScript接口来检测网页中的音频状态
+        return true; // 为了简单起见，这里假设总是有音频在播放
     }
 } 

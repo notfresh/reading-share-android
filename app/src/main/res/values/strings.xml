@@ -41,4 +41,6 @@
     <string name="statistics_title">链接点击统计</string>
     
     <string name="no_data_available">暂无数据</string>
+
+    <string name="force_back">强制返回</string>
 </resources>
