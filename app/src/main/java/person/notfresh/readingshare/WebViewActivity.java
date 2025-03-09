@@ -14,11 +14,20 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import android.view.View;
+import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
+import android.os.PowerManager;
+import android.content.Context;
+import android.os.Build;
+import android.webkit.PermissionRequest;
 
 public class WebViewActivity extends AppCompatActivity {
     private WebView webView;
     private Toolbar toolbar;
     private String currentUrl;
+    private boolean audioPlaying = false;
+    private MediaSessionCompat mediaSession;
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +53,15 @@ public class WebViewActivity extends AppCompatActivity {
         
         // 加载URL
         webView.loadUrl(currentUrl);
+
+        // 初始化MediaSession
+        initMediaSession();
+        
+        // 获取WakeLock
+        PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK, 
+                "WebViewAudio::WakeLock");
     }
 
     @Override
@@ -109,6 +127,51 @@ public class WebViewActivity extends AppCompatActivity {
             webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
         }
         
+        // 关键：允许WebView在后台播放媒体
+        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        
+        // 更关键：确保WebView在后台不被暂停
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            webView.setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onShowCustomView(View view, CustomViewCallback callback) {
+                    super.onShowCustomView(view, callback);
+                }
+                
+                // 这个方法会在音频开始和停止播放时被调用
+                @Override
+                public void onPermissionRequest(PermissionRequest request) {
+                    runOnUiThread(() -> request.grant(request.getResources()));
+                }
+            });
+        }
+        
+        // 修改JavaScriptInterface
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void setAudioPlaying(boolean isPlaying) {
+                audioPlaying = isPlaying;
+                if (isPlaying) {
+                    // 当音频开始播放时激活MediaSession
+                    if (!mediaSession.isActive()) {
+                        mediaSession.setActive(true);
+                    }
+                    // 获取WakeLock以保持CPU运行
+                    if (!wakeLock.isHeld()) {
+                        wakeLock.acquire(3600*1000); // 持有1小时
+                    }
+                } else {
+                    // 当音频停止时释放资源
+                    if (mediaSession.isActive()) {
+                        mediaSession.setActive(false);
+                    }
+                    if (wakeLock.isHeld()) {
+                        wakeLock.release();
+                    }
+                }
+            }
+        }, "AndroidAudio");
+        
         // 设置 WebViewClient 处理页面加载
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -131,6 +194,37 @@ public class WebViewActivity extends AppCompatActivity {
                 // 普通网页链接在WebView中加载
                 view.loadUrl(url);
                 return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // 注入JavaScript来监听音频/视频播放状态
+                String js = "javascript:" +
+                        "var audioElements = document.getElementsByTagName('audio');" +
+                        "var videoElements = document.getElementsByTagName('video');" +
+                        "function updatePlayingStatus() {" +
+                        "  var isPlaying = false;" +
+                        "  for(var i=0; i<audioElements.length; i++) {" +
+                        "    if(!audioElements[i].paused) { isPlaying = true; break; }" +
+                        "  }" +
+                        "  if(!isPlaying) {" +
+                        "    for(var i=0; i<videoElements.length; i++) {" +
+                        "      if(!videoElements[i].paused) { isPlaying = true; break; }" +
+                        "    }" +
+                        "  }" +
+                        "  AndroidAudio.setAudioPlaying(isPlaying);" +
+                        "}" +
+                        "setInterval(updatePlayingStatus, 1000);" +
+                        "for(var i=0; i<audioElements.length; i++) {" +
+                        "  audioElements[i].addEventListener('play', function() { AndroidAudio.setAudioPlaying(true); });" +
+                        "  audioElements[i].addEventListener('pause', function() { updatePlayingStatus(); });" +
+                        "}" +
+                        "for(var i=0; i<videoElements.length; i++) {" +
+                        "  videoElements[i].addEventListener('play', function() { AndroidAudio.setAudioPlaying(true); });" +
+                        "  videoElements[i].addEventListener('pause', function() { updatePlayingStatus(); });" +
+                        "}";
+                view.evaluateJavascript(js, null);
             }
         });
 
@@ -170,14 +264,47 @@ public class WebViewActivity extends AppCompatActivity {
             webView.clearCache(true);
             webView.destroy();
         }
+        if (mediaSession != null) {
+            mediaSession.release();
+        }
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+        }
         super.onDestroy();
     }
 
     @Override
     protected void onPause() {
         if (isAudioPlaying()) {
-            // 创建并启动前台服务
+            // 启动服务
             Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
+            serviceIntent.putExtra("current_url", currentUrl);
+            
+            // 在音频播放时，注入保持播放的脚本
+            webView.evaluateJavascript(
+                "var keepPlaying = function() {" +
+                "  var audios = document.getElementsByTagName('audio');" +
+                "  var videos = document.getElementsByTagName('video');" +
+                "  for(var i=0; i<audios.length; i++) {" +
+                "    if(!audios[i].paused) {" +
+                "      var playPromise = audios[i].play();" +
+                "      if(playPromise !== undefined) {" +
+                "        playPromise.then(_ => {}).catch(e => console.log(e));" +
+                "      }" +
+                "    }" +
+                "  }" +
+                "  for(var i=0; i<videos.length; i++) {" +
+                "    if(!videos[i].paused) {" +
+                "      var playPromise = videos[i].play();" +
+                "      if(playPromise !== undefined) {" +
+                "        playPromise.then(_ => {}).catch(e => console.log(e));" +
+                "      }" +
+                "    }" +
+                "  }" +
+                "};" +
+                "keepPlaying();" +
+                "setInterval(keepPlaying, 500);", null);
+                
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent);
             } else {
@@ -203,12 +330,29 @@ public class WebViewActivity extends AppCompatActivity {
             webView.onResume();
             webView.resumeTimers();
         }
+        
+        // 停止前台服务
+        stopService(new Intent(this, WebViewBackgroundService.class));
     }
 
-    // 检查是否有音频正在播放的辅助方法
+    // 优化isAudioPlaying方法
     private boolean isAudioPlaying() {
         // 这个方法需要您根据应用的具体情况来实现
         // 可以使用JavaScript接口来检测网页中的音频状态
-        return true; // 为了简单起见，这里假设总是有音频在播放
+        //return true; // 为了简单起见，这里假设总是有音频在播放
+        return audioPlaying;
+    }
+
+    private void initMediaSession() {
+        mediaSession = new MediaSessionCompat(this, "WebViewAudio");
+        mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
+        mediaSession.setActive(true);
+        
+        PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder()
+                .setActions(PlaybackStateCompat.ACTION_PLAY |
+                        PlaybackStateCompat.ACTION_PAUSE |
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE);
+        mediaSession.setPlaybackState(stateBuilder.build());
     }
 } 
