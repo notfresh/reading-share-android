@@ -28,6 +28,7 @@ public class WebViewActivity extends AppCompatActivity {
     private boolean audioPlaying = false;
     private MediaSessionCompat mediaSession;
     private PowerManager.WakeLock wakeLock;
+    private boolean preserveCache = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,8 +97,29 @@ public class WebViewActivity extends AppCompatActivity {
             Log.d("WebViewActivityMenu", "点击了强制返回");
             finish();
             return true;
+        } else if (item.getItemId() == R.id.action_archive_back) {
+            // 存档返回，保留缓存并关闭
+            Log.d("WebViewActivityMenu", "点击了存档返回");
+            Toast.makeText(this, "页面已存档", Toast.LENGTH_SHORT).show();
+            preserveCache = true;  // 设置标志
+            finish();  // 直接调用finish
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void finish() {
+        if (preserveCache) {
+            // 如果需要保留缓存，只处理WebView部分
+            if (webView != null) {
+                webView.stopLoading();
+                // 不清除历史和缓存，但停止WebView
+                webView.destroy();
+            }
+            // 不在这里释放mediaSession和wakeLock
+        }
+        super.finish();  // 调用原始的finish方法
     }
 
     private void setupWebView() {
@@ -257,18 +279,28 @@ public class WebViewActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        // 清理 WebView
-        if (webView != null) {
-            webView.stopLoading();
-            webView.clearHistory();
-            webView.clearCache(true);
-            webView.destroy();
+        if (!preserveCache) {  // 只有在不保留缓存时才清除WebView缓存
+            // 清理 WebView
+            if (webView != null) {
+                webView.stopLoading();
+                webView.clearHistory();
+                webView.clearCache(true);
+                webView.destroy();
+            }
         }
+        if(preserveCache){  // 只生效一次,反转回来
+           //preserveCache = false;
+        }
+        
+        
+        // 无论是否保留缓存，都在onDestroy中释放这些资源
         if (mediaSession != null) {
             mediaSession.release();
+            mediaSession = null;  // 防止重复释放
         }
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
+            wakeLock = null;  // 防止重复释放
         }
         super.onDestroy();
     }

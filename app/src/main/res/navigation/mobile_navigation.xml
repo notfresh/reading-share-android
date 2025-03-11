@@ -20,7 +20,7 @@
     <fragment
         android:id="@+id/nav_slideshow"
         android:name="person.notfresh.readingshare.ui.settings.SettingFragment"
-        android:label="@string/menu_slideshow"
+        android:label="@string/menu_settings"
         tools:layout="@layout/fragment_slideshow" />
 
     <fragment
@@ -34,6 +34,12 @@
         android:name="person.notfresh.readingshare.ui.statistics.StatisticsFragment"
         android:label="统计"
         tools:layout="@layout/fragment_statistics" />
+
+    <fragment
+        android:id="@+id/nav_archive"
+        android:name="person.notfresh.readingshare.ui.archive.ArchiveFragment"
+        android:label="@string/menu_archive"
+        tools:layout="@layout/fragment_archive" />
 
     <action
         android:id="@+id/action_nav_home_to_nav_statistics"

@@ -47,9 +47,12 @@ public class ExportUtil {
             String url = escapeCSV(link.getUrl());
             String date = sdf.format(new Date(link.getTimestamp()));
             String tags = escapeCSV(TextUtils.join(",", link.getTags()));
+            String clickCount = String.valueOf(link.getClickCount());
+            String summary = escapeCSV(link.getSummary());
+        
             
-            csv.append(String.format("%s,%s,%s,%s\n",
-                    title, url, date, tags));
+            csv.append(String.format("%s,%s,%s,%s,%s,%s\n",
+                    title, url, date, tags, clickCount, summary));
         }
 
         String fileName = "links_" + getCurrentTime() + ".csv";

@@ -11,7 +11,8 @@
     <string name="menu_home">首页</string>
     <string name="menu_gallery">标签</string>
     <string name="menu_rss">RSS</string>
-    <string name="menu_slideshow">设置</string>
+    <string name="menu_settings">设置</string>
+    <string name="menu_archive">归档</string>
     
 
     <string-array name="default_tabs_array">
@@ -43,4 +44,5 @@
     <string name="no_data_available">暂无数据</string>
 
     <string name="force_back">强制返回</string>
+    <string name="archive_back">存档返回</string>
 </resources>

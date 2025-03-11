@@ -116,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
             
             // 然后设置 AppBarConfiguration
             mAppBarConfiguration = new AppBarConfiguration.Builder(
-                    R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss)
+                    R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive)
                     .setOpenableLayout(drawer)
                     .build();
 
@@ -151,6 +151,8 @@ public class MainActivity extends AppCompatActivity {
                             navController.navigate(R.id.nav_rss);
                         } else if (id == R.id.nav_slideshow) {
                             navController.navigate(R.id.nav_slideshow);
+                        } else if (id == R.id.nav_archive) {
+                            navController.navigate(R.id.nav_archive);
                         }
                     } catch (Exception e) {
                         Log.e("MainActivity", "Navigation failed", e);

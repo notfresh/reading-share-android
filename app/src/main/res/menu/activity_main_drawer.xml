@@ -22,7 +22,13 @@
         <item
             android:id="@+id/nav_slideshow"
             android:icon="@drawable/ic_settings"
-            android:title="@string/menu_slideshow"
+            android:title="@string/menu_settings"
+            android:textAppearance="@style/NavigationDrawerText"/>
+        
+        <item
+            android:id="@+id/nav_archive"
+            android:icon="@drawable/ic_archive"
+            android:title="@string/menu_archive"
             android:textAppearance="@style/NavigationDrawerText"/>
     </group>
 </menu>

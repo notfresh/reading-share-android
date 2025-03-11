@@ -524,6 +524,8 @@ import person.notfresh.readingshare.R;
 
 想要设计一个自己心仪的图标，去网上找svg格式的图标，在res/drawable里面引入 new vector，然后在对应的位置引用即可。
 
+
+
 # 循环列表
 
 下面简单说明一下：
@@ -812,6 +814,8 @@ https://www.cnblogs.com/tuyile006/p/3691024.html
 # Icon设置
 
 举个例子  profileImage.setImageResource(R.drawable.default_avatar);
+
+https://romannurik.github.io/AndroidAssetStudio/
 
 # 信任所有证书
 
