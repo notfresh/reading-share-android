@@ -17,4 +17,9 @@
         android:title="@string/archive_back"
         android:icon="@drawable/ic_archive"
         app:showAsAction="never"/>
+    
+    <!-- <item
+        android:id="@+id/action_webview_switch_out"
+        android:title="@string/webview_switch_out"
+        app:showAsAction="never"/> -->
 </menu> 

@@ -1445,6 +1445,23 @@ public void onDestroyView() {
 整个过程遵循 Android Fragment 的标准生命周期，通过 ViewBinding 绑定视图，使用 RecyclerView 显示链接列表，并提供搜索、选择和分享功能。界面状态的变化（如选择模式的切换）会动态更新菜单项和标题栏。
 
 
+# 关于WebView的缓存
 
+我发现这种保留缓存的方式依然不能实现我的期望，能不能增加一个功能，直接先隐藏当前WebView，返回LinksAdapter逻辑点击的时候直接恢复这个WebView
+
+然而，必须要说明的两个要求。1. 正常的阅读链接，我点击它就还是按原来的功能，2.在打开一个链接后，也就是一个WebView后，如果我使用的是切出来，那么这个
+
+
+帮我实现一个更高级的功能：将WebView实例保存起来，当用户再次点击相同链接时，直接使用之前已加载的WebView实例而不是创建新的。这样可以实现立即恢复之前浏览的内容和状态。
+
+
+实现这个功能的关键点：
+需要一个全局的WebView管理器，可以存储多个WebView实例，每个URL对应一个WebView实例
+当用户点击"存档返回"时，不销毁WebView，而是保存起来，当用户再次点击相同URL时，检查是否有已缓存的WebView，如果有就直接使用
+让我设计一个实现方案：
+创建一个WebViewManager单例类
+在WebViewActivity中，当用户点击"存档返回"时，将WebView交给WebViewManager管理
+修改LinksAdapter中的openLink方法，检查WebViewManager中是否有对应URL的WebView
+这种方法的好处是可以完全保留WebView的状态，包括滚动位置、表单内容、JavaScript状态等，提供无缝的浏览体验。
 
 # @END

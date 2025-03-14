@@ -1,5 +1,7 @@
 package person.notfresh.readingshare;
 
+import static person.notfresh.readingshare.WebViewManager.*;
+
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -20,6 +22,7 @@ import android.os.PowerManager;
 import android.content.Context;
 import android.os.Build;
 import android.webkit.PermissionRequest;
+import android.view.ViewGroup;
 
 public class WebViewActivity extends AppCompatActivity {
     private WebView webView;
@@ -48,21 +51,42 @@ public class WebViewActivity extends AppCompatActivity {
             return;
         }
 
-        // 初始化 WebView
-        webView = findViewById(R.id.webview);
-        setupWebView();
+        // 检查是否有缓存的WebView实例
+        WebView cachedWebView = getInstance().getWebView(currentUrl);
+        ViewGroup webViewContainer = findViewById(R.id.webview_container);
         
-        // 加载URL
-        webView.loadUrl(currentUrl);
+        if (cachedWebView != null) {
+            // 使用缓存的WebView
+            webView = cachedWebView;
+            if (webView.getParent() != null) {
+                ((ViewGroup) webView.getParent()).removeView(webView);
+            }
+            webViewContainer.addView(webView);
+            Toast.makeText(this, "已恢复存档页面", Toast.LENGTH_SHORT).show();
+            
+            // 初始化MediaSession（确保缓存的WebView有可用的mediaSession）
+            initMediaSession();
+        } else {
+            // 创建新的WebView
+            webView = findViewById(R.id.webview);
+            setupWebView();
+            webView.loadUrl(currentUrl);
+        }
 
-        // 初始化MediaSession
-        initMediaSession();
-        
         // 获取WakeLock
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK, 
                 "WebViewAudio::WakeLock");
+
+        // 只对通义网站禁用MediaSessionCompat功能
+        if (currentUrl != null && currentUrl.contains("tongyi.aliyun.com")) {
+            Log.d("WebViewActivity", "检测到通义网站，禁用MediaSession功能");
+            // 不初始化mediaSession，避免NPE问题
+            mediaSession = null;
+            // 在通义网站上禁用JavascriptInterface
+            webView.removeJavascriptInterface("AndroidMediaInterface");
+        }
     }
 
     @Override
@@ -98,11 +122,27 @@ public class WebViewActivity extends AppCompatActivity {
             finish();
             return true;
         } else if (item.getItemId() == R.id.action_archive_back) {
-            // 存档返回，保留缓存并关闭
+            // 存档返回，保存整个WebView实例
             Log.d("WebViewActivityMenu", "点击了存档返回");
             Toast.makeText(this, "页面已存档", Toast.LENGTH_SHORT).show();
-            preserveCache = true;  // 设置标志
-            finish();  // 直接调用finish
+            
+            // 首先释放mediaSession，防止后续回调时出现NPE
+            if (mediaSession != null) {
+                mediaSession.setActive(false);
+                mediaSession.release();
+                mediaSession = null;
+            }
+            
+            // 从布局中移除WebView以保持其状态
+            if (webView != null && webView.getParent() != null) {
+                ((ViewGroup) webView.getParent()).removeView(webView);
+                // 存储WebView实例
+                getInstance().storeWebView(currentUrl, webView);
+                // 设置webView为null以防止在onDestroy中被销毁
+                webView = null;
+            }
+            preserveCache = true;  // 保留其他标记
+            finish();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -118,6 +158,13 @@ public class WebViewActivity extends AppCompatActivity {
                 webView.destroy();
             }
             // 不在这里释放mediaSession和wakeLock
+        } else {
+            // 不需要保留缓存时，检查WebViewManager中是否有当前URL的缓存
+            if (currentUrl != null && getInstance().hasCache(currentUrl)) {
+                // 清除WebViewManager中的缓存
+                Log.d("WebViewActivity", "清除URL缓存: " + currentUrl);
+                getInstance().removeWebView(currentUrl);
+            }
         }
         super.finish();  // 调用原始的finish方法
     }
@@ -168,94 +215,44 @@ public class WebViewActivity extends AppCompatActivity {
             });
         }
         
-        // 修改JavaScriptInterface
-        webView.addJavascriptInterface(new Object() {
-            @android.webkit.JavascriptInterface
-            public void setAudioPlaying(boolean isPlaying) {
-                audioPlaying = isPlaying;
-                if (isPlaying) {
-                    // 当音频开始播放时激活MediaSession
-                    if (!mediaSession.isActive()) {
-                        mediaSession.setActive(true);
-                    }
-                    // 获取WakeLock以保持CPU运行
-                    if (!wakeLock.isHeld()) {
-                        wakeLock.acquire(3600*1000); // 持有1小时
-                    }
-                } else {
-                    // 当音频停止时释放资源
-                    if (mediaSession.isActive()) {
-                        mediaSession.setActive(false);
-                    }
-                    if (wakeLock.isHeld()) {
-                        wakeLock.release();
-                    }
-                }
-            }
-        }, "AndroidAudio");
+        // 添加JS接口
+        webView.addJavascriptInterface(new MediaInterfaceObject(), "AndroidMediaInterface");
         
-        // 设置 WebViewClient 处理页面加载
+        // 注入安全检查脚本 - 保留这部分
+        webView.evaluateJavascript(
+            "function safeMediaCall(callback) {" +
+            "  try {" +
+            "    return callback();" +
+            "  } catch(e) {" +
+            "    console.log('Media interface error: ' + e.message);" +
+            "    return false;" +
+            "  }" +
+            "}", null);
+        
+        // 改为一个更简单的通义网站处理方法
         webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                currentUrl = url;
-                // 如果是特殊的 scheme，使用系统处理
-                if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                    try {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                        startActivity(intent);
-                        return true;
-                    } catch (Exception e) {
-                        Toast.makeText(WebViewActivity.this, 
-                            "无法打开此链接", 
-                            Toast.LENGTH_SHORT).show();
-                        return true;
-                    }
-                }
-                
-                // 普通网页链接在WebView中加载
-                view.loadUrl(url);
-                return true;
-            }
-
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // 注入JavaScript来监听音频/视频播放状态
-                String js = "javascript:" +
-                        "var audioElements = document.getElementsByTagName('audio');" +
-                        "var videoElements = document.getElementsByTagName('video');" +
-                        "function updatePlayingStatus() {" +
-                        "  var isPlaying = false;" +
-                        "  for(var i=0; i<audioElements.length; i++) {" +
-                        "    if(!audioElements[i].paused) { isPlaying = true; break; }" +
+                
+                // 只在通义网站注入特殊处理
+                if (url != null && url.contains("tongyi.aliyun.com")) {
+                    view.evaluateJavascript(
+                        "console.log('为通义网站应用简单处理');" +
+                        "window.onerror = function(msg, url, line) {" +
+                        "  if(msg.indexOf('mediaSession') > -1) {" +
+                        "    console.log('已拦截mediaSession错误');" +
+                        "    return true;" + // 拦截错误
                         "  }" +
-                        "  if(!isPlaying) {" +
-                        "    for(var i=0; i<videoElements.length; i++) {" +
-                        "      if(!videoElements[i].paused) { isPlaying = true; break; }" +
-                        "    }" +
-                        "  }" +
-                        "  AndroidAudio.setAudioPlaying(isPlaying);" +
-                        "}" +
-                        "setInterval(updatePlayingStatus, 1000);" +
-                        "for(var i=0; i<audioElements.length; i++) {" +
-                        "  audioElements[i].addEventListener('play', function() { AndroidAudio.setAudioPlaying(true); });" +
-                        "  audioElements[i].addEventListener('pause', function() { updatePlayingStatus(); });" +
-                        "}" +
-                        "for(var i=0; i<videoElements.length; i++) {" +
-                        "  videoElements[i].addEventListener('play', function() { AndroidAudio.setAudioPlaying(true); });" +
-                        "  videoElements[i].addEventListener('pause', function() { updatePlayingStatus(); });" +
-                        "}";
-                view.evaluateJavascript(js, null);
-            }
-        });
-
-        // 设置 WebChromeClient 处理进度和标题
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onReceivedTitle(WebView view, String title) {
-                if (getSupportActionBar() != null) {
-                    getSupportActionBar().setTitle(title);
+                        "  return false;" + // 不拦截其他错误
+                        "};" +
+                        // 简单替换通义可能使用的媒体API
+                        "if(window.AndroidMediaInterface === undefined) {" +
+                        "  window.AndroidMediaInterface = {" +
+                        "    isMediaSessionActive: function() { return false; }," +
+                        "    setMediaPlaying: function() { return false; }" +
+                        "  };" +
+                        "}", null);
                 }
             }
         });
@@ -289,7 +286,7 @@ public class WebViewActivity extends AppCompatActivity {
             }
         }
         if(preserveCache){  // 只生效一次,反转回来
-           //preserveCache = false;
+           preserveCache = false;
         }
         
         
@@ -307,7 +304,7 @@ public class WebViewActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
-        if (isAudioPlaying()) {
+        if (isAudioPlaying() && webView != null) {  // 添加对webView的null检查
             // 启动服务
             Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
             serviceIntent.putExtra("current_url", currentUrl);
@@ -365,13 +362,20 @@ public class WebViewActivity extends AppCompatActivity {
         
         // 停止前台服务
         stopService(new Intent(this, WebViewBackgroundService.class));
+        
+        // 如果mediaSession为null，重新初始化它
+        if (mediaSession == null && webView != null) {
+            initMediaSession();
+        }
     }
 
     // 优化isAudioPlaying方法
     private boolean isAudioPlaying() {
-        // 这个方法需要您根据应用的具体情况来实现
-        // 可以使用JavaScript接口来检测网页中的音频状态
-        //return true; // 为了简单起见，这里假设总是有音频在播放
+        // 如果webView已经被移除并存档，则返回false
+        // TODO: 需要检测是否正在播放，这里做一个假设而已
+        if (webView == null) {
+            return false;
+        }
         return audioPlaying;
     }
 
@@ -386,5 +390,41 @@ public class WebViewActivity extends AppCompatActivity {
                         PlaybackStateCompat.ACTION_PAUSE |
                         PlaybackStateCompat.ACTION_PLAY_PAUSE);
         mediaSession.setPlaybackState(stateBuilder.build());
+    }
+
+    // 添加一个JS接口类来处理媒体操作
+    private class MediaInterfaceObject {
+        @android.webkit.JavascriptInterface
+        public boolean isMediaSessionActive() {
+            try {
+                return mediaSession != null && mediaSession.isActive();
+            } catch (Exception e) {
+                Log.e("WebViewActivity", "MediaSession访问错误", e);
+                return false;
+            }
+        }
+        
+        @android.webkit.JavascriptInterface
+        public void setMediaPlaying(boolean isPlaying) {
+            try {
+                audioPlaying = isPlaying;
+                // 安全地更新媒体状态
+                if (mediaSession != null) {
+                    PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder();
+                    stateBuilder.setState(
+                        isPlaying ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED,
+                        PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN,
+                        1.0f);
+                    mediaSession.setPlaybackState(stateBuilder.build());
+                }
+            } catch (Exception e) {
+                Log.e("WebViewActivity", "设置媒体状态错误", e);
+            }
+        }
+        
+        @android.webkit.JavascriptInterface
+        public boolean isTongyiSite(String url) {
+            return url != null && url.contains("tongyi.aliyun.com");
+        }
     }
 } 
