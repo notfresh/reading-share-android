@@ -38,7 +38,7 @@ public class ExportUtil {
     public static String exportToCsv(Context context, List<LinkItem> links) throws Exception {
         StringBuilder csv = new StringBuilder();
         // 修改CSV头，移除来源字段
-        csv.append("标题,链接,时间,标签\n");
+        csv.append("标题,链接,时间,标签,阅读次数,摘要\n");
         
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
         

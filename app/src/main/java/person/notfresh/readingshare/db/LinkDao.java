@@ -243,7 +243,9 @@ public class LinkDao {
 
     public List<LinkItem> getLinksByTags(Set<String> tags) {
         List<LinkItem> links = new ArrayList<>();
-
+        if(tags.isEmpty()){
+            return links;
+        }
         // 构建查询语句，按时间戳降序排序
         String query = "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l " +
                 "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + " " +
@@ -526,5 +528,36 @@ public class LinkDao {
         }
         
         return database.rawQuery(query, null);
+    }
+
+    /**
+     * 获取所有标签及其使用次数
+     * @return Map<String, Integer> 标签名称和使用次数的映射
+     */
+    public Map<String, Integer> getTagsWithCount() {
+        Map<String, Integer> tagCountMap = new HashMap<>();
+        SQLiteDatabase db =  dbHelper.getReadableDatabase();
+        
+        // 首先获取所有标签
+        Cursor cursor = db.rawQuery("SELECT DISTINCT name FROM tags", null);
+        
+        if (cursor.moveToFirst()) {
+            do {
+                String tag = cursor.getString(0);
+                // 对每个标签，计算其在数据库中出现的次数
+                Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM tags t , link_tags lt  WHERE t._id = lt.tag_id and name = ?",
+                        new String[] { tag });
+                
+                if (countCursor.moveToFirst()) {
+                    int count = countCursor.getInt(0);
+                    tagCountMap.put(tag, count);
+                }
+                
+                countCursor.close();
+            } while (cursor.moveToNext());
+        }
+        
+        cursor.close();
+        return tagCountMap;
     }
 } 

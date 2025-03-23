@@ -928,8 +928,7 @@ public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int positi
 
 1. **连接设备**：将你的安卓设备通过 USB 连接到电脑，并确保 USB 调试已开启。
 2. **打开 Android Studio**：启动 Android Studio。
-3. **打开 Device File Explorer**：
-   - 在 Android Studio 中，点击右下角的 "Device File Explorer" 选项。
+3. **打开 view / tool windows / Device File Explorer**：
 4. **导航到数据库文件**：
    - 在 Device File Explorer 中，导航到你的应用的数据库目录，通常路径为：
      ```

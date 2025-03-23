@@ -216,10 +216,26 @@ public class SettingFragment extends Fragment {
                             Log.d("importCsvFromUri", "处理标签: 原始值=" + columns[3] + 
                                   ", 解析结果=" + tags.toString());
                         }
+                        int clickCount = 0;
+                        if (columns.length >= 5) {
+                            try {
+                                clickCount = Integer.parseInt(columns[4].trim());
+                            } catch (NumberFormatException e) {
+                                Log.e("importCsvFromUri", "点击数转换失败: " + columns[4], e);
+                                clickCount = 0;
+                            }
+                        }
+                        String summary = "";    
+                        if (columns.length >= 6) {
+                            summary = columns[5].trim();
+                        }
                         
                         LinkItem newLink = new LinkItem(title, url, "imported", "", "");
                         newLink.setTimestamp(timestamp);
                         newLink.setTags(tags);
+                        newLink.setClickCount(clickCount);
+                        newLink.setSummary(summary);
+
                         Log.d("importCsvFromUri", "创建新链接: " + newLink.toString() + 
                               ", 标签数量=" + tags.size());
                         linkDao.insertLink(newLink);

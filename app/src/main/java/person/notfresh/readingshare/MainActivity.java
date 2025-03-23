@@ -2,6 +2,7 @@ package person.notfresh.readingshare;
 
 import android.annotation.SuppressLint;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -17,6 +18,7 @@ import android.util.Log;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 
+import com.google.android.flexbox.FlexboxLayout;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.navigation.NavigationView;
 
@@ -60,6 +62,7 @@ import android.content.SharedPreferences;
 import androidx.core.view.GravityCompat;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import person.notfresh.readingshare.util.CrawlUtil;
+import person.notfresh.readingshare.util.RecentTagsManager;
 
 import java.io.IOException;
 import android.widget.ImageView;
@@ -460,6 +463,8 @@ public class MainActivity extends AppCompatActivity {
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_save_link, null);
         EditText titleInput = dialogView.findViewById(R.id.edit_title);
         EditText urlInput = dialogView.findViewById(R.id.edit_url);
+        EditText tagsInput = dialogView.findViewById(R.id.edit_tags);
+        FlexboxLayout recentTagsContainer = dialogView.findViewById(R.id.recent_tags_container);
 
         // 设置初始值和提示
         titleInput.setHint(initialTitle);  // 使用 hint 显示灰色提示文字
@@ -467,6 +472,33 @@ public class MainActivity extends AppCompatActivity {
 
         // 让标题输入框获得焦点
         titleInput.requestFocus();
+
+        // 获取并显示最近标签
+        Context context = this;
+        List<String> recentTags = RecentTagsManager.getRecentTags(context);
+        if (!recentTags.isEmpty()) {
+            TextView recentTagsLabel = dialogView.findViewById(R.id.text_recent_tags_label);
+            recentTagsLabel.setVisibility(View.VISIBLE);
+
+            for (String tag : recentTags) {
+                TextView tagView = (TextView) LayoutInflater.from(context)
+                        .inflate(R.layout.item_recent_tag, recentTagsContainer, false);
+                tagView.setText(tag);
+                tagView.setOnClickListener(v -> {
+                    String currentText = tagsInput.getText().toString().trim();
+                    // 如果输入框不为空且不以逗号结尾，添加逗号分隔符
+                    if (!currentText.isEmpty() && !currentText.endsWith(",") && !currentText.endsWith("，")) {
+                        tagsInput.setText(currentText + "，" + tag);
+                    } else {
+                        // 如果为空或以逗号结尾，直接添加标签
+                        tagsInput.setText(currentText + tag);
+                    }
+                    // 将光标移到末尾
+                    tagsInput.setSelection(tagsInput.getText().length());
+                });
+                recentTagsContainer.addView(tagView);
+            }
+        }
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("保存链接")
@@ -487,9 +519,17 @@ public class MainActivity extends AppCompatActivity {
                             "clipboard",
                             ""
                         );
-
+                        String[] tags = tagsInput.getText().toString().split("[,，]");
+                        List<String> tagList = new ArrayList<>();
+                        for (String tag : tags) {
+                            String trimmedTag = tag.trim();
+                            if (!trimmedTag.isEmpty()) {
+                                tagList.add(trimmedTag);
+                            }
+                        }
+                        newLink.setTags(tagList);
                         linkDao.insertLink(newLink);
-                        
+
                         // 清除剪贴板
                         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                         clipboard.setPrimaryClip(ClipData.newPlainText("", ""));

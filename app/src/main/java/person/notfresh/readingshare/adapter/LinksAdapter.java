@@ -54,6 +54,7 @@ import java.io.IOException;
 import person.notfresh.readingshare.util.AppUtils;
 import person.notfresh.readingshare.WebViewActivity;
 import person.notfresh.readingshare.util.CrawlUtil;
+import person.notfresh.readingshare.util.RecentTagsManager;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_PINNED_HEADER = -1;
@@ -165,6 +166,17 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         item.addTag(tagName);
         notifyDataSetChanged();
         linkDao.updateLinkTags(item);
+    }
+
+    public void addTagsToLink(LinkItem item, List<String> tagNames) {
+        for(String tagName: tagNames){
+            item.addTag(tagName);
+        }
+        notifyDataSetChanged();
+        linkDao.updateLinkTags(item);
+        
+        // 保存最近使用的标签
+        RecentTagsManager.addRecentTags(context, tagNames);
     }
 
     public void updateLinkTags(LinkItem item) {
@@ -503,7 +515,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
         }
         
-        notifyDataSetChanged();
+            notifyDataSetChanged();
     }
 
     private static void handleBilibiliLink(String shortUrl) {
@@ -702,20 +714,62 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
 
         private void showAddTagDialog(Context context, LinkItem item) {
-            EditText input = new EditText(context);
-            input.setHint("输入标签名称");
-
-            new AlertDialog.Builder(context)
-                    .setTitle("添加标签")
-                    .setView(input)
-                    .setPositiveButton("确定", (dialog, which) -> {
-                        String tagName = input.getText().toString().trim();
-                        if (!tagName.isEmpty()) {
-                            adapter.addTagToLink(item, tagName);
+            // 创建一个自定义布局，包含输入框和最近标签
+            View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_tag, null);
+            EditText input = dialogView.findViewById(R.id.edit_tag_input);
+            FlexboxLayout recentTagsContainer = dialogView.findViewById(R.id.recent_tags_container);
+            
+            // 获取并显示最近标签
+            List<String> recentTags = RecentTagsManager.getRecentTags(context);
+            if (!recentTags.isEmpty()) {
+                TextView recentTagsLabel = dialogView.findViewById(R.id.text_recent_tags_label);
+                recentTagsLabel.setVisibility(View.VISIBLE);
+                
+                for (String tag : recentTags) {
+                    TextView tagView = (TextView) LayoutInflater.from(context)
+                            .inflate(R.layout.item_recent_tag, recentTagsContainer, false);
+                    tagView.setText(tag);
+                    tagView.setOnClickListener(v -> {
+                        String currentText = input.getText().toString().trim();
+                        // 如果输入框不为空且不以逗号结尾，添加逗号分隔符
+                        if (!currentText.isEmpty() && !currentText.endsWith(",") && !currentText.endsWith("，")) {
+                            input.setText(currentText + "，" + tag);
+                        } else {
+                            // 如果为空或以逗号结尾，直接添加标签
+                            input.setText(currentText + tag);
                         }
+                        // 将光标移到末尾
+                        input.setSelection(input.getText().length());
+                    });
+                    recentTagsContainer.addView(tagView);
+                }
+            }
+
+            AlertDialog dialog = new AlertDialog.Builder(context)
+                    .setTitle("添加标签")
+                    .setView(dialogView)
+                    .setPositiveButton("确定", (dialogInterface, which) -> {
+                        String tagName = input.getText().toString().trim();
+                        String[] tags = tagName.split("[,，]");
+                        List<String> tagList = new ArrayList<>();
+                        for (String tag : tags) {
+                            String trimmedTag = tag.trim();
+                            if (!trimmedTag.isEmpty()) {
+                                tagList.add(trimmedTag);
+                            }
+                        }
+                        
+                        // 记录最近使用的标签
+                        if (!tagList.isEmpty()) {
+                            RecentTagsManager.addRecentTags(context, tagList);
+                        }
+                        
+                        adapter.addTagsToLink(item, tagList);
                     })
                     .setNegativeButton("取消", null)
-                    .show();
+                    .create();
+            
+            dialog.show();
         }
 
         private void showTagOptionsDialog(Context context, String tag, LinkItem item) {
