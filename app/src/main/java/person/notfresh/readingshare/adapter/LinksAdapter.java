@@ -55,6 +55,7 @@ import person.notfresh.readingshare.util.AppUtils;
 import person.notfresh.readingshare.WebViewActivity;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
+import person.notfresh.readingshare.util.SwipeActionsHelper;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_PINNED_HEADER = -1;
@@ -71,6 +72,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private List<LinkItem> links = new ArrayList<>();
     private List<LinkItem> pinnedLinks = new ArrayList<>();
     private Map<String, List<LinkItem>> groupedLinks = new TreeMap<>(Collections.reverseOrder());
+    private SwipeActionsHelper swipeActionsHelper;
 
     public interface OnLinkActionListener {
         void onDeleteLink(LinkItem link);
@@ -85,6 +87,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         this.context = context;
         this.linkDao = new LinkDao(context);
         this.linkDao.open();
+        this.swipeActionsHelper = new SwipeActionsHelper(this);
     }
 
     public void setOnLinkActionListener(OnLinkActionListener listener) {
@@ -584,7 +587,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return null;
     }
 
-    static class LinkViewHolder extends RecyclerView.ViewHolder {
+    public static class LinkViewHolder extends RecyclerView.ViewHolder {
         TextView titleText;
         TextView urlText;
         TextView summaryText;
@@ -882,5 +885,21 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             position += entry.getValue().size() + 1; // +1 for header
         }
         return -1;
+    }
+
+    /**
+     * 为RecyclerView添加滑动操作功能
+     * @param recyclerView 要添加滑动功能的RecyclerView
+     */
+    public void enableSwipeActions(RecyclerView recyclerView) {
+        swipeActionsHelper.attachToRecyclerView(recyclerView);
+    }
+    
+    /**
+     * 检查适配器是否处于选择模式
+     * @return 是否处于选择模式
+     */
+    public boolean isInSelectionMode() {
+        return isSelectionMode;
     }
 } 

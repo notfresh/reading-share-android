@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center">
+
+    <TextView
+        android:id="@+id/btn_archive"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:background="#4CAF50"
+        android:gravity="center"
+        android:paddingHorizontal="16dp"
+        android:text="归档"
+        android:textColor="@android:color/white" />
+
+    <TextView
+        android:id="@+id/btn_delete"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:background="#F44336"
+        android:gravity="center"
+        android:paddingHorizontal="16dp"
+        android:text="删除"
+        android:textColor="@android:color/white" />
+</LinearLayout> 

@@ -140,6 +140,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         recyclerView.setAdapter(adapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
+        // 启用滑动操作功能
+        adapter.enableSwipeActions(recyclerView);
+
         // 设置 RecyclerView 的点击事件
         recyclerView.setOnTouchListener((v, event) -> {
             searchEditText.clearFocus();  // 让搜索框失去焦点
