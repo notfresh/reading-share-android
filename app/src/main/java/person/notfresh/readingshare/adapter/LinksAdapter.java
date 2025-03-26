@@ -64,7 +64,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     
     private List<Object> items = new ArrayList<>();
     private List<Object> originalItems = new ArrayList<>();  // 存储原始数据
-    private OnLinkActionListener listener;
+    private OnLinkActionListener listener; // 具体表示哪个Fragment
     private LinkDao linkDao;
     private static Context context;  // 添加 context 引用
     private Set<LinkItem> selectedItems = new HashSet<>();
@@ -78,6 +78,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         void onDeleteLink(LinkItem link);
         void onUpdateLink(LinkItem oldLink, String newTitle);
         void addTagToLink(LinkItem item, String tag);
+        void addTagsToLink(LinkItem item, List<String> tags);
         void updateLinkTags(LinkItem item);
         void onEnterSelectionMode();  // 添加新的回调方法
         void onPinStatusChanged();
@@ -171,6 +172,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         linkDao.updateLinkTags(item);
     }
 
+    //@mark.2
     public void addTagsToLink(LinkItem item, List<String> tagNames) {
         for(String tagName: tagNames){
             item.addTag(tagName);
@@ -627,7 +629,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             clickCountText.setText("阅读 " + item.getClickCount() + " 次");  // 设置阅读次数
 
             // 添加选择模式的视觉反馈
-            if (adapter.isSelectionMode) {  //@mark.1
+            if (adapter.isSelectionMode) {
 //                itemView.setBackgroundResource(
 //                    adapter.selectedItems.contains(item) ?
 //                    R.drawable.selected_background :
@@ -767,7 +769,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                             RecentTagsManager.addRecentTags(context, tagList);
                         }
                         
-                        adapter.addTagsToLink(item, tagList);
+                        adapter.addTagsToLink(item, tagList); //@mark.1
+                        // adapter.listener.addTagToLink(item, ); //@mark.3
+
                     })
                     .setNegativeButton("取消", null)
                     .create();

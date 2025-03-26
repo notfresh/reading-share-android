@@ -384,17 +384,145 @@ public class LinkDao {
         return addTag(tagName);
     }
 
+    /**
+     * 删除标签及其所有关联
+     * @param tag 要删除的标签名
+     */
     public void deleteTag(String tag) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         db.beginTransaction();
+        
         try {
-            // 从链接-标签关系表中删除该标签的所有关联
-            db.delete(
-                    LinkDbHelper.TABLE_LINK_TAGS,
-                    "tag = ?",
-                    new String[]{tag}
+            // 1. 先查询标签ID
+            long tagId = -1;
+            Cursor cursor = db.query(
+                    LinkDbHelper.TABLE_TAGS,
+                    new String[]{LinkDbHelper.COLUMN_TAG_ID},
+                    LinkDbHelper.COLUMN_TAG_NAME + " = ?",
+                    new String[]{tag},
+                    null, null, null
             );
+            
+            if (cursor.moveToFirst()) {
+                tagId = cursor.getLong(0);
+            }
+            cursor.close();
+            
+            if (tagId != -1) {
+                // 2. 删除链接-标签关联表中的记录
+                Log.d("LinkDao", "删除标签关联: tagId=" + tagId);
+                int linkTagsDeleted = db.delete(
+                        LinkDbHelper.TABLE_LINK_TAGS,
+                        LinkDbHelper.COLUMN_TAG_ID_REF + " = ?",
+                        new String[]{String.valueOf(tagId)}
+                );
+                Log.d("LinkDao", "已删除" + linkTagsDeleted + "条关联记录");
+                
+                // 3. 最后删除标签本身
+                int tagsDeleted = db.delete(
+                        LinkDbHelper.TABLE_TAGS,
+                        LinkDbHelper.COLUMN_TAG_ID + " = ?",
+                        new String[]{String.valueOf(tagId)}
+                );
+                Log.d("LinkDao", "已删除" + tagsDeleted + "个标签");
+            } else {
+                Log.w("LinkDao", "未找到标签: " + tag);
+            }
+            
             db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e("LinkDao", "删除标签时出错: " + e.getMessage(), e);
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
+     * 删除标签及其所有关联,并且删除只有这个标签的链接
+     * @param tag 要删除的标签名
+     */
+    public void deleteTagWithLinks(String tag) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        
+        try {
+            // 1. 先查询标签ID
+            long tagId = -1;
+            Cursor cursor = db.query(
+                    LinkDbHelper.TABLE_TAGS,
+                    new String[]{LinkDbHelper.COLUMN_TAG_ID},
+                    LinkDbHelper.COLUMN_TAG_NAME + " = ?",
+                    new String[]{tag},
+                    null, null, null
+            );
+            
+            if (cursor.moveToFirst()) {
+                tagId = cursor.getLong(0);
+            }
+            cursor.close();
+            
+            if (tagId != -1) {
+                // 2. 查找只有这一个标签的链接
+                // 首先找到所有有这个标签的链接ID
+                String findLinksQuery = "SELECT " + LinkDbHelper.COLUMN_LINK_ID +
+                                       " FROM " + LinkDbHelper.TABLE_LINK_TAGS + 
+                                       " WHERE " + LinkDbHelper.COLUMN_TAG_ID_REF + " = ?";
+                
+                Cursor linksCursor = db.rawQuery(findLinksQuery, new String[]{String.valueOf(tagId)});
+                
+                // 保存要删除的链接ID列表
+                List<Long> linksToDelete = new ArrayList<>();
+                
+                while (linksCursor.moveToNext()) {
+                    long linkId = linksCursor.getLong(0);
+                    
+                    // 检查这个链接是否只有这一个标签
+                    String countTagsQuery = "SELECT COUNT(*) FROM " + LinkDbHelper.TABLE_LINK_TAGS + 
+                                           " WHERE " + LinkDbHelper.COLUMN_LINK_ID + " = ?";
+                    
+                    Cursor tagCountCursor = db.rawQuery(countTagsQuery, new String[]{String.valueOf(linkId)});
+                    
+                    if (tagCountCursor.moveToFirst() && tagCountCursor.getInt(0) <= 1) {
+                        // 链接只有这一个标签，加入待删除列表
+                        linksToDelete.add(linkId);
+                    }
+                    
+                    tagCountCursor.close();
+                }
+                linksCursor.close();
+                
+                // 3. 删除只有一个标签的链接
+                for (long linkId : linksToDelete) {
+                    Log.d("LinkDao", "删除仅有此标签的链接: linkId=" + linkId);
+                    db.delete(
+                            LinkDbHelper.TABLE_LINKS,
+                            LinkDbHelper.COLUMN_ID + " = ?",
+                            new String[]{String.valueOf(linkId)}
+                    );
+                }
+                
+                // 4. 删除链接-标签关联
+                int linkTagsDeleted = db.delete(
+                        LinkDbHelper.TABLE_LINK_TAGS,
+                        LinkDbHelper.COLUMN_TAG_ID_REF + " = ?",
+                        new String[]{String.valueOf(tagId)}
+                );
+                Log.d("LinkDao", "已删除" + linkTagsDeleted + "条标签关联");
+                
+                // 5. 删除标签本身
+                int tagsDeleted = db.delete(
+                        LinkDbHelper.TABLE_TAGS,
+                        LinkDbHelper.COLUMN_TAG_ID + " = ?",
+                        new String[]{String.valueOf(tagId)}
+                );
+                Log.d("LinkDao", "已删除标签: " + tag);
+            } else {
+                Log.w("LinkDao", "未找到标签: " + tag);
+            }
+            
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e("LinkDao", "删除标签及链接时出错: " + e.getMessage(), e);
         } finally {
             db.endTransaction();
         }

@@ -206,7 +206,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         adapter.setGroupedLinks(groupedLinks);
     }
 
-    @Override
+    //@Override
     public void addTagToLink(LinkItem item, String tag) {
         linkDao.addTagToLink(item.getId(), tag);
         // 刷新列表
@@ -215,6 +215,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     }
 
     @Override
+    public void addTagsToLink(LinkItem item, List<String> tags) {
+
+    }
+
+    //@Override
     public void updateLinkTags(LinkItem item) {
         linkDao.updateLinkTags(item);
         // 刷新列表
