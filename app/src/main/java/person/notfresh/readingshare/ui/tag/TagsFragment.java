@@ -30,6 +30,10 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.flexbox.FlexboxLayout;
 import com.google.android.material.snackbar.Snackbar;
+import android.widget.ScrollView;
+import android.widget.LinearLayout;
+import android.widget.Button;
+import android.widget.ImageView;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.LinksAdapter;
@@ -77,6 +81,11 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private MenuItem closeSelectionMenuItem;
     private MenuItem selectAllMenuItem;  // 添加全选菜单项引用
     private boolean isSelectionMode = false;
+    private ScrollView tagsScrollView;
+    private View toggleTagsButton;
+    private ImageView arrowIndicator;
+    private boolean isTagsExpanded = true;  // 默认展开
+    private static final int COLLAPSED_HEIGHT_DP = 120;  // 减小折叠高度
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -84,11 +93,26 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         Log.d("TagsFragment", "onCreateView started");
         View root = inflater.inflate(R.layout.fragment_tags, container, false);
 
-        tagsContainer = root.findViewById(R.id.tags_container);
+        // 获取标签容器引用
+        tagsContainer = root.findViewById(R.id.container_tags);
         Log.d("TagsFragment", "tagsContainer found: " + (tagsContainer != null));
         
-        linksRecyclerView = root.findViewById(R.id.links_recycler_view);
-        Log.d("TagsFragment", "linksRecyclerView found: " + (linksRecyclerView != null));
+        // 获取标签容器和展开/折叠相关视图
+        tagsScrollView = root.findViewById(R.id.tags_scrollview);
+        toggleTagsButton = root.findViewById(R.id.btn_toggle_tags);
+        arrowIndicator = root.findViewById(R.id.arrow_indicator);
+        
+        // 设置展开/折叠按钮点击事件
+        toggleTagsButton.setOnClickListener(v -> toggleTagsExpansion());
+        
+        // 设置初始箭头状态为向上(收起)
+        arrowIndicator.setImageResource(R.drawable.ic_expand_less);
+        arrowIndicator.setContentDescription("收起标签");
+        
+        // 设置初始高度为 wrap_content
+        ViewGroup.LayoutParams params = tagsScrollView.getLayoutParams();
+        params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        tagsScrollView.setLayoutParams(params);
 
         linkDao = new LinkDao(requireContext());
         linkDao.open();
@@ -96,6 +120,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 设置 RecyclerView
         linksAdapter = new LinksAdapter(requireContext());
         linksAdapter.setOnLinkActionListener(this);
+        linksRecyclerView = root.findViewById(R.id.recycler_links);
         linksRecyclerView.setAdapter(linksAdapter);
         linksRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
@@ -190,41 +215,72 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 .show();
     }
 
-    private void loadTags() { // TODO:删除的时候没有刷新界面
-        // 获取包含使用次数的标签集合
-        Map<String, Integer> tagsWithCount = linkDao.getTagsWithCount();
-        Log.d("TagsFragment", "Loading tags: " + tagsWithCount.size());
-        tagsContainer.removeAllViews();
-        
-        // 添加"无标签"选项
-        View noTagView = getLayoutInflater().inflate(R.layout.item_tag_with_count, tagsContainer, false);
-        TextView tagText = noTagView.findViewById(R.id.text_tag);
-        TextView countText = noTagView.findViewById(R.id.text_count);
-        
-        tagText.setText("无标签");
-        
-        // 获取无标签的链接数量
-        int noTagCount = linkDao.getLinksWithoutTags().size();
-        countText.setText(String.valueOf(noTagCount));
-        
-        noTagView.setBackgroundResource(R.drawable.tag_background_normal);
-        noTagView.setOnClickListener(v -> {
-            Log.d("TagsFragment", "Clicked no tags");
-            updateTagSelection(v);
-        });
-        
-        // 设置特殊标识，表示这是"无标签"选项
-        setTagViewId(noTagView, NO_TAG);
-        
-        tagsContainer.addView(noTagView);
-        
-        // 添加其他标签及其使用次数
-        for (Map.Entry<String, Integer> entry : tagsWithCount.entrySet()) {
-            String tag = entry.getKey();
-            int count = entry.getValue();
-            Log.d("TagsFragment", "Adding tag: " + tag + " (count: " + count + ")");
-            addTagView(tag, count, false);
+    private void loadTags() {
+        // 添加空值检查，避免空指针异常
+        if (tagsContainer == null) {
+            Log.e("TagsFragment", "tagsContainer is null in loadTags()");
+            return;
         }
+        
+        // 优化: 先显示正在加载，避免空白感
+        tagsContainer.removeAllViews();
+        TextView loadingView = new TextView(requireContext());
+        loadingView.setText("正在加载标签...");
+        loadingView.setPadding(16, 16, 16, 16);
+        tagsContainer.addView(loadingView);
+        
+        // 使用后台线程加载标签数据
+        new Thread(() -> {
+            // 后台获取标签数据
+            Map<String, Integer> tagsWithCount = linkDao.getTagsWithCount();
+            Log.d("TagsFragment", "Tags loaded: " + tagsWithCount.size());
+            
+            // 回到主线程更新UI
+            requireActivity().runOnUiThread(() -> {
+                tagsContainer.removeAllViews();
+                
+                // 添加"无标签"选项
+                View noTagView = getLayoutInflater().inflate(R.layout.item_tag_with_count, tagsContainer, false);
+                TextView tagText = noTagView.findViewById(R.id.text_tag);
+                TextView countText = noTagView.findViewById(R.id.text_count);
+                
+                tagText.setText("无标签");
+                
+                // 获取无标签的链接数量
+                int noTagCount = linkDao.getLinksWithoutTags().size();
+                countText.setText(String.valueOf(noTagCount));
+                
+                noTagView.setBackgroundResource(R.drawable.tag_background_normal);
+                noTagView.setOnClickListener(v -> {
+                    Log.d("TagsFragment", "Clicked no tags");
+                    updateTagSelection(v);
+                });
+                
+                // 设置特殊标识
+                setTagViewId(noTagView, NO_TAG);
+                tagsContainer.addView(noTagView);
+                
+                // 添加其他标签
+                for (Map.Entry<String, Integer> entry : tagsWithCount.entrySet()) {
+                    addTagView(entry.getKey(), entry.getValue(), false);
+                }
+                
+                // 标签加载完成后，检查是否需要显示展开按钮
+                tagsContainer.post(() -> {
+                    // 测量高度
+                    int height = tagsContainer.getHeight();
+                    // 计算折叠高度（像素）
+                    float density = getResources().getDisplayMetrics().density;
+                    int collapsedHeightPx = (int) (COLLAPSED_HEIGHT_DP * density);
+                    
+                    // 如果内容高度大于折叠高度，显示按钮
+                    toggleTagsButton.setVisibility(height > collapsedHeightPx ? View.VISIBLE : View.GONE);
+                });
+                
+                // 恢复选择状态
+                restoreSelections();
+            });
+        }).start();
     }
 
     private void addTagView(String tag, int count, boolean isSelected) {
@@ -255,6 +311,12 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         });
         
         tagsContainer.addView(tagItemView);
+
+        // 可以在此处添加高度检测 (如果需要)
+        tagsContainer.post(() -> {
+            // 检查是否需要显示展开按钮
+            checkTagsVisibility();
+        });
     }
 
     /**
@@ -347,6 +409,11 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             Toast.makeText(requireContext(), 
                 "操作失败: " + e.getMessage(), 
                 Toast.LENGTH_SHORT).show();
+        }
+
+        // 可以在此处添加高度检测 (如果需要)
+        if (tagsContainer != null) {
+            tagsContainer.post(this::checkTagsVisibility);
         }
     }
 
@@ -991,5 +1058,55 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     private boolean isNoTagView(View tagView) {
         return TAG_VIEW_NO_TAG.equals(tagView.getTag());
+    }
+
+    // 更新展开/折叠方法
+    private void toggleTagsExpansion() {
+        isTagsExpanded = !isTagsExpanded;
+        
+        ViewGroup.LayoutParams params = tagsScrollView.getLayoutParams();
+        
+        if (isTagsExpanded) {
+            // 展开状态 - 移除高度限制
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            arrowIndicator.setImageResource(R.drawable.ic_expand_less);
+            arrowIndicator.setContentDescription("收起标签");
+        } else {
+            // 折叠状态 - 使用固定高度
+            float density = getResources().getDisplayMetrics().density;
+            params.height = (int) (COLLAPSED_HEIGHT_DP * density);
+            arrowIndicator.setImageResource(R.drawable.ic_expand_more);
+            arrowIndicator.setContentDescription("展开标签");
+        }
+        
+        tagsScrollView.setLayoutParams(params);
+    }
+
+    // 添加一个新的方法来检查标签高度和更新按钮可见性
+    private void checkTagsVisibility() {
+        if (tagsContainer == null || toggleTagsButton == null) return;
+        
+        // 测量高度
+        int height = tagsContainer.getHeight();
+        // 计算折叠高度（像素）
+        float density = getResources().getDisplayMetrics().density;
+        int collapsedHeightPx = (int) (COLLAPSED_HEIGHT_DP * density);
+        
+        // 如果内容高度大于折叠高度，显示按钮，否则隐藏
+        toggleTagsButton.setVisibility(height > collapsedHeightPx ? View.VISIBLE : View.GONE);
+        
+        // 如果按钮可见，确保其状态与 isTagsExpanded 一致
+        if (toggleTagsButton.getVisibility() == View.VISIBLE) {
+            arrowIndicator.setImageResource(isTagsExpanded ? 
+                R.drawable.ic_expand_less : R.drawable.ic_expand_more);
+        }
+    }
+
+    // 修复 refreshTags 方法
+    public void refreshTags() {
+        // 重新加载标签或检查可见性
+        if (tagsContainer != null) {
+            tagsContainer.post(this::checkTagsVisibility);
+        }
     }
 } 

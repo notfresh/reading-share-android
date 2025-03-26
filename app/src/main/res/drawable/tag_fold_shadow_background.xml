@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 顶部阴影 -->
+    <item>
+        <shape>
+            <padding
+                android:top="1dp" />
+            <solid android:color="#10000000" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <padding
+                android:top="1dp" />
+            <solid android:color="#20000000" />
+        </shape>
+    </item>
+
+    <!-- 实际背景 -->
+    <item>
+        <shape>
+            <solid android:color="#F5F5F5" />
+        </shape>
+    </item>
+</layer-list> 
