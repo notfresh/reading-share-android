@@ -9,7 +9,6 @@ import android.view.MenuItem;
 import android.content.Intent;
 import android.net.Uri;
 
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,13 +28,10 @@ import androidx.navigation.ui.NavigationUI;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import person.notfresh.readingshare.databinding.ActivityMainBinding;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.adapter.LinksAdapter;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.app.AlertDialog;
@@ -75,7 +71,6 @@ public class MainActivity extends AppCompatActivity {
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
     private LinkDao linkDao;
-    private static final int CLIPBOARD_PERMISSION_REQUEST = 100;
     private boolean hasFocus = false;
     private String lastClipboardText = "";  // 添加这个变量来记录上次处理的剪贴板内容
     private NavController navController;  // 将 navController 声明为类成员变量
