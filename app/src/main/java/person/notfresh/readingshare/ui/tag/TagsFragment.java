@@ -34,6 +34,7 @@ import android.widget.ScrollView;
 import android.widget.LinearLayout;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.text.InputType;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.LinksAdapter;
@@ -942,12 +943,52 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             return;
         }
 
+        // 创建对话框让用户输入文件名
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("设置文件名");
+        
+        // 创建输入框
+        final EditText input = new EditText(requireContext());
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        
+        // 设置默认文件名
+        String defaultFileName = "分享的链接_" + new SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(new Date());
+        input.setText(defaultFileName);
+        input.setSelection(defaultFileName.length()); // 将光标放在末尾
+        
+        builder.setView(input);
+        
+        // 设置按钮
+        builder.setPositiveButton("确定", (dialog, which) -> {
+            String fileName = input.getText().toString().trim();
+            
+            // 如果用户没有输入，使用默认文件名
+            if (fileName.isEmpty()) {
+                fileName = defaultFileName;
+            }
+            
+            // 确保文件名中不包含非法字符
+            fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+            
+            // 执行导出操作
+            exportAndShareFile(isJson, new ArrayList<>(selectedItems), fileName);
+        });
+        
+        builder.setNegativeButton("取消", (dialog, which) -> dialog.cancel());
+        
+        builder.show();
+    }
+
+    /**
+     * 导出并分享文件的实际操作
+     */
+    private void exportAndShareFile(boolean isJson, List<LinkItem> items, String fileName) {
         try {
             String filePath;
             if (isJson) {
-                filePath = ExportUtil.exportToJson(requireContext(), new ArrayList<>(selectedItems));
+                filePath = ExportUtil.exportToJson(requireContext(), items, fileName);
             } else {
-                filePath = ExportUtil.exportToCsv(requireContext(), new ArrayList<>(selectedItems));
+                filePath = ExportUtil.exportToCsv(requireContext(), items, fileName);
             }
             
             File file = new File(filePath);

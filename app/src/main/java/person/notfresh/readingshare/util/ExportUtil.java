@@ -12,36 +12,74 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import person.notfresh.readingshare.model.LinkItem;
+import java.io.IOException;
+import android.util.Log;
+import org.json.JSONException;
 
 public class ExportUtil {
     
-    public static String exportToJson(Context context, List<LinkItem> links) throws Exception {
+    /**
+     * 导出到JSON文件，支持自定义文件名
+     */
+    public static String exportToJson(Context context, List<LinkItem> links, String fileName) throws IOException, JSONException {
         JSONArray jsonArray = new JSONArray();
+        
         for (LinkItem link : links) {
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("title", link.getTitle());
-            jsonObject.put("url", link.getUrl());
-            jsonObject.put("timestamp", link.getTimestamp());
-            jsonObject.put("tags", TextUtils.join(",", link.getTags()));
-            jsonArray.put(jsonObject);
+            try {
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put("title", link.getTitle());
+                jsonObject.put("url", link.getUrl());
+                jsonObject.put("tags", new JSONArray(link.getTags()));
+                jsonArray.put(jsonObject);
+            } catch (JSONException e) {
+                Log.e("ExportUtil", "Error creating JSON object", e);
+            }
         }
-
-        String fileName = "links_" + getCurrentTime() + ".json";
-        File file = new File(context.getExternalFilesDir(null), fileName);
+        
+        // 确保文件名有.json后缀
+        if (!fileName.toLowerCase().endsWith(".json")) {
+            fileName += ".json";
+        }
+        
+        File exportDir = new File(context.getExternalFilesDir(null), "exports");
+        if (!exportDir.exists()) {
+            exportDir.mkdirs();
+        }
+        
+        File file = new File(exportDir, fileName);
         FileWriter writer = new FileWriter(file);
-        writer.write(jsonArray.toString(4)); // 缩进4个空格
+        writer.write(jsonArray.toString(4)); // 缩进4个空格，使JSON更易读
+        writer.flush();
         writer.close();
         
         return file.getAbsolutePath();
     }
 
-    public static String exportToCsv(Context context, List<LinkItem> links) throws Exception {
+    /**
+     * 导出到CSV文件，支持自定义文件名
+     */
+    public static String exportToCsv(Context context, List<LinkItem> links, String fileName) throws IOException {
+        // 确保文件名有.csv后缀
+        if (!fileName.toLowerCase().endsWith(".csv")) {
+            fileName += ".csv";
+        }
+        
+        File exportDir = new File(context.getExternalFilesDir(null), "exports");
+        if (!exportDir.exists()) {
+            exportDir.mkdirs();
+        }
+        
+        File file = new File(exportDir, fileName);
+        FileWriter writer = new FileWriter(file);
+        
+        // 创建CSV内容
         StringBuilder csv = new StringBuilder();
-        // 修改CSV头，移除来源字段
+        // 写入CSV标题行
         csv.append("标题,链接,时间,标签,阅读次数,摘要\n");
         
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
         
+        // 写入每一条链接
         for (LinkItem link : links) {
             String title = escapeCSV(link.getTitle());
             String url = escapeCSV(link.getUrl());
@@ -49,19 +87,36 @@ public class ExportUtil {
             String tags = escapeCSV(TextUtils.join(",", link.getTags()));
             String clickCount = String.valueOf(link.getClickCount());
             String summary = escapeCSV(link.getSummary());
-        
             
             csv.append(String.format("%s,%s,%s,%s,%s,%s\n",
                     title, url, date, tags, clickCount, summary));
         }
-
-        String fileName = "links_" + getCurrentTime() + ".csv";
-        File file = new File(context.getExternalFilesDir(null), fileName);
-        FileWriter writer = new FileWriter(file);
+        
         writer.write(csv.toString());
+        writer.flush();
         writer.close();
         
         return file.getAbsolutePath();
+    }
+
+    /**
+     * 原始的导出到JSON方法（向后兼容）
+     */
+    public static String exportToJson(Context context, List<LinkItem> links) throws IOException, JSONException {
+        // 生成默认文件名
+        String fileName = "links_" + getCurrentTime() + ".json";
+        // 调用新方法
+        return exportToJson(context, links, fileName);
+    }
+
+    /**
+     * 原始的导出到CSV方法（向后兼容）
+     */
+    public static String exportToCsv(Context context, List<LinkItem> links) throws IOException {
+        // 生成默认文件名
+        String fileName = "links_" + getCurrentTime() + ".csv";
+        // 调用新方法
+        return exportToCsv(context, links, fileName);
     }
 
     private static String getCurrentTime() {
