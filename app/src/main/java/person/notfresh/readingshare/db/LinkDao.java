@@ -9,6 +9,7 @@ import android.text.TextUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -384,6 +385,14 @@ public class LinkDao {
         return addTag(tagName);
     }
 
+    // 添加标签
+    public long addTag(String tagName) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_TAG_NAME, tagName);
+        return database.insert(LinkDbHelper.TABLE_TAGS, null, values);
+    }
+
+
     /**
      * 删除标签及其所有关联
      * @param tag 要删除的标签名
@@ -528,12 +537,6 @@ public class LinkDao {
         }
     }
 
-    // 添加标签
-    public long addTag(String tagName) {
-        ContentValues values = new ContentValues();
-        values.put(LinkDbHelper.COLUMN_TAG_NAME, tagName);
-        return database.insert(LinkDbHelper.TABLE_TAGS, null, values);
-    }
 
     // 私有方法：使用ID添加标签
     private void addTagToLink(long linkId, long tagId) {
@@ -663,17 +666,17 @@ public class LinkDao {
      * @return Map<String, Integer> 标签名称和使用次数的映射
      */
     public Map<String, Integer> getTagsWithCount() {
-        Map<String, Integer> tagCountMap = new HashMap<>();
+        Map<String, Integer> tagCountMap = new LinkedHashMap<>();
         SQLiteDatabase db =  dbHelper.getReadableDatabase();
         
         // 首先获取所有标签
-        Cursor cursor = db.rawQuery("SELECT DISTINCT name FROM tags", null);
+        Cursor cursor = db.rawQuery("SELECT name FROM tags order by _id", null);
         
         if (cursor.moveToFirst()) {
             do {
                 String tag = cursor.getString(0);
                 // 对每个标签，计算其在数据库中出现的次数
-                Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM tags t , link_tags lt  WHERE t._id = lt.tag_id and name = ?",
+                Cursor countCursor = db.rawQuery("SELECT COUNT(lt.link_id) FROM tags t , link_tags lt  WHERE t._id = lt.tag_id and name = ?",
                         new String[] { tag });
                 
                 if (countCursor.moveToFirst()) {
