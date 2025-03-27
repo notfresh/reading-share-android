@@ -82,6 +82,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         void updateLinkTags(LinkItem item);
         void onEnterSelectionMode();  // 添加新的回调方法
         void onPinStatusChanged();
+//        void updateLinkRemark(LinkItem item);
+//        void onLinkRemarkUpdated(LinkItem item);
     }
 
     public LinksAdapter(Context context) {
@@ -218,6 +220,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         popup.getMenu().add(0, 4, 0, "切换置顶");
         popup.getMenu().add(0, 5, 0, "多选模式");
         popup.getMenu().add(0, 6, 0, "获取摘要");
+        // popup.getMenu().add(0, 7, 0, "备注");
         
         popup.setOnMenuItemClickListener(menuItem -> {
             switch (menuItem.getItemId()) {
@@ -301,6 +304,13 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     }).start();
                     notifyItemChanged(position);
                     return true;
+                // case 7:
+                //     // 增加备注
+                //     Log.d("LinksAdapter", "追加备注");
+                    
+                //     Log.d("LinksAdapter", "刷新位置: " + position);
+                //     notifyItemChanged(position);
+                //     return true;
                 default:
                     return false;
             }
@@ -597,6 +607,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         TextView clickCountText;  // 阅读次数显示
         FlexboxLayout tagContainer;
         Button addTagButton;
+        TextView remarkText;
+        Button addRemarkButton;
         private final LinksAdapter adapter;
 
         LinkViewHolder(View view, LinksAdapter adapter) {
@@ -608,6 +620,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             showMoreText = view.findViewById(R.id.text_show_more);
             tagContainer = view.findViewById(R.id.tag_container);
             addTagButton = view.findViewById(R.id.btn_add_tag);
+            addRemarkButton = view.findViewById(R.id.btn_add_remark);
+            remarkText = view.findViewById(R.id.text_remark);
             clickCountText = view.findViewById(R.id.click_count_text);  // 绑定阅读次数控件
         }
 
@@ -616,7 +630,14 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             titleText.setText(item.getTitle());
             urlText.setText(formatUrlForDisplay(item.getUrl()));
             tagContainer.removeAllViews();
-            
+
+            try{
+                summaryText.setText(item.getSummary());
+                remarkText.setText(item.getRemark());
+                clickCountText.setText(item.getClickCount());
+            }catch(Exception e){
+            }
+
             // 添加标签
             for (String tag : item.getTags()) {
                 addTagView(tag, item);
@@ -708,6 +729,61 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 summaryText.setVisibility(View.GONE);
                 showMoreText.setVisibility(View.GONE);
             }
+
+            // 设置备注按钮点击事件
+            addRemarkButton = itemView.findViewById(R.id.btn_add_remark);
+            addRemarkButton.setOnClickListener(v -> {
+                showAddRemarkDialog(v.getContext(), item);
+            });
+
+            // 处理备注显示
+            String remark = item.getRemark();
+            TextView showMoreRemarkText = itemView.findViewById(R.id.text_show_more_remark);
+
+            if (remark != null && !remark.isEmpty()) {
+                // 清理备注文本 - 去除多余空行和首尾空白
+                remark = cleanupRemarkText(remark);
+                
+                // 如果清理后文本为空，则不显示
+                if (remark.isEmpty()) {
+                    remarkText.setVisibility(View.GONE);
+                    showMoreRemarkText.setVisibility(View.GONE);
+                    return;
+                }
+                
+                remarkText.setVisibility(View.VISIBLE);
+                remarkText.setText("备注: " + remark);
+                remarkText.setMaxLines(2); // 默认显示两行
+                
+                // 创建final副本供Lambda使用
+                final String finalRemark = remark;
+                
+                // 测量文本是否需要"显示更多"
+                remarkText.post(() -> {
+                    // 检查文本是否被截断或包含换行符
+                    boolean needsExpansion = remarkText.getLineCount() > 2 || finalRemark.contains("\n");
+                    
+                    if (needsExpansion) {
+                        showMoreRemarkText.setVisibility(View.VISIBLE);
+                        showMoreRemarkText.setText("显示更多");
+                        
+                        showMoreRemarkText.setOnClickListener(v -> {
+                            if (remarkText.getMaxLines() <= 2) {
+                                remarkText.setMaxLines(Integer.MAX_VALUE);
+                                showMoreRemarkText.setText("收起");
+                            } else {
+                                remarkText.setMaxLines(2);
+                                showMoreRemarkText.setText("显示更多");
+                            }
+                        });
+                    } else {
+                        showMoreRemarkText.setVisibility(View.GONE);
+                    }
+                });
+            } else {
+                remarkText.setVisibility(View.GONE);
+                showMoreRemarkText.setVisibility(View.GONE);
+            }
         }
 
         private void addTagView(String tag, LinkItem item) {
@@ -790,6 +866,41 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     .show();
         }
 
+        private void showAddRemarkDialog(Context context, LinkItem item) {
+            // 创建一个包含输入框的对话框
+            View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_remark, null);
+            EditText input = dialogView.findViewById(R.id.edit_remark_input);
+            
+            // 如果已有备注，显示现有内容
+            if (item.getRemark() != null && !item.getRemark().isEmpty()) {
+                input.setText(item.getRemark());
+                input.setSelection(input.getText().length()); // 将光标放在末尾
+            }
+
+            AlertDialog dialog = new AlertDialog.Builder(context)
+                    .setTitle("添加备注")
+                    .setView(dialogView)
+                    .setPositiveButton("确定", (dialogInterface, which) -> {
+                        String remarkText = input.getText().toString();
+                        
+                        // 清理文本，移除多余空行
+                        remarkText = cleanupRemarkText(remarkText);
+                        
+                        // 更新本地数据
+                        item.setRemark(remarkText);
+                        
+                        // 更新数据库
+                        adapter.updateLinkRemark(item);
+                        
+                        // 刷新视图
+                        adapter.notifyItemChanged(getAdapterPosition());
+                    })
+                    .setNegativeButton("取消", null)
+                    .create();
+            
+            dialog.show();
+        }
+
         // 格式化 URL 显示的辅助方法
         private String formatUrlForDisplay(String url) {
             final int MAX_URL_LENGTH = 200;
@@ -814,6 +925,33 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
             
             return url;
+        }
+
+        // 添加清理备注文本的辅助方法
+        private String cleanupRemarkText(String text) {
+            if (text == null) return "";
+            
+            // 去除首尾空白
+            text = text.trim();
+            
+            // 替换连续多个换行为单个换行
+            text = text.replaceAll("\\n{2,}", "\n");
+            
+            // 去除每行首尾空白
+            String[] lines = text.split("\\n");
+            StringBuilder cleaned = new StringBuilder();
+            
+            for (String line : lines) {
+                String trimmedLine = line.trim();
+                if (!trimmedLine.isEmpty()) {
+                    if (cleaned.length() > 0) {
+                        cleaned.append("\n");
+                    }
+                    cleaned.append(trimmedLine);
+                }
+            }
+            
+            return cleaned.toString();
         }
     }
 
@@ -905,5 +1043,11 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
      */
     public boolean isInSelectionMode() {
         return isSelectionMode;
+    }
+
+    public void updateLinkRemark(LinkItem item) {
+        if (linkDao != null) {
+            linkDao.updateLinkRemark(item.getId(), item.getRemark());
+        }
     }
 } 

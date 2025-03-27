@@ -353,4 +353,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             });
         }
     }
+
+    public void onLinkRemarkUpdated(LinkItem item) {
+        // 如果需要刷新UI，可以在这里处理
+        // 目前LinkDao中更新了数据库，而adapter中已经更新了视图，所以这里不需要额外操作
+    }
 }

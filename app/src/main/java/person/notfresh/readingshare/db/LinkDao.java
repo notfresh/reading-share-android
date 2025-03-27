@@ -148,6 +148,7 @@ public class LinkDao {
                 String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
                 String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
                 String summary = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUMMARY));
+                String remark = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_REMARK));
                 String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
                 String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
                 String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
@@ -157,6 +158,7 @@ public class LinkDao {
                 LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
                 item.setId(id);  // 设置 id
                 item.setSummary(summary);
+                item.setRemark(remark);
                 item.setClickCount(clickCount);  // 设置 clickCount
                 
                 // 加载该链接的标签
@@ -690,5 +692,19 @@ public class LinkDao {
         
         cursor.close();
         return tagCountMap;
+    }
+
+    public void updateLinkRemark(long linkId, String remark) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_REMARK, remark);
+        
+        database.update(
+                LinkDbHelper.TABLE_LINKS, 
+                values, 
+                LinkDbHelper.COLUMN_ID + " = ?", 
+                new String[]{String.valueOf(linkId)}
+        );
+        
+        Log.d("LinkDao", "更新链接备注: linkId=" + linkId + ", remark is " + remark);
     }
 } 
