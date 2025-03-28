@@ -761,7 +761,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 // 测量文本是否需要"显示更多"
                 remarkText.post(() -> {
                     // 检查文本是否被截断或包含换行符
-                    boolean needsExpansion = remarkText.getLineCount() > 2 || finalRemark.contains("\n");
+                    boolean needsExpansion = countLines(finalRemark) > 2;
                     
                     if (needsExpansion) {
                         showMoreRemarkText.setVisibility(View.VISIBLE);
@@ -784,6 +784,21 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 remarkText.setVisibility(View.GONE);
                 showMoreRemarkText.setVisibility(View.GONE);
             }
+        }
+
+        // 添加计算换行符数量的辅助方法
+        private int countLines(String text) {
+            if (text == null || text.isEmpty()) {
+                return 0;
+            }
+            
+            int count = 1;
+            for (int i = 0; i < text.length(); i++) {
+                if (text.charAt(i) == '\n') {
+                    count++;
+                }
+            }
+            return count;
         }
 
         private void addTagView(String tag, LinkItem item) {
