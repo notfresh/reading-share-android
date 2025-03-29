@@ -15,4 +15,5 @@
     <color name="tag_text_color">#FFFFFF</color>
     <color name="tag_background_color">#2196F3</color>
     <color name="tag_count_background">#80FFFFFF</color> <!-- 半透明白色背景 -->
+    <color name="tag_highlight_color">#FFD700</color> <!-- 金色 -->
 </resources>

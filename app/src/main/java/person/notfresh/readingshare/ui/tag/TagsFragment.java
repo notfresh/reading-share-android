@@ -35,6 +35,8 @@ import android.widget.LinearLayout;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.text.InputType;
+import android.widget.PopupMenu;
+import android.graphics.Typeface;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.LinksAdapter;
@@ -72,6 +74,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private static final String KEY_NO_TAG_SELECTED = "noTagSelected";
     private static final String NO_TAG = "NO_TAG";  // 用于表示"无标签"选项
     private static final String TAG_VIEW_NO_TAG = "NO_TAG_VIEW";
+    private static final String PREF_HIGHLIGHTED_TAGS = "highlighted_tags";
     
     private FlexboxLayout tagsContainer;
     private RecyclerView linksRecyclerView;
@@ -87,6 +90,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private ImageView arrowIndicator;
     private boolean isTagsExpanded = false;  // 默认折叠
     private static final int COLLAPSED_HEIGHT_DP = 120;  // 减小折叠高度
+    private Set<String> highlightedTags = new HashSet<>();  // 保存高亮的标签
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -105,7 +109,13 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
         // 设置初始高度为 wrap_content
         ViewGroup.LayoutParams params = tagsScrollView.getLayoutParams();
-        params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        if(!isTagsExpanded){
+            // 设置为屏幕高度的25%
+            int screenHeight = getResources().getDisplayMetrics().heightPixels;
+            params.height = screenHeight / 4;
+        }else{
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        }
         tagsScrollView.setLayoutParams(params);
         
         // 设置展开/折叠按钮点击事件
@@ -130,6 +140,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 启用滑动操作功能
         linksAdapter.enableSwipeActions(linksRecyclerView);
 
+        // 加载高亮标签设置
+        loadHighlightedTags();
+        
         // 初始加载所有内容
         List<LinkItem> allLinks = linkDao.getAllLinks();
         linksAdapter.setLinks(allLinks);
@@ -279,7 +292,6 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     // 如果内容高度大于折叠高度，显示按钮
                     toggleTagsButton.setVisibility(height > collapsedHeightPx ? View.VISIBLE : View.GONE);
                 });
-                
                 // 恢复选择状态
                 restoreSelections();
             });
@@ -296,9 +308,20 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         countText.setText(String.valueOf(count));
         
         if (isSelected) {
+            // 选中状态优先
             tagItemView.setBackgroundResource(R.drawable.tag_background_selected);
-        } else {
-            tagItemView.setBackgroundResource(R.drawable.tag_background_normal);
+        }  else {
+            // 检查是否是高亮标签
+            boolean isHighlighted = highlightedTags.contains(tag);
+            if (isHighlighted) {
+                // 未选中但是高亮标签
+                tagItemView.setBackgroundResource(R.drawable.tag_background_highlighted);
+                // 设置金色文字和加粗
+                tagText.setTextColor(getResources().getColor(R.color.tag_highlight_color, null));
+                tagText.setTypeface(tagText.getTypeface(), Typeface.BOLD);
+            }else{// 普通标签
+                tagItemView.setBackgroundResource(R.drawable.tag_background_normal);
+            }
         }
         
         // 使用设置标签名称的辅助方法
@@ -322,6 +345,67 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         });
     }
 
+    private void setTagStyle(View tagView, boolean isSelected){
+        if (isSelected) {
+            tagView.setBackgroundResource(R.drawable.tag_background_selected);
+        }else{
+            // 检查是否是高亮标签
+            boolean isHighlighted = false;
+            TextView tagText = tagView.findViewById(R.id.text_tag);
+
+            if (tagText != null) {
+                String tag = (String) tagText.getText();
+                isHighlighted = highlightedTags.contains(tag);
+            }
+            if (isHighlighted) {
+                tagView.setBackgroundResource(R.drawable.tag_background_highlighted);
+                // 设置金色文字和加粗
+                tagText.setTextColor(getResources().getColor(R.color.tag_highlight_color, null));
+                tagText.setTypeface(tagText.getTypeface(), Typeface.BOLD);
+            }else{// 普通标签
+                tagView.setBackgroundResource(R.drawable.tag_background_normal);
+            }
+        }
+    }
+    
+    private void updateTagSelection(View tagView) {
+        if (selectedTags.contains(tagView)) {
+            // 取消选择这个标签
+//            tagView.setBackgroundResource(R.drawable.tag_background_normal);
+//            // 检查是否是高亮标签
+//            TextView tagText = tagView.findViewById(R.id.text_tag);
+//            if (tagText != null) {
+//                tagText.setTextColor(getResources().getColor(android.R.color.black, null));
+//            }
+            setTagStyle(tagView, false);
+
+            selectedTags.remove(tagView);
+
+            if (selectedTags.isEmpty()) {
+                // 如果没有选中的标签，显示所有内容
+                requireActivity().setTitle("全部内容");
+                List<LinkItem> allLinks = linkDao.getAllLinks();
+                linksAdapter.setLinks(allLinks);
+                clearSavedSelections();
+            } else {
+                // 根据剩余选中的标签筛选内容
+                updateContentBySelectedTags();
+            }
+        } else {
+            // 选中新标签
+            tagView.setBackgroundResource(R.drawable.tag_background_selected);
+            
+            // 如果使用复合视图，需要更新文本颜色
+            TextView tagText = tagView.findViewById(R.id.text_tag);
+            if (tagText != null) {
+                tagText.setTextColor(getResources().getColor(android.R.color.white, null));
+            }
+            
+            selectedTags.add(tagView);
+            updateContentBySelectedTags();
+        }
+    }
+
     /**
      * 处理标签点击事件
      * @param tag 标签名称
@@ -341,7 +425,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     }
 
     private void showTagOptionsDialog(String tag) {
-        String[] options = {"删除标签",  "删除标签及所有关联链接","发布到网站"};
+        String[] options = {"删除标签",  "删除标签及所有关联链接","发布到网站","切换高亮"};
         
         new AlertDialog.Builder(requireContext())
             .setTitle("标签操作")
@@ -355,6 +439,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         break;
                     case 2: // 发布到网站
                         publishTagToWebsite(tag);
+                        break;
+                    case 3: // 高亮标签
+                        toggleTagHighlight(tag);
                         break;
                 }
             })
@@ -606,43 +693,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
-    private void updateTagSelection(View tagView) {
-        if (selectedTags.contains(tagView)) {
-            // 取消选择这个标签
-            tagView.setBackgroundResource(R.drawable.tag_background_normal);
-            
-            // 如果使用复合视图，需要更新文本颜色
-            TextView tagText = tagView.findViewById(R.id.text_tag);
-            if (tagText != null) {
-                tagText.setTextColor(getResources().getColor(android.R.color.black, null));
-            }
-
-            selectedTags.remove(tagView);
-
-            if (selectedTags.isEmpty()) {
-                // 如果没有选中的标签，显示所有内容
-                requireActivity().setTitle("全部内容");
-                List<LinkItem> allLinks = linkDao.getAllLinks();
-                linksAdapter.setLinks(allLinks);
-                clearSavedSelections();
-            } else {
-                // 根据剩余选中的标签筛选内容
-                updateContentBySelectedTags();
-            }
-        } else {
-            // 选中新标签
-            tagView.setBackgroundResource(R.drawable.tag_background_selected);
-            
-            // 如果使用复合视图，需要更新文本颜色
-            TextView tagText = tagView.findViewById(R.id.text_tag);
-            if (tagText != null) {
-                tagText.setTextColor(getResources().getColor(android.R.color.white, null));
-            }
-            
-            selectedTags.add(tagView);
-            updateContentBySelectedTags();
-        }
-    }
+    
 
     private void updateContentBySelectedTags() {
         List<LinkItem> links = new ArrayList<>();
@@ -1167,5 +1218,27 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (tagsContainer != null) {
             tagsContainer.post(this::checkTagsVisibility);
         }
+    }
+
+    private void loadHighlightedTags() {
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        highlightedTags = new HashSet<>(prefs.getStringSet(PREF_HIGHLIGHTED_TAGS, new HashSet<>()));
+    }
+
+    private void toggleTagHighlight(String tagName) {
+        // 如果标签已经高亮，则取消高亮
+        if (highlightedTags.contains(tagName)) {
+            highlightedTags.remove(tagName);
+        } else {
+            // 否则添加高亮
+            highlightedTags.add(tagName);
+        }
+        
+        // 保存更改到SharedPreferences
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putStringSet(PREF_HIGHLIGHTED_TAGS, highlightedTags).apply();
+        
+        // 重新加载标签以应用新样式
+        loadTags();
     }
 } 
