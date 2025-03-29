@@ -85,7 +85,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private ScrollView tagsScrollView;
     private View toggleTagsButton;
     private ImageView arrowIndicator;
-    private boolean isTagsExpanded = true;  // 默认展开
+    private boolean isTagsExpanded = false;  // 默认折叠
     private static final int COLLAPSED_HEIGHT_DP = 120;  // 减小折叠高度
 
     @Override
@@ -102,6 +102,11 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         tagsScrollView = root.findViewById(R.id.tags_scrollview);
         toggleTagsButton = root.findViewById(R.id.btn_toggle_tags);
         arrowIndicator = root.findViewById(R.id.arrow_indicator);
+
+        // 设置初始高度为 wrap_content
+        ViewGroup.LayoutParams params = tagsScrollView.getLayoutParams();
+        params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        tagsScrollView.setLayoutParams(params);
         
         // 设置展开/折叠按钮点击事件
         toggleTagsButton.setOnClickListener(v -> toggleTagsExpansion());
@@ -110,10 +115,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         arrowIndicator.setImageResource(R.drawable.ic_expand_less);
         arrowIndicator.setContentDescription("收起标签");
         
-        // 设置初始高度为 wrap_content
-        ViewGroup.LayoutParams params = tagsScrollView.getLayoutParams();
-        params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-        tagsScrollView.setLayoutParams(params);
+        
 
         linkDao = new LinkDao(requireContext());
         linkDao.open();
@@ -1119,7 +1121,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         ViewGroup.LayoutParams params = tagsScrollView.getLayoutParams();
         
         if (isTagsExpanded) {
-            // 展开状态 - 移除高度限制
+            // 展开状态 - 设置为自适应高度，但最大不超过屏幕高度的1/3
+            // int maxHeight = getResources().getDisplayMetrics().heightPixels / 3;
+            // tagsScrollView.setMaxHeight(maxHeight);
             params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
             arrowIndicator.setImageResource(R.drawable.ic_expand_less);
             arrowIndicator.setContentDescription("收起标签");
@@ -1132,6 +1136,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
         
         tagsScrollView.setLayoutParams(params);
+        
+        // 确保按钮在状态改变后依然可见
+        toggleTagsButton.bringToFront();
     }
 
     // 添加一个新的方法来检查标签高度和更新按钮可见性

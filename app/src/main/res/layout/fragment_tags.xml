@@ -16,45 +16,51 @@
         android:fadingEdgeLength="24dp"
         android:requiresFadingEdge="vertical">
 
-        <com.google.android.flexbox.FlexboxLayout
-            android:id="@+id/container_tags"
+        <!-- 将标签容器和折叠按钮放在同一个垂直布局中 -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="8dp"
-            app:flexWrap="wrap"
-            app:alignItems="flex_start"
-            app:alignContent="flex_start"
-            app:flexDirection="row" />
-    </ScrollView>
+            android:orientation="vertical">
 
-    <!-- 简洁折叠/展开指示器 -->
-    <LinearLayout
-        android:id="@+id/btn_toggle_tags"
-        android:layout_width="match_parent"
-        android:layout_height="24dp"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:background="@android:color/transparent"
-        android:clickable="true"
-        android:focusable="true">
+            <com.google.android.flexbox.FlexboxLayout
+                android:id="@+id/container_tags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                app:flexWrap="wrap"
+                app:alignItems="flex_start"
+                app:alignContent="flex_start"
+                app:flexDirection="row" />
+
+            <!-- 折叠/展开按钮放在内容的最下方 -->
+            <LinearLayout
+                android:id="@+id/btn_toggle_tags"
+                android:layout_width="match_parent"
+                android:layout_height="32dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@android:color/transparent">
 
         <!-- 分隔线 - 移除水平边距使其占满宽度 -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#E0E0E0"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
 
         <!-- 展开/折叠指示箭头 -->
-        <ImageView
-            android:id="@+id/arrow_indicator"
-            android:layout_width="24dp"
-            android:layout_height="16dp"
-            android:layout_marginTop="-8dp"
-            android:src="@drawable/ic_expand_more"
-            android:contentDescription="展开收起标签"
-            android:background="@drawable/circle_background"
-            android:padding="2dp"/>
-    </LinearLayout>
+                <ImageView
+                    android:id="@+id/arrow_indicator"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_expand_more"
+                    android:contentDescription="展开收起标签"
+                    android:background="@drawable/circle_background"
+                    android:padding="2dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
 
     <!-- 链接列表 -->
     <androidx.recyclerview.widget.RecyclerView
