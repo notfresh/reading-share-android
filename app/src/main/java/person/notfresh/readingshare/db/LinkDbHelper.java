@@ -6,7 +6,8 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
 public class LinkDbHelper extends SQLiteOpenHelper {
-    private static final String DATABASE_NAME = "links.db";
+    private static final String DEFAULT_DATABASE_NAME = "links.db";
+    private static String databaseName = "links.db";
     //private static final int DATABASE_VERSION = 4;
     // private static final int DATABASE_VERSION = 5; // 添加summary字段
     private static final int DATABASE_VERSION = 8; // 添加点击数量字段
@@ -77,10 +78,24 @@ public class LinkDbHelper extends SQLiteOpenHelper {
         "FOREIGN KEY(source_id) REFERENCES rss_sources(id)" +
         ")";
 
+    // 原有构造函数，使用默认数据库名
     public LinkDbHelper(Context context) {
-        super(context, DATABASE_NAME, null, DATABASE_VERSION);
-        Log.d("LinkDbHelper", "数据库版本 " + DATABASE_VERSION);
+        this(context, DEFAULT_DATABASE_NAME);
+        Log.d("LinkDbHelper", "使用默认数据库: " + DEFAULT_DATABASE_NAME);
+    }
 
+    // 新增构造函数，允许指定数据库名
+    public LinkDbHelper(Context context, String databaseName) {
+        super(context, databaseName, null, DATABASE_VERSION);
+        this.databaseName = databaseName;
+        Log.d("LinkDbHelper", "使用自定义数据库: " + databaseName + ", 版本: " + DATABASE_VERSION);
+
+    }
+
+
+    // 获取当前数据库名称
+    public String getDatabaseName() {
+        return this.databaseName;
     }
 
     @Override
