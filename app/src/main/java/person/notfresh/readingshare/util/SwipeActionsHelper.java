@@ -25,8 +25,11 @@ public class SwipeActionsHelper {
     private ItemTouchHelper itemTouchHelper;
     private Handler handler;
     private int activePosition = -1; // 跟踪当前活动的滑动项
-    private static final int BUTTONS_DISPLAY_DURATION = 1000; // 按钮显示持续时间(3秒)
-    
+    private static final int BUTTONS_DISPLAY_DURATION = 1000; // 按钮显示持续时间(1秒)
+    private String userEnv;
+    // 存储当前滑动的Item
+    private LinkItem currentSwipedItem;
+
     // 声明一个记录当前按钮宽度的变量
     private float buttonWidth = 200; // 设置一个固定值，确保按钮有足够宽度被点击
     // 标记是否正在处理关闭操作
@@ -38,6 +41,25 @@ public class SwipeActionsHelper {
         this.adapter = adapter;
         this.itemTouchHelper = new ItemTouchHelper(createSwipeCallback());
         this.handler = new Handler(Looper.getMainLooper());
+        this.userEnv = adapter.DEFAULT_USER_ENV; // 使用默认用户环境
+    }
+
+    public SwipeActionsHelper(LinksAdapter adapter, String userEnv) {
+        this.adapter = adapter;
+        this.itemTouchHelper = new ItemTouchHelper(createSwipeCallback());
+        this.handler = new Handler(Looper.getMainLooper());
+        this.userEnv = userEnv;
+    }
+    
+    // 设置当前被滑动的Item
+    public void setCurrentSwipedItem(LinkItem item) {
+        this.currentSwipedItem = item;
+        Log.d(TAG, "当前滑动项设置为: " + (item != null ? item.getTitle() : "null"));
+    }
+    
+    // 获取当前被滑动的Item
+    public LinkItem getCurrentSwipedItem() {
+        return currentSwipedItem;
     }
     
     public void attachToRecyclerView(RecyclerView recyclerView) {
@@ -106,8 +128,25 @@ public class SwipeActionsHelper {
                                 if (touchX > viewRight - buttonWidth) {
                                     Log.d(TAG, "Button area clicked!");
                                     
-                                    // 统一使用归档功能
-                                    Toast.makeText(rv.getContext(), "归档功能测试", Toast.LENGTH_SHORT).show();
+                                    // 使用当前滑动的Item执行操作
+                                    if (currentSwipedItem != null) {
+                                        // 根据用户环境执行不同操作
+                                        if ("archive".equals(userEnv)) {
+                                            Toast.makeText(rv.getContext(), 
+                                                "归档操作: " + currentSwipedItem.getTitle(), 
+                                                Toast.LENGTH_SHORT).show();
+                                            // 在这里执行归档特定操作
+                                        } else {
+                                            Toast.makeText(rv.getContext(), 
+                                                "主环境操作: " + currentSwipedItem.getTitle(), 
+                                                Toast.LENGTH_SHORT).show();
+                                            // 执行主环境下的操作
+                                        }
+                                    } else {
+                                        Toast.makeText(rv.getContext(), 
+                                            "无法获取当前项目信息", 
+                                            Toast.LENGTH_SHORT).show();
+                                    }
                                     
                                     closeActiveItem();
                                     return true;
@@ -139,6 +178,9 @@ public class SwipeActionsHelper {
             isClosingItem = true;
             int positionToClose = activePosition;
             activePosition = -1;
+            
+            // 清除当前滑动项引用
+            currentSwipedItem = null;
             
             // 确保刷新以恢复状态
             adapter.notifyItemChanged(positionToClose);
@@ -193,8 +235,14 @@ public class SwipeActionsHelper {
                 // 标记活动位置
                 activePosition = position;
                 
-                // 不要在这里调用notifyItemChanged，让系统保持滑动状态
-                // adapter.notifyItemChanged(position);
+                // 获取当前滑动的LinkItem并保存
+                Object item = adapter.getItemAtPosition(position);
+                if (item instanceof LinkItem) {
+                    setCurrentSwipedItem((LinkItem) item);
+                } else {
+                    setCurrentSwipedItem(null);
+                    Log.w(TAG, "滑动项不是LinkItem类型");
+                }
                 
                 // 设置定时器延迟关闭
                 handler.removeCallbacksAndMessages(null);
@@ -239,9 +287,21 @@ public class SwipeActionsHelper {
             
             // 抽取绘制按钮的方法以避免代码重复
             private void drawButtons(Canvas c, View itemView, float dX) {
+                // 根据用户环境选择不同的颜色和文本
+                int backgroundColor;
+                String text;
+                
+                if ("archive".equals(userEnv)) {
+                    backgroundColor = Color.rgb(139, 0, 0); // 深红色
+                    text = "恢复";
+                } else {
+                    backgroundColor = Color.rgb(0, 0, 140); // 深蓝色
+                    text = "归档";
+                }
+                
                 // 绘制背景
                 Paint paint = new Paint();
-                paint.setColor(Color.rgb(0, 0, 140)); // 绿色
+                paint.setColor(backgroundColor);
                 
                 RectF background = new RectF(
                     itemView.getRight() + dX,
@@ -255,7 +315,6 @@ public class SwipeActionsHelper {
                 // 绘制文字
                 paint.setColor(Color.WHITE);
                 paint.setTextSize(36);
-                String text = "归档";
                 
                 // 计算文字位置
                 float textWidth = paint.measureText(text);

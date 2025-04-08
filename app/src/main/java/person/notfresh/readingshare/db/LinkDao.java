@@ -31,6 +31,10 @@ public class LinkDao {
         dbHelper = new LinkDbHelper(context);
     }
 
+    public LinkDao(Context context, String databaseName) {
+        dbHelper = new LinkDbHelper(context, databaseName);
+    }
+
     public void open() {
         database = dbHelper.getWritableDatabase();
     }

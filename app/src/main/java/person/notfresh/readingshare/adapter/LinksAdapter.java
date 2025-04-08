@@ -73,6 +73,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private List<LinkItem> pinnedLinks = new ArrayList<>();
     private Map<String, List<LinkItem>> groupedLinks = new TreeMap<>(Collections.reverseOrder());
     private SwipeActionsHelper swipeActionsHelper;
+    private String userEnv;
+    public static final String DEFAULT_USER_ENV = "main";
 
     public interface OnLinkActionListener {
         void onDeleteLink(LinkItem link);
@@ -91,6 +93,15 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         this.linkDao = new LinkDao(context);
         this.linkDao.open();
         this.swipeActionsHelper = new SwipeActionsHelper(this);
+        this.userEnv = DEFAULT_USER_ENV;
+    }
+
+    public LinksAdapter(Context context, String databaseName, String userEnv) {
+        this.context = context;
+        this.linkDao = new LinkDao(context, databaseName);
+        this.linkDao.open();
+        this.swipeActionsHelper = new SwipeActionsHelper(this);
+        this.userEnv = userEnv;
     }
 
     public void setOnLinkActionListener(OnLinkActionListener listener) {
@@ -1064,5 +1075,13 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         if (linkDao != null) {
             linkDao.updateLinkRemark(item.getId(), item.getRemark());
         }
+    }
+
+    // 添加一个方法来获取指定位置的项目
+    public Object getItemAtPosition(int position) {
+        if (position >= 0 && position < items.size()) {
+            return items.get(position);
+        }
+        return null;
     }
 } 
