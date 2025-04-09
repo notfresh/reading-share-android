@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class LinkItem {
+public class LinkItem implements Cloneable {
     private long id;
     private String title;
     private String url;        // 只存储纯URL
@@ -136,5 +136,20 @@ public class LinkItem {
     @Override
     public int hashCode() {
         return Objects.hash(id);
+    }
+
+    @Override
+    public LinkItem clone() {
+        try {
+            LinkItem clone = (LinkItem) super.clone();
+            // 确保深度复制所有可变对象
+            if (this.tags != null) {
+                clone.tags = new ArrayList<>(this.tags);
+            }
+            return clone;
+        } catch (CloneNotSupportedException e) {
+            // 这不应该发生，因为我们实现了Cloneable
+            throw new RuntimeException("克隆LinkItem失败", e);
+        }
     }
 } 

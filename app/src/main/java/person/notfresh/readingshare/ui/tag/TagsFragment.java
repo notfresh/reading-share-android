@@ -822,7 +822,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     // 实现 OnLinkActionListener 的方法
     @Override
     public void onDeleteLink(LinkItem link) {
-        linkDao.deleteLink(link.getUrl()); //TODO:删除的时候没有刷新界面
+        linkDao.deleteLink(link.getId());
         // 刷新列表
         loadTags(); // 使用已有的 loadTags() 方法重新加载标签和链接
         restoreSelections();
@@ -834,6 +834,11 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linkDao.updateLinkTitle(oldLink.getUrl(), newTitle);
         // 重新加载当前标签的链接
         loadTags();
+    }
+
+    @Override
+    public boolean deleteLink(Long id) {
+        return false;
     }
 
     public void addTagsToLink(LinkItem item, List<String> tags){

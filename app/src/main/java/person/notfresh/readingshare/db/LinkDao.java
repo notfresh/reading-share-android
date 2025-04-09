@@ -68,12 +68,39 @@ public class LinkDao {
         );
     }
 
-    public void deleteLink(long id) {
-        database.delete(
+    /**
+     * 删除一个链接及其所有相关标签关联
+     */
+    public boolean deleteLink(long linkId) {
+        Log.d("LinkDao", "删除链接ID: " + linkId);
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        boolean success = false;
+        
+        db.beginTransaction();
+        try {
+            // 删除链接和标签的关联
+            int linkTagsDeleted = db.delete(
+                LinkDbHelper.TABLE_LINK_TAGS,
+                LinkDbHelper.COLUMN_LINK_ID + " = ?",
+                new String[]{String.valueOf(linkId)}
+            );
+            Log.d("LinkDao", "删除了 " + linkTagsDeleted + " 个标签关联");
+            
+            // 删除链接本身
+            int linksDeleted = db.delete(
                 LinkDbHelper.TABLE_LINKS,
                 LinkDbHelper.COLUMN_ID + " = ?",
-                new String[]{String.valueOf(id)}
-        );
+                new String[]{String.valueOf(linkId)}
+            );
+            Log.d("LinkDao", "删除了 " + linksDeleted + " 个链接记录");
+            
+            db.setTransactionSuccessful();
+            success = (linksDeleted > 0);
+        } finally {
+            db.endTransaction();
+        }
+        
+        return success;
     }
 
     public void updateLinkTitle(String url, String newTitle) {

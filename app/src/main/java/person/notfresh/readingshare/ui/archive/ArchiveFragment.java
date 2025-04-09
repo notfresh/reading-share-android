@@ -116,6 +116,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         return super.onOptionsItemSelected(item);
     }
 
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                             ViewGroup container, Bundle savedInstanceState) {
@@ -127,7 +128,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         if (getArguments() != null) {
             selectedDate = getArguments().getString("selected_date");
         }
-        String archive_db = "archive_db";
+        String archive_db = "archive.db";
         linkDao = new LinkDao(requireContext(), archive_db);
         linkDao.open();
 
@@ -204,6 +205,11 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         adapter.setGroupedLinks(groupedLinks);
     }
 
+    @Override
+    public boolean deleteLink(Long id) {
+        return false;
+    }
+
     //@Override
     public void addTagToLink(LinkItem item, String tag) {
         linkDao.addTagToLink(item.getId(), tag);
@@ -212,9 +218,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         adapter.setGroupedLinks(groupedLinks);
     }
 
-    public void archiveOneItem(LinkItem item){
-        linkDao.insertLink(item);
-    }
+
 
     @Override
     public void addTagsToLink(LinkItem item, List<String> tags) {

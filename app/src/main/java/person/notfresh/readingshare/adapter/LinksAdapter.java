@@ -66,6 +66,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private List<Object> originalItems = new ArrayList<>();  // 存储原始数据
     private OnLinkActionListener listener; // 具体表示哪个Fragment
     private LinkDao linkDao;
+    private LinkDao archiveLinkDao;
     private static Context context;  // 添加 context 引用
     private Set<LinkItem> selectedItems = new HashSet<>();
     private boolean isSelectionMode = false;
@@ -76,9 +77,12 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private String userEnv;
     public static final String DEFAULT_USER_ENV = "main";
 
+
+
     public interface OnLinkActionListener {
         void onDeleteLink(LinkItem link);
         void onUpdateLink(LinkItem oldLink, String newTitle);
+        boolean deleteLink(Long id);
         void addTagToLink(LinkItem item, String tag);
         void addTagsToLink(LinkItem item, List<String> tags);
         void updateLinkTags(LinkItem item);
@@ -88,12 +92,19 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 //        void onLinkRemarkUpdated(LinkItem item);
     }
 
+    public void commonInit(Context context){
+        String archive_db = "archive.db";
+        archiveLinkDao = new LinkDao(context, archive_db);
+        archiveLinkDao.open();
+    }
+
     public LinksAdapter(Context context) {
         this.context = context;
         this.linkDao = new LinkDao(context);
         this.linkDao.open();
         this.swipeActionsHelper = new SwipeActionsHelper(this);
         this.userEnv = DEFAULT_USER_ENV;
+        commonInit(context);
     }
 
     public LinksAdapter(Context context, String databaseName, String userEnv) {
@@ -102,10 +113,20 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         this.linkDao.open();
         this.swipeActionsHelper = new SwipeActionsHelper(this);
         this.userEnv = userEnv;
+        commonInit(context);
     }
 
     public void setOnLinkActionListener(OnLinkActionListener listener) {
         this.listener = listener;
+    }
+
+    public void archiveOneItem(LinkItem item) {
+        // 使用clone方法创建深度副本
+        LinkItem clonedItem = item.clone();
+        // 记录日志
+        Log.d("LinksAdapter", "归档链接: " + clonedItem.getTitle() + " (ID: " + clonedItem.getId() + ")");
+        // 将克隆对象保存到归档数据库
+        archiveLinkDao.insertLink(clonedItem);
     }
 
     @Override
@@ -1083,5 +1104,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             return items.get(position);
         }
         return null;
+    }
+
+    public OnLinkActionListener getListener(){
+        return this.listener;
     }
 } 

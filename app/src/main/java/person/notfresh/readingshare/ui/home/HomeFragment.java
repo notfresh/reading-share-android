@@ -189,13 +189,38 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
-    @Override
-    public void onDeleteLink(LinkItem link) {
-        // linkDao.deleteLink(link.getUrl());
-        linkDao.deleteLink(link.getId());
-        // 刷新列表
+    public boolean deleteLink(Long linkId){
+        Log.d("HomeFragment", "deleteLink: + link id " + linkId);
+        linkDao.deleteLink(linkId);
+        List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
+        adapter.setPinnedLinks(pinnedLinks);
+        // 重新加载分组链接
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);
+        adapter.notifyDataSetChanged();
+        return true;
+    }
+
+    @Override
+    public void onDeleteLink(LinkItem link) {
+
+        Log.d("HomeFragment", "onDeleteLink: " + link.getTitle() + ", link id " + link.getId());
+        
+        // 首先删除数据库中的链接
+        linkDao.deleteLink(link.getId());
+        
+        // 重新加载置顶链接
+        List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
+        adapter.setPinnedLinks(pinnedLinks);
+        
+        // 重新加载分组链接
+        Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
+        adapter.setGroupedLinks(groupedLinks);
+        
+        // 通知适配器数据已更改
+        adapter.notifyDataSetChanged();
+        
+        Log.d("HomeFragment", "链接删除完成，UI已更新");
     }
 
     @Override

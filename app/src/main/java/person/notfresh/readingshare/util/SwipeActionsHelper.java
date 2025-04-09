@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import person.notfresh.readingshare.adapter.LinksAdapter;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.ui.archive.ArchiveFragment;
 
 public class SwipeActionsHelper {
     
@@ -54,7 +55,8 @@ public class SwipeActionsHelper {
     // 设置当前被滑动的Item
     public void setCurrentSwipedItem(LinkItem item) {
         this.currentSwipedItem = item;
-        Log.d(TAG, "当前滑动项设置为: " + (item != null ? item.getTitle() : "null"));
+        Log.d(TAG+"X", "Item: " + (item != null ? item.getId() + ", " +item.getTitle() : "null"));
+        Log.d(TAG+"X", "Current Item: " + (currentSwipedItem != null ? currentSwipedItem.getId() + ", " +currentSwipedItem.getTitle() : "null"));
     }
     
     // 获取当前被滑动的Item
@@ -130,18 +132,22 @@ public class SwipeActionsHelper {
                                     
                                     // 使用当前滑动的Item执行操作
                                     if (currentSwipedItem != null) {
-                                        // 根据用户环境执行不同操作
-                                        if ("archive".equals(userEnv)) {
-                                            Toast.makeText(rv.getContext(), 
-                                                "归档操作: " + currentSwipedItem.getTitle(), 
+                                        // 记录当前操作的Item ID
+                                        long itemId = currentSwipedItem.getId();
+                                        Log.d("SwipeActionsHelperX", "正在归档项目ID: " + itemId + ", 标题: " + currentSwipedItem.getTitle());
+                                        
+                                        // 添加到归档数据库
+                                        adapter.archiveOneItem(currentSwipedItem);
+                                        Log.d("SwipeActionsHelperX", "已添加到归档数据库, 现在从主数据库删除");
+                                        
+                                        // 从主数据库删除
+                                        adapter.getListener().onDeleteLink(currentSwipedItem);
+                                        Log.d("SwipeActionsHelperX", "已从主数据库删除，操作完成");
+                                        
+                                        Toast.makeText(rv.getContext(),
+                                                "归档成功: " + currentSwipedItem.getTitle(),
                                                 Toast.LENGTH_SHORT).show();
-                                            // 在这里执行归档特定操作
-                                        } else {
-                                            Toast.makeText(rv.getContext(), 
-                                                "主环境操作: " + currentSwipedItem.getTitle(), 
-                                                Toast.LENGTH_SHORT).show();
-                                            // 执行主环境下的操作
-                                        }
+                                        Log.d("SwipeActionsHelperX", "归档成功: " + currentSwipedItem.getTitle());
                                     } else {
                                         Toast.makeText(rv.getContext(), 
                                             "无法获取当前项目信息", 
@@ -230,7 +236,7 @@ public class SwipeActionsHelper {
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
-                Log.d(TAG, "onSwiped: position=" + position);
+                Log.d(TAG+"X", "onSwiped: position=" + position);
                 
                 // 标记活动位置
                 activePosition = position;
@@ -239,6 +245,7 @@ public class SwipeActionsHelper {
                 Object item = adapter.getItemAtPosition(position);
                 if (item instanceof LinkItem) {
                     setCurrentSwipedItem((LinkItem) item);
+                    Log.d(TAG+"X", "swap item id is " + ((LinkItem) item).getId());
                 } else {
                     setCurrentSwipedItem(null);
                     Log.w(TAG, "滑动项不是LinkItem类型");
