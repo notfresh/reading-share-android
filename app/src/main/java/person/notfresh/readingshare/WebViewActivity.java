@@ -81,7 +81,11 @@ public class WebViewActivity extends AppCompatActivity {
 
         // 只对通义网站禁用MediaSessionCompat功能
         if (currentUrl != null && currentUrl.contains("tongyi.aliyun.com")) {
-            Log.d("WebViewActivity", "检测到通义网站，禁用MediaSession功能");
+            try {
+                Log.d("WebViewActivity", "检测到通义网站，禁用MediaSession功能");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
             // 不初始化mediaSession，避免NPE问题
             mediaSession = null;
             // 在通义网站上禁用JavascriptInterface
@@ -143,6 +147,11 @@ public class WebViewActivity extends AppCompatActivity {
             }
             preserveCache = true;  // 保留其他标记
             finish();
+            return true;
+        } else if (item.getItemId() == R.id.webview_share) {
+            // 强制返回，直接关闭当前 WebView
+            Log.d("WebViewActivityMenu", "点击了强制返回");
+            //finish();
             return true;
         }
         return super.onOptionsItemSelected(item);

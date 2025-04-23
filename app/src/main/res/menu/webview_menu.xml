@@ -17,6 +17,12 @@
         android:title="@string/archive_back"
         android:icon="@drawable/ic_archive"
         app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/webview_share"
+        android:title="@string/webview_share"
+        android:icon="@drawable/ic_archive"
+        app:showAsAction="never"/>
     
     <!-- <item
         android:id="@+id/action_webview_switch_out"
