@@ -35,6 +35,59 @@ public class LinkItem implements Cloneable {
         this.timestamp = timestamp;
     }
 
+    public long getId() { return id; }
+    public void setId(long id) { this.id = id; }
+
+    public String getTitle() { return title; }
+    public String getUrl() { return url; }
+    public String getSourceApp() { return sourceApp; }
+    public long getTimestamp() { return timestamp; }
+    public String getOriginalIntent() { return originalIntent; }
+    public String getTargetActivity() { return targetActivity; }
+    public List<String> getTags() { return tags; }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setTags(List<String> tags) { this.tags = tags; }
+    public void addTag(String tag) {
+        if (!tags.contains(tag)) {
+            tags.add(tag);
+        }
+    }
+    public void removeTag(String tag) { tags.remove(tag); }
+
+    public String getRemark() { return remark; }
+    public void setRemark(String remark) { this.remark = remark; }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public boolean isPinned() {
+        return isPinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        isPinned = pinned;
+    }
+
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
+
+    public int getClickCount() {
+        return clickCount;
+    }
+
+    public void setClickCount(int clickCount) {
+        this.clickCount = clickCount;
+    }
+
+    public void incrementClickCount() {
+        this.clickCount++;
+    }
+
     // 提取URL的辅助方法
     private String extractUrl(String text) {
         int urlStart = text.indexOf("http");
@@ -70,59 +123,6 @@ public class LinkItem implements Cloneable {
             }
         }
         return "";
-    }
-
-    public long getId() { return id; }
-    public void setId(long id) { this.id = id; }
-
-    public String getTitle() { return title; }
-    public String getUrl() { return url; }
-    public String getSourceApp() { return sourceApp; }
-    public long getTimestamp() { return timestamp; }
-    public String getOriginalIntent() { return originalIntent; }
-    public String getTargetActivity() { return targetActivity; }
-    public List<String> getTags() { return tags; }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public void setTags(List<String> tags) { this.tags = tags; }
-    public void addTag(String tag) { 
-        if (!tags.contains(tag)) {
-            tags.add(tag); 
-        }
-    }
-    public void removeTag(String tag) { tags.remove(tag); }
-
-    public String getRemark() { return remark; }
-    public void setRemark(String remark) { this.remark = remark; }
-
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public boolean isPinned() {
-        return isPinned;
-    }
-
-    public void setPinned(boolean pinned) {
-        isPinned = pinned;
-    }
-
-    public String getSummary() { return summary; }
-    public void setSummary(String summary) { this.summary = summary; }
-
-    public int getClickCount() {
-        return clickCount;
-    }
-
-    public void setClickCount(int clickCount) {
-        this.clickCount = clickCount;
-    }
-
-    public void incrementClickCount() {
-        this.clickCount++;
     }
 
     @Override

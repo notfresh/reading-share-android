@@ -22,8 +22,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.os.Handler;
 import android.os.Looper;
-import android.app.Activity;
-
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.RecyclerView;
@@ -39,7 +37,6 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.io.File;
-import java.util.Arrays;
 import android.content.ComponentName;
 import java.util.stream.Collectors;
 
@@ -61,23 +58,23 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private static final int TYPE_PINNED_HEADER = -1;
     private static final int TYPE_DATE_HEADER = 0;
     private static final int TYPE_LINK_ITEM = 1;
-    
+
+    private List<LinkItem> links = new ArrayList<>();
     private List<Object> items = new ArrayList<>();
-    private List<Object> originalItems = new ArrayList<>();  // 存储原始数据
+    private Set<LinkItem> selectedItems = new HashSet<>();
+    private List<Object> originalItems = new ArrayList<>();
+    private List<LinkItem> pinnedLinks = new ArrayList<>();
+    private Map<String, List<LinkItem>> groupedLinks = new TreeMap<>(Collections.reverseOrder());
     private OnLinkActionListener listener; // 具体表示哪个Fragment
     private LinkDao linkDao;
     private LinkDao archiveLinkDao;
     private static Context context;  // 添加 context 引用
-    private Set<LinkItem> selectedItems = new HashSet<>();
+
     private boolean isSelectionMode = false;
-    private List<LinkItem> links = new ArrayList<>();
-    private List<LinkItem> pinnedLinks = new ArrayList<>();
-    private Map<String, List<LinkItem>> groupedLinks = new TreeMap<>(Collections.reverseOrder());
-    private SwipeActionsHelper swipeActionsHelper;
+
+   private SwipeActionsHelper swipeActionsHelper;
     private String userEnv;
     public static final String DEFAULT_USER_ENV = "main";
-
-
 
     public interface OnLinkActionListener {
         void onDeleteLink(LinkItem link);
@@ -118,15 +115,6 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     public void setOnLinkActionListener(OnLinkActionListener listener) {
         this.listener = listener;
-    }
-
-    public void archiveOneItem(LinkItem item) {
-        // 使用clone方法创建深度副本
-        LinkItem clonedItem = item.clone();
-        // 记录日志
-        Log.d("LinksAdapter", "归档链接: " + clonedItem.getTitle() + " (ID: " + clonedItem.getId() + ")");
-        // 将克隆对象保存到归档数据库
-        archiveLinkDao.insertLink(clonedItem);
     }
 
     @Override
@@ -171,6 +159,30 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return items.size();
     }
 
+    private String getItemUrl(int position) {
+        if (items.get(position) instanceof LinkItem) {
+            return ((LinkItem) items.get(position)).getUrl();
+        }
+        return null;
+    }
+
+    // 添加一个方法来获取指定位置的项目
+    public Object getItemAtPosition(int position) {
+        if (position >= 0 && position < items.size()) {
+            return items.get(position);
+        }
+        return null;
+    }
+
+    public OnLinkActionListener getListener(){
+        return this.listener;
+    }
+
+    public void setPinnedLinks(List<LinkItem> pinnedLinks) {
+        this.pinnedLinks = pinnedLinks;
+        notifyDataSetChanged();
+    }
+
     public void setGroupedLinks(Map<String, List<LinkItem>> groupedLinks) {
         items.clear();
         originalItems.clear();
@@ -200,10 +212,63 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 ", 总项目数=" + items.size());
     }
 
+    public Set<LinkItem> getSelectedItems() {
+        return new HashSet<>(selectedItems);
+    }
+
+    // 添加获取当前链接列表的方法
+    public List<LinkItem> getLinks() {
+        List<LinkItem> currentLinks = new ArrayList<>();
+        for (Object item : items) {
+            if (item instanceof LinkItem) {
+                currentLinks.add((LinkItem) item);
+            }
+        }
+        return currentLinks;
+    }
+
+    public void setLinks(List<LinkItem> newLinks) {
+        // 清除现有的分组数据
+        items.clear();
+
+        // 对新的链接列表进行分组
+        if (newLinks != null && !newLinks.isEmpty()) {
+            // 按日期分组
+            Map<String, List<LinkItem>> groups = new TreeMap<>(Collections.reverseOrder());
+            for (LinkItem item : newLinks) {
+                String date = formatDate(item.getTimestamp());
+                groups.computeIfAbsent(date, k -> new ArrayList<>()).add(item);
+            }
+
+            // 转换为展平的列表
+            for (Map.Entry<String, List<LinkItem>> entry : groups.entrySet()) {
+                items.add(entry.getKey());
+                items.addAll(entry.getValue());
+            }
+        }
+
+        // 同时更新 links 列表（用于 getLinks 方法）
+        this.links = new ArrayList<>(newLinks);
+
+        // 通知适配器数据已更新
+        notifyDataSetChanged();
+    }
+
+    /////////////////////////////////////////////////////////////
+
     public void addTagToLink(LinkItem item, String tagName) {
         item.addTag(tagName);
         notifyDataSetChanged();
         linkDao.updateLinkTags(item);
+    }
+
+    public void archiveOneItem(LinkItem item) {
+        // 使用clone方法创建深度副本
+        LinkItem clonedItem = item.clone();
+        // 记录日志
+        Log.d("LinksAdapter", "归档链接: " + clonedItem.getTitle() + " (ID: " + clonedItem.getId() + ")");
+        // 将克隆对象保存到归档数据库
+        archiveLinkDao.insertLink(clonedItem);
     }
 
     //@mark.2
@@ -379,13 +444,11 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     }
 
     public void toggleSelectionMode() {
-        Log.d("LinksAdapter", "Toggling selection mode. Current: " + isSelectionMode);  // 添加日志
         isSelectionMode = !isSelectionMode; //@mark.4
         if (!isSelectionMode) {
             selectedItems.clear();
         }
         notifyDataSetChanged();
-        Log.d("LinksAdapter", "Selection mode toggled to: " + isSelectionMode);  // 添加日志
     }
 
     public void toggleItemSelection(LinkItem item) { //@mark.5
@@ -397,51 +460,28 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         notifyDataSetChanged();
     }
 
-    public Set<LinkItem> getSelectedItems() {
-        return new HashSet<>(selectedItems);
+    private String extractTitleFromUrl(String url) {
+        try {
+            // 移除协议部分
+            url = url.replaceFirst("https?://", "");
+            // 移除参数部分
+            url = url.split("\\?")[0];
+            // 移除路径，只保留域名部分
+            String[] parts = url.split("/");
+            if (parts.length > 0) {
+                return parts[0];
+            }
+        } catch (Exception e) {
+            Log.e("ExtractTitle", "Error extracting title from URL", e);
+        }
+        return "新链接";
     }
 
-    public void setLinks(List<LinkItem> newLinks) {
-        // 清除现有的分组数据
-        items.clear();
-        
-        // 对新的链接列表进行分组
-        if (newLinks != null && !newLinks.isEmpty()) {
-            // 按日期分组
-            Map<String, List<LinkItem>> groups = new TreeMap<>(Collections.reverseOrder());
-            for (LinkItem item : newLinks) {
-                String date = formatDate(item.getTimestamp());
-                groups.computeIfAbsent(date, k -> new ArrayList<>()).add(item);
-            }
-            
-            // 转换为展平的列表
-            for (Map.Entry<String, List<LinkItem>> entry : groups.entrySet()) {
-                items.add(entry.getKey());
-                items.addAll(entry.getValue());
-            }
-        }
-        
-        // 同时更新 links 列表（用于 getLinks 方法）
-        this.links = new ArrayList<>(newLinks);
-        
-        // 通知适配器数据已更新
-        notifyDataSetChanged();
-    }
+
 
     private String formatDate(long timestamp) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         return sdf.format(new Date(timestamp));
-    }
-
-    // 添加获取当前链接列表的方法
-    public List<LinkItem> getLinks() {
-        List<LinkItem> currentLinks = new ArrayList<>();
-        for (Object item : items) {
-            if (item instanceof LinkItem) {
-                currentLinks.add((LinkItem) item);
-            }
-        }
-        return currentLinks;
     }
 
     private void shareAsText(LinkItem item) {
@@ -624,12 +664,6 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
     }
 
-    private String getItemUrl(int position) {
-        if (items.get(position) instanceof LinkItem) {
-            return ((LinkItem) items.get(position)).getUrl();
-        }
-        return null;
-    }
 
     public static class LinkViewHolder extends RecyclerView.ViewHolder {
         TextView titleText;
@@ -1015,10 +1049,6 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
     }
 
-    public void setPinnedLinks(List<LinkItem> pinnedLinks) {
-        this.pinnedLinks = pinnedLinks;
-        notifyDataSetChanged();
-    }
 
     private void openLink(Context context, String url, int position) {
         try {
@@ -1098,15 +1128,5 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
     }
 
-    // 添加一个方法来获取指定位置的项目
-    public Object getItemAtPosition(int position) {
-        if (position >= 0 && position < items.size()) {
-            return items.get(position);
-        }
-        return null;
-    }
 
-    public OnLinkActionListener getListener(){
-        return this.listener;
-    }
 } 

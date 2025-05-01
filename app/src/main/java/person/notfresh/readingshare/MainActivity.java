@@ -394,23 +394,6 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-    private String extractTitleFromUrl(String url) {
-        try {
-            // 移除协议部分
-            url = url.replaceFirst("https?://", "");
-            // 移除参数部分
-            url = url.split("\\?")[0];
-            // 移除路径，只保留域名部分
-            String[] parts = url.split("/");
-            if (parts.length > 0) {
-                return parts[0];
-            }
-        } catch (Exception e) {
-            Log.e("ExtractTitle", "Error extracting title from URL", e);
-        }
-        return "新链接";
-    }
-
     private void handleClipboardText(String text) {
         if (TextUtils.isEmpty(text)) {
             return;

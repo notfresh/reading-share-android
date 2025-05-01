@@ -14,7 +14,6 @@ public class RssEntry {
     }
 
     public RssEntry() {
-
     }
 
     public String getTitle() {
