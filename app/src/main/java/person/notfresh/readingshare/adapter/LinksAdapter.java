@@ -72,7 +72,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     private boolean isSelectionMode = false;
 
-   private SwipeActionsHelper swipeActionsHelper;
+    private SwipeActionsHelper swipeActionsHelper;
     private String userEnv;
     public static final String DEFAULT_USER_ENV = "main";
 
@@ -87,6 +87,14 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         void onPinStatusChanged();
 //        void updateLinkRemark(LinkItem item);
 //        void onLinkRemarkUpdated(LinkItem item);
+    }
+
+    /**
+     * 检查适配器是否处于选择模式
+     * @return 是否处于选择模式
+     */
+    public boolean isInSelectionMode() {
+        return isSelectionMode;
     }
 
     public void commonInit(Context context){
@@ -115,6 +123,10 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     public void setOnLinkActionListener(OnLinkActionListener listener) {
         this.listener = listener;
+    }
+
+    public OnLinkActionListener getListener(){
+        return this.listener;
     }
 
     @Override
@@ -174,9 +186,6 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return null;
     }
 
-    public OnLinkActionListener getListener(){
-        return this.listener;
-    }
 
     public void setPinnedLinks(List<LinkItem> pinnedLinks) {
         this.pinnedLinks = pinnedLinks;
@@ -477,8 +486,6 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return "新链接";
     }
 
-
-
     private String formatDate(long timestamp) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         return sdf.format(new Date(timestamp));
@@ -664,6 +671,75 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
     }
 
+    private void openLink(Context context, String url, int position) {
+        try {
+            Log.d("LinksAdapter", "openLink called, position: " + position + ", url: " + url);
+
+            // 检查位置是否有效
+            if (position < 0 || position >= items.size()) {
+                Log.e("LinksAdapter", "Invalid position: " + position);
+                return;
+            }
+
+            // 获取当前点击的LinkItem
+            Object item = items.get(position);
+            if (!(item instanceof LinkItem)) {
+                Log.e("LinksAdapter", "Item at position " + position + " is not a LinkItem");
+                return;
+            }
+
+            LinkItem linkItem = (LinkItem) item;
+            Log.d("LinksAdapter", "LinkItem found: " + linkItem.getTitle());
+
+            // 更新点击次数
+            linkItem.incrementClickCount();
+            Log.d("LinksAdapter", "Click count updated to: " + linkItem.getClickCount());
+            linkDao.updateClickCount(linkItem.getId(), linkItem.getClickCount());
+
+            // 刷新当前项
+            notifyItemChanged(position);
+
+            // 打开链接
+            Log.d("LinksAdapter", "Starting WebViewActivity with url: " + url);
+            Intent intent = new Intent(context, WebViewActivity.class);
+            intent.putExtra("url", url);
+            context.startActivity(intent);
+
+        } catch (Exception e) {
+            Log.e("LinksAdapter", "Error in openLink: " + e.getMessage(), e);
+            Toast.makeText(context, "无法打开链接: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public int getPositionForDate(String date) {
+        int position = 0;
+        // 如果有置顶链接，需要加上置顶区域的位置
+        if (!pinnedLinks.isEmpty()) {
+            position += pinnedLinks.size() + 1;  // +1 for "置顶" header
+        }
+
+        for (Map.Entry<String, List<LinkItem>> entry : groupedLinks.entrySet()) {
+            if (entry.getKey().equals(date)) {
+                return position;
+            }
+            position += entry.getValue().size() + 1; // +1 for header
+        }
+        return -1;
+    }
+
+    /**
+     * 为RecyclerView添加滑动操作功能
+     * @param recyclerView 要添加滑动功能的RecyclerView
+     */
+    public void enableSwipeActions(RecyclerView recyclerView) {
+        swipeActionsHelper.attachToRecyclerView(recyclerView);
+    }
+
+    public void updateLinkRemark(LinkItem item) {
+        if (linkDao != null) {
+            linkDao.updateLinkRemark(item.getId(), item.getRemark());
+        }
+    }
 
     public static class LinkViewHolder extends RecyclerView.ViewHolder {
         TextView titleText;
@@ -1050,83 +1126,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     }
 
 
-    private void openLink(Context context, String url, int position) {
-        try {
-            Log.d("LinksAdapter", "openLink called, position: " + position + ", url: " + url);
-            
-            // 检查位置是否有效
-            if (position < 0 || position >= items.size()) {
-                Log.e("LinksAdapter", "Invalid position: " + position);
-                return;
-            }
 
-            // 获取当前点击的LinkItem
-            Object item = items.get(position);
-            if (!(item instanceof LinkItem)) {
-                Log.e("LinksAdapter", "Item at position " + position + " is not a LinkItem");
-                return;
-            }
-
-            LinkItem linkItem = (LinkItem) item;
-            Log.d("LinksAdapter", "LinkItem found: " + linkItem.getTitle());
-
-            // 更新点击次数
-            linkItem.incrementClickCount();
-            Log.d("LinksAdapter", "Click count updated to: " + linkItem.getClickCount());
-            linkDao.updateClickCount(linkItem.getId(), linkItem.getClickCount());
-
-            // 刷新当前项
-            notifyItemChanged(position);
-
-            // 打开链接
-            Log.d("LinksAdapter", "Starting WebViewActivity with url: " + url);
-            Intent intent = new Intent(context, WebViewActivity.class);
-            intent.putExtra("url", url);
-            context.startActivity(intent);
-            
-        } catch (Exception e) {
-            Log.e("LinksAdapter", "Error in openLink: " + e.getMessage(), e);
-            Toast.makeText(context, "无法打开链接: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    public int getPositionForDate(String date) {
-        int position = 0;
-        // 如果有置顶链接，需要加上置顶区域的位置
-        if (!pinnedLinks.isEmpty()) {
-            position += pinnedLinks.size() + 1;  // +1 for "置顶" header
-        }
-
-        for (Map.Entry<String, List<LinkItem>> entry : groupedLinks.entrySet()) {
-            if (entry.getKey().equals(date)) {
-                return position;
-            }
-            position += entry.getValue().size() + 1; // +1 for header
-        }
-        return -1;
-    }
-
-    /**
-     * 为RecyclerView添加滑动操作功能
-     * @param recyclerView 要添加滑动功能的RecyclerView
-     */
-    public void enableSwipeActions(RecyclerView recyclerView) {
-        swipeActionsHelper.attachToRecyclerView(recyclerView);
-    }
-    
-    /**
-     * 检查适配器是否处于选择模式
-     * @return 是否处于选择模式
-     */
-    public boolean isInSelectionMode() {
-        return isSelectionMode;
-    }
-
-    public void updateLinkRemark(LinkItem item) {
-        if (linkDao != null) {
-            linkDao.updateLinkRemark(item.getId(), item.getRemark());
-        }
-    }
 
 
 } 
