@@ -170,12 +170,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        handleIntent(intent);
-    }
-
+    
     @Override 
     public void onWindowFocusChanged(boolean hasFocus) { //@mark
         super.onWindowFocusChanged(hasFocus);
@@ -188,9 +183,46 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // 让 Fragment 处理菜单
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         updateNavHeader();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (linkDao != null) {
+            linkDao.close();
+        }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // 先让 Fragment 处理菜单项点击
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment_content_main);
+        if (currentFragment != null && currentFragment.onOptionsItemSelected(item)) {
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        return NavigationUI.navigateUp(navController, mAppBarConfiguration)
+                || super.onSupportNavigateUp();
+    }
+
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleIntent(intent);
     }
 
     private void handleIntent(Intent intent) {
@@ -300,35 +332,6 @@ public class MainActivity extends AppCompatActivity {
         return result.isEmpty() ? "分享的内容" : result;
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (linkDao != null) {
-            linkDao.close();
-        }
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // 让 Fragment 处理菜单
-        return super.onCreateOptionsMenu(menu);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // 先让 Fragment 处理菜单项点击
-        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment_content_main);
-        if (currentFragment != null && currentFragment.onOptionsItemSelected(item)) {
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    @Override
-    public boolean onSupportNavigateUp() {
-        return NavigationUI.navigateUp(navController, mAppBarConfiguration)
-                || super.onSupportNavigateUp();
-    }
 
     private void checkClipboardPermission() {
         // 直接检查剪贴板，不需要请求权限
@@ -539,8 +542,6 @@ public class MainActivity extends AppCompatActivity {
         // 在后台获取网页标题
         fetchTitleFromUrl(url, titleInput);
     }
-
-
 
     private void fetchTitleFromUrl(String url, EditText titleInput) {
         ExecutorService executor = Executors.newSingleThreadExecutor();
