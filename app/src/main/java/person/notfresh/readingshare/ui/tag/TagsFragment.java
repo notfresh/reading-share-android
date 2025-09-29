@@ -43,6 +43,7 @@ import person.notfresh.readingshare.adapter.LinksAdapter;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.ExportUtil;
+import person.notfresh.readingshare.util.ShareUtil;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -93,6 +94,12 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private Set<String> highlightedTags = new HashSet<>();  // 保存高亮的标签
 
     @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setHasOptionsMenu(true);  // 启用选项菜单
+    }
+
+    @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                             Bundle savedInstanceState) {
         Log.d("TagsFragment", "onCreateView started");
@@ -136,6 +143,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linksRecyclerView = root.findViewById(R.id.recycler_links);
         linksRecyclerView.setAdapter(linksAdapter);
         linksRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        // 在标签页默认不显示置顶区（仅在与筛选结果有交集时显示）
+        linksAdapter.setPinnedLinks(Collections.emptyList());
 
         // 启用滑动操作功能
         linksAdapter.enableSwipeActions(linksRecyclerView);
@@ -154,12 +163,6 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         Log.d("TagsFragment", "Tags loaded");
 
         return root;
-    }
-
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);  // 启用选项菜单
     }
 
     @Override
@@ -197,6 +200,14 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (linkDao != null) {
+            linkDao.close();
+        }
     }
 
     private void showAddTagDialog() {
@@ -693,8 +704,6 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
-    
-
     private void updateContentBySelectedTags() {
         List<LinkItem> links = new ArrayList<>();
         Set<String> selectedTagNames = new HashSet<>();
@@ -746,6 +755,26 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             Collections.sort(dayLinks, (a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
         }
         
+        // 计算置顶与筛选结果的交集，仅当有交集时展示
+        if (selectedTags.isEmpty()) {
+            // 未选择任何标签时不显示置顶区
+            linksAdapter.setPinnedLinks(Collections.emptyList());
+        } else {
+            // 使用链接 id 作为交集判断依据
+            Set<Long> selectedIds = new HashSet<>();
+            for (LinkItem item : links) {
+                selectedIds.add(item.getId());
+            }
+            List<LinkItem> pinned = linkDao.getPinnedLinks();
+            List<LinkItem> pinnedOverlap = new ArrayList<>();
+            for (LinkItem p : pinned) {
+                if (selectedIds.contains(p.getId())) {
+                    pinnedOverlap.add(p);
+                }
+            }
+            linksAdapter.setPinnedLinks(pinnedOverlap);
+        }
+
         linksAdapter.setGroupedLinks(groupedLinks);
 
         // 保存选择状态
@@ -811,13 +840,6 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        if (linkDao != null) {
-            linkDao.close();
-        }
-    }
 
     // 实现 OnLinkActionListener 的方法
     @Override
@@ -828,6 +850,11 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         restoreSelections();
         linksAdapter.notifyDataSetChanged();
     }
+    
+    @Override
+    public boolean deleteLink(Long id) {
+        return false;
+    }
 
     @Override
     public void onUpdateLink(LinkItem oldLink, String newTitle) {
@@ -836,10 +863,6 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         loadTags();
     }
 
-    @Override
-    public boolean deleteLink(Long id) {
-        return false;
-    }
 
     public void addTagsToLink(LinkItem item, List<String> tags){
 
@@ -949,7 +972,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     @Override
     public void onPinStatusChanged() {
-
+        // 置顶状态变化后，依据当前筛选重新计算交集并刷新
+        updateContentBySelectedTags();
     }
 
     private void toggleSelectionMode() {
@@ -975,98 +999,14 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     private void shareAsText() {
         Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
-        if (selectedItems.isEmpty()) {
-            Toast.makeText(requireContext(), "请先选择要分享的链接", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        StringBuilder shareText = new StringBuilder();
-        for (LinkItem item : selectedItems) {
-            shareText.append(item.getTitle())
-                    .append("\n")
-                    .append(item.getUrl())
-                    .append("\n\n");
-        }
-
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
-        startActivity(Intent.createChooser(shareIntent, "分享到"));
+        ShareUtil.shareLinksAsText(requireContext(), new ArrayList<>(selectedItems));
     }
 
     private void shareAsFile(boolean isJson) {
         Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
-        if (selectedItems.isEmpty()) {
-            Toast.makeText(requireContext(), "请先选择要分享的链接", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // 创建对话框让用户输入文件名
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("设置文件名");
-        
-        // 创建输入框
-        final EditText input = new EditText(requireContext());
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        
-        // 设置默认文件名
-        String defaultFileName = "分享的链接_" + new SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(new Date());
-        input.setText(defaultFileName);
-        input.setSelection(defaultFileName.length()); // 将光标放在末尾
-        
-        builder.setView(input);
-        
-        // 设置按钮
-        builder.setPositiveButton("确定", (dialog, which) -> {
-            String fileName = input.getText().toString().trim();
-            
-            // 如果用户没有输入，使用默认文件名
-            if (fileName.isEmpty()) {
-                fileName = defaultFileName;
-            }
-            
-            // 确保文件名中不包含非法字符
-            fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
-            
-            // 执行导出操作
-            exportAndShareFile(isJson, new ArrayList<>(selectedItems), fileName);
-        });
-        
-        builder.setNegativeButton("取消", (dialog, which) -> dialog.cancel());
-        
-        builder.show();
+        ShareUtil.shareLinksAsFileWithDialog(requireContext(), new ArrayList<>(selectedItems), isJson);
     }
 
-    /**
-     * 导出并分享文件的实际操作
-     */
-    private void exportAndShareFile(boolean isJson, List<LinkItem> items, String fileName) {
-        try {
-            String filePath;
-            if (isJson) {
-                filePath = ExportUtil.exportToJson(requireContext(), items, fileName);
-            } else {
-                filePath = ExportUtil.exportToCsv(requireContext(), items, fileName);
-            }
-            
-            File file = new File(filePath);
-            Uri uri = androidx.core.content.FileProvider.getUriForFile(
-                requireContext(),
-                requireContext().getPackageName() + ".provider",
-                file);
-            
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("*/*");
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(shareIntent, "分享文件"));
-            
-        } catch (Exception e) {
-            Snackbar.make(requireView(), 
-                "分享失败：" + e.getMessage(), 
-                Snackbar.LENGTH_LONG).show();
-        }
-    }
 
     private void selectAllItems() {
         // 获取当前标签过滤后的链接
@@ -1108,7 +1048,6 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 根据当前选中的标签更新链接列表
         Set<String> selectedTagNames = new HashSet<>();
         boolean hasNoTagFilter = false;
-
         // 收集选中的标签名称
         for (View tagView : selectedTags) {
             String tag = getTagNameFromView(tagView);
@@ -1118,7 +1057,6 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 selectedTagNames.add(tag);
             }
         }
-
         List<LinkItem> links = new ArrayList<>();
         
         if (selectedTags.isEmpty()) {

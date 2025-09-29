@@ -5,62 +5,66 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- 标签区域 -->
-    <ScrollView
-        android:id="@+id/tags_scrollview"
+    <!-- 标签区域（使用 FrameLayout 使按钮悬浮在底部，不随滚动） -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:maxHeight="120dp" 
-        android:scrollbars="none"
-        android:fadingEdge="vertical"
-        android:fadingEdgeLength="24dp"
-        android:requiresFadingEdge="vertical">
+        android:layout_height="wrap_content">
 
-        <!-- 将标签容器和折叠按钮放在同一个垂直布局中 -->
-        <LinearLayout
+        <ScrollView
+            android:id="@+id/tags_scrollview"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:maxHeight="120dp"
+            android:scrollbars="none"
+            android:fadingEdge="vertical"
+            android:fadingEdgeLength="24dp"
+            android:requiresFadingEdge="vertical">
 
-            <com.google.android.flexbox.FlexboxLayout
-                android:id="@+id/container_tags"
+            <!-- 仅包含标签容器，不包含按钮 -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="8dp"
-                app:flexWrap="wrap"
-                app:alignItems="flex_start"
-                app:alignContent="flex_start"
-                app:flexDirection="row" />
+                android:orientation="vertical">
 
-            <!-- 折叠/展开按钮放在内容的最下方 -->
-            <LinearLayout
-                android:id="@+id/btn_toggle_tags"
-                android:layout_width="match_parent"
-                android:layout_height="32dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@android:color/transparent">
-
-        <!-- 分隔线 - 移除水平边距使其占满宽度 -->
-                <View
+                <com.google.android.flexbox.FlexboxLayout
+                    android:id="@+id/container_tags"
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#E0E0E0"/>
-
-        <!-- 展开/折叠指示箭头 -->
-                <ImageView
-                    android:id="@+id/arrow_indicator"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_expand_more"
-                    android:contentDescription="展开收起标签"
-                    android:background="@drawable/circle_background"
-                    android:padding="2dp"/>
+                    android:layout_height="wrap_content"
+                    android:padding="8dp"
+                    app:flexWrap="wrap"
+                    app:alignItems="flex_start"
+                    app:alignContent="flex_start"
+                    app:flexDirection="row" />
             </LinearLayout>
+        </ScrollView>
+
+        <!-- 折叠/展开按钮悬浮在标签区域底部 -->
+        <LinearLayout
+            android:id="@+id/btn_toggle_tags"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@android:color/transparent">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#E0E0E0"/>
+
+            <ImageView
+                android:id="@+id/arrow_indicator"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_expand_more"
+                android:contentDescription="展开收起标签"
+                android:background="@drawable/circle_background"
+                android:padding="2dp"/>
         </LinearLayout>
-    </ScrollView>
+    </FrameLayout>
 
     <!-- 链接列表 -->
     <androidx.recyclerview.widget.RecyclerView

@@ -21,31 +21,33 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import javax.net.ssl.HttpsURLConnection;
 
+import person.notfresh.readingshare.config.Config;
+
 public class CrawlUtil {
 
     public static String getWeixinArticleTitle(String url) throws IOException {
         // 使用jsoup连接并获取页面，添加更多请求头模拟真实浏览器
         Document doc = Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                .header("Accept-Encoding", "gzip, deflate, br")
-                .header("Connection", "keep-alive")
-                .header("Cache-Control", "max-age=0")
-                .timeout(10000)  // 增加超时时间到10秒
-                .maxBodySize(0)  // 不限制响应大小
-                .followRedirects(true)  // 允许重定向
+                .userAgent(Config.UserAgent.CHROME_USER_AGENT)
+                .header("Accept", Config.Headers.ACCEPT)
+                .header("Accept-Language", Config.Headers.ACCEPT_LANGUAGE)
+                .header("Accept-Encoding", Config.Headers.ACCEPT_ENCODING)
+                .header("Connection", Config.Headers.CONNECTION)
+                .header("Cache-Control", Config.Headers.CACHE_CONTROL)
+                .timeout(Config.Network.WECHAT_CRAWL_TIMEOUT)
+                .maxBodySize(Config.Misc.MAX_BODY_SIZE)
+                .followRedirects(Config.Misc.FOLLOW_REDIRECTS)
                 .get();
 
         // 获取标题（尝试多种选择器）
         String title = doc.title();  // 先尝试获取页面标题
         if (title.isEmpty()) {
             // 如果页面标题为空，尝试获取文章标题
-            title = doc.select("h1.rich_media_title").text();
+            title = doc.select(Config.WeChatSelectors.TITLE_SELECTOR).text();
         }
         if (title.isEmpty()) {
             // 如果还是空，尝试其他可能的选择器
-            title = doc.select("#activity-name").text();
+            title = doc.select(Config.WeChatSelectors.ACTIVITY_NAME_SELECTOR).text();
         }
 
         // 如果所有方法都无法获取标题，返回空字符串
@@ -54,7 +56,7 @@ public class CrawlUtil {
 
     public static String getUrlSummary(String url, int timeoutSeconds) throws IOException, JSONException, KeyManagementException, NoSuchAlgorithmException {
         // 构建API请求URL
-        String apiUrl = "https://duxiang.ai/api/abstract";
+        String apiUrl = Config.API.DUXIANG_API_URL;
         
         // 创建连接
         URL apiUrlObj = new URL(apiUrl);
@@ -81,15 +83,15 @@ public class CrawlUtil {
             httpsConn.setHostnameVerifier((hostname, session) -> true);
         }
         conn.setRequestMethod("POST");
-        conn.setConnectTimeout(3 * 1000);
+        conn.setConnectTimeout(Config.Network.CONNECT_TIMEOUT);
         conn.setReadTimeout(timeoutSeconds * 1000);
         conn.setDoOutput(true);
-        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("Content-Type", Config.Headers.CONTENT_TYPE_JSON);
         
         // 构建请求JSON
         JSONObject requestJson = new JSONObject();
         requestJson.put("url", url);
-        requestJson.put("key", "notfresh@duxiang.ai");
+        requestJson.put("key", Config.API.DUXIANG_API_KEY);
         
         // 写入请求体
         try (java.io.OutputStream os = conn.getOutputStream()) {

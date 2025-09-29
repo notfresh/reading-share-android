@@ -23,6 +23,7 @@ import android.content.Context;
 import android.os.Build;
 import android.webkit.PermissionRequest;
 import android.view.ViewGroup;
+import person.notfresh.readingshare.util.ShareUtil;
 
 public class WebViewActivity extends AppCompatActivity {
     private WebView webView;
@@ -32,6 +33,7 @@ public class WebViewActivity extends AppCompatActivity {
     private MediaSessionCompat mediaSession;
     private PowerManager.WakeLock wakeLock;
     private boolean preserveCache = false;
+    private String pageTitleCache = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,6 +107,98 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     @Override
+    public void finish() {
+        if (preserveCache) {
+            // 如果需要保留缓存，只处理WebView部分
+            if (webView != null) {
+                webView.stopLoading();
+                // 不清除历史和缓存，但停止WebView
+                webView.destroy();
+            }
+            // 不在这里释放mediaSession和wakeLock
+        } else {
+            // 不需要保留缓存时，检查WebViewManager中是否有当前URL的缓存
+            if (currentUrl != null && getInstance().hasCache(currentUrl)) {
+                // 清除WebViewManager中的缓存
+                Log.d("WebViewActivity", "清除URL缓存: " + currentUrl);
+                getInstance().removeWebView(currentUrl);
+            }
+        }
+        super.finish();  // 调用原始的finish方法
+    }
+
+    @Override
+    public void onBackPressed() {
+        // 如果 WebView 可以后退，则后退
+        if (webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        onBackPressed();
+        return true;
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (!preserveCache) {  // 只有在不保留缓存时才清除WebView缓存
+            // 清理 WebView
+            if (webView != null) {
+                webView.stopLoading();
+                webView.clearHistory();
+                webView.clearCache(true);
+                webView.destroy();
+            }
+        }
+        if(preserveCache){  // 只生效一次,反转回来
+           preserveCache = false;
+        }
+        
+        
+        // 无论是否保留缓存，都在onDestroy中释放这些资源
+        if (mediaSession != null) {
+            mediaSession.release();
+            mediaSession = null;  // 防止重复释放
+        }
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+            wakeLock = null;  // 防止重复释放
+        }
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onStop() {
+        // 使用setWillNotDraw(false)确保WebView即使在后台也能继续渲染
+        if (webView != null) {
+            webView.setWillNotDraw(false);
+        }
+        super.onStop();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+        }
+        
+        // 停止前台服务
+        stopService(new Intent(this, WebViewBackgroundService.class));
+        
+        // 如果mediaSession为null，重新初始化它
+        if (mediaSession == null && webView != null) {
+            initMediaSession();
+        }
+    }
+
+    
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_open_browser) {
             // 添加日志打印
@@ -149,34 +243,16 @@ public class WebViewActivity extends AppCompatActivity {
             finish();
             return true;
         } else if (item.getItemId() == R.id.webview_share) {
-            // 强制返回，直接关闭当前 WebView
-            Log.d("WebViewActivityMenu", "点击了强制返回");
-            //finish();
+            Log.d("WebViewActivityMenu", "点击了分享");
+            String title = (pageTitleCache != null && !pageTitleCache.isEmpty()) ? pageTitleCache : (webView != null ? webView.getTitle() : "");
+            String url = webView != null ? webView.getUrl() : "";
+            Log.d("ShareUtil", "WebViewActivityMenu share title=" + title + ", url=" + url);
+            ShareUtil.shareText(this, title, null, url);
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
-    @Override
-    public void finish() {
-        if (preserveCache) {
-            // 如果需要保留缓存，只处理WebView部分
-            if (webView != null) {
-                webView.stopLoading();
-                // 不清除历史和缓存，但停止WebView
-                webView.destroy();
-            }
-            // 不在这里释放mediaSession和wakeLock
-        } else {
-            // 不需要保留缓存时，检查WebViewManager中是否有当前URL的缓存
-            if (currentUrl != null && getInstance().hasCache(currentUrl)) {
-                // 清除WebViewManager中的缓存
-                Log.d("WebViewActivity", "清除URL缓存: " + currentUrl);
-                getInstance().removeWebView(currentUrl);
-            }
-        }
-        super.finish();  // 调用原始的finish方法
-    }
 
     private void setupWebView() {
         // 启用 JavaScript
@@ -238,11 +314,65 @@ public class WebViewActivity extends AppCompatActivity {
             "  }" +
             "}", null);
         
-        // 改为一个更简单的通义网站处理方法
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                try {
+                    String t = view.getTitle();
+                    if (t != null && !t.trim().isEmpty()) {
+                        pageTitleCache = t.trim();
+                    }
+                    view.evaluateJavascript("document.title", value -> {
+                        try {
+                            if (value != null && value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+                                String jsTitle = value.substring(1, value.length() - 1);
+                                if (!jsTitle.trim().isEmpty()) {
+                                    pageTitleCache = jsTitle.trim();
+                                }
+                            }
+                        } catch (Exception ignore) {
+
+                        }
+                    });
+
+                    // 对微信公众号页面做更稳健的标题提取（不依赖站点特判，通用选择器）
+                    String wechatTitleScript =
+                            "(function(){" +
+                            "  function txt(x){var y=(x||''); return y.replace(/\\s+/g,' ').trim();}" +
+                            "  var el=document.getElementById('activity-name')||document.querySelector('h1.rich_media_title, h2.rich_media_title');" +
+                            "  var t=el?txt(el.innerText||el.textContent):'';" +
+                            "  if(!t){var metas=document.getElementsByTagName('meta'); for(var i=0;i<metas.length;i++){ var p=metas[i].getAttribute('property'); if(p==='og:title'){ t=txt(metas[i].getAttribute('content')); break; } }}" +
+                            "  if(!t){t=txt(document.title);} return t;" +
+                            "})();";
+                    view.evaluateJavascript(wechatTitleScript, value -> {
+                        try {
+                            if (value != null && value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+                                String jsTitle = value.substring(1, value.length() - 1);
+                                if (!jsTitle.trim().isEmpty()) {
+                                    pageTitleCache = jsTitle.trim();
+                                }
+                            }
+                        } catch (Exception ignore) {}
+                    });
+
+                    // 再延迟一次尝试，处理晚加载的标题
+                    view.postDelayed(() -> view.evaluateJavascript(wechatTitleScript, value2 -> {
+                        try {
+                            if (value2 != null && value2.length() >= 2 && value2.startsWith("\"") && value2.endsWith("\"")) {
+                                String jsTitle2 = value2.substring(1, value2.length() - 1);
+                                if (!jsTitle2.trim().isEmpty()) {
+                                    pageTitleCache = jsTitle2.trim();
+                                }
+                            }
+                        } catch (Exception ignore) {
+
+                        }
+                    }), 500);
+                } catch (Exception ignore) {
+
+                }
                 
                 // 只在通义网站注入特殊处理
                 if (url != null && url.contains("tongyi.aliyun.com")) {
@@ -267,49 +397,7 @@ public class WebViewActivity extends AppCompatActivity {
         });
     }
 
-    @Override
-    public void onBackPressed() {
-        // 如果 WebView 可以后退，则后退
-        if (webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            super.onBackPressed();
-        }
-    }
-
-    @Override
-    public boolean onSupportNavigateUp() {
-        onBackPressed();
-        return true;
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (!preserveCache) {  // 只有在不保留缓存时才清除WebView缓存
-            // 清理 WebView
-            if (webView != null) {
-                webView.stopLoading();
-                webView.clearHistory();
-                webView.clearCache(true);
-                webView.destroy();
-            }
-        }
-        if(preserveCache){  // 只生效一次,反转回来
-           preserveCache = false;
-        }
-        
-        
-        // 无论是否保留缓存，都在onDestroy中释放这些资源
-        if (mediaSession != null) {
-            mediaSession.release();
-            mediaSession = null;  // 防止重复释放
-        }
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-            wakeLock = null;  // 防止重复释放
-        }
-        super.onDestroy();
-    }
+    
 
     @Override
     protected void onPause() {
@@ -352,31 +440,7 @@ public class WebViewActivity extends AppCompatActivity {
         super.onPause();
     }
 
-    @Override
-    protected void onStop() {
-        // 使用setWillNotDraw(false)确保WebView即使在后台也能继续渲染
-        if (webView != null) {
-            webView.setWillNotDraw(false);
-        }
-        super.onStop();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (webView != null) {
-            webView.onResume();
-            webView.resumeTimers();
-        }
-        
-        // 停止前台服务
-        stopService(new Intent(this, WebViewBackgroundService.class));
-        
-        // 如果mediaSession为null，重新初始化它
-        if (mediaSession == null && webView != null) {
-            initMediaSession();
-        }
-    }
+   
 
     // 优化isAudioPlaying方法
     private boolean isAudioPlaying() {

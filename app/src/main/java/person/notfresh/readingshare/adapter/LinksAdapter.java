@@ -53,6 +53,7 @@ import person.notfresh.readingshare.WebViewActivity;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.SwipeActionsHelper;
+import person.notfresh.readingshare.util.ShareUtil;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_PINNED_HEADER = -1;
@@ -339,7 +340,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     }
                     return true;
                 case 3:
-                    shareAsText(item);
+                    ShareUtil.shareLinkAsText(context, item);
                     return true;
                 case 4:
                     Log.d("LinksAdapter", "切换置顶被点击, linkId: " + item.getId() + ", 当前置顶状态: " + item.isPinned());
@@ -491,57 +492,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         return sdf.format(new Date(timestamp));
     }
 
-    private void shareAsText(LinkItem item) {
-        StringBuilder shareText = new StringBuilder();
-        shareText.append(item.getTitle()).append("\n");
-        if (item.getRemark() != null && !item.getRemark().isEmpty()) {
-            shareText.append(item.getRemark()).append("\n");
-        }
-        shareText.append(item.getUrl());
-        
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
-        
-        // 创建选择器并排除自己的应用
-        Intent chooserIntent = Intent.createChooser(shareIntent, "分享到");
-        String myPackageName = context.getPackageName();
-        chooserIntent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-        chooserIntent.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, 
-            new ComponentName[]{new ComponentName(myPackageName, myPackageName + ".MainActivity")});
-        
-        context.startActivity(chooserIntent);
-    }
+    // 分享逻辑已迁移至 ShareUtil
 
-    private void shareAsFile(LinkItem item, boolean isJson) {
-        try {
-            List<LinkItem> singleItemList = Collections.singletonList(item);
-            String filePath = isJson ? 
-                ExportUtil.exportToJson(context, singleItemList) : 
-                ExportUtil.exportToCsv(context, singleItemList);
-            
-            File file = new File(filePath);
-            Uri uri = androidx.core.content.FileProvider.getUriForFile(
-                context, context.getPackageName() + ".provider", file);
-                
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("*/*");
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            
-            // 创建选择器并排除自己的应用
-            Intent chooserIntent = Intent.createChooser(shareIntent, "分享文件");
-            String myPackageName = context.getPackageName();
-            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-            chooserIntent.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, 
-                new ComponentName[]{new ComponentName(myPackageName, myPackageName + ".MainActivity")});
-            
-            context.startActivity(chooserIntent);
-            
-        } catch (Exception e) {
-            Toast.makeText(context, "分享失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
+    // 文件分享逻辑已迁移至 ShareUtil
 
     private void showDeleteConfirmDialog(LinkItem item) {
         new AlertDialog.Builder(context)
