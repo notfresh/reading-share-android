@@ -552,9 +552,9 @@ public class MainActivity extends AppCompatActivity {
             String title = "";
             try {
                 if (url.contains("weixin.qq.com")) {
-                    title = fetchTitleFromWeixin(url, titleInput);
+                    title = CrawlUtil.getWeixinArticleTitle(url);
                 } else {
-                    title = fetchTitleCommon(url, titleInput);
+                    title = CrawlUtil.fetchTitleCommon(url);
                 }
             } catch (Exception e) {
                 Log.e("FetchTitle", "Error fetching title", e);
@@ -567,44 +567,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         });
-    }
-    private String fetchTitleFromWeixin(String url, EditText titleInput) throws IOException {
-        String title = CrawlUtil.getWeixinArticleTitle(url);
-        return title;
-    }
-
-    private String fetchTitleCommon(String url, EditText titleInput) throws IOException {
-        String title = "";
-        URL urlObj = new URL(url);
-        URLConnection conn = urlObj.openConnection();
-        conn.setConnectTimeout(3000);
-        conn.setReadTimeout(3000);
-        conn.setRequestProperty("User-Agent", 
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-
-        BufferedReader reader = new BufferedReader(
-            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)
-        );
-        
-        StringBuilder html = new StringBuilder();
-        String line;
-        int linesRead = 0;
-        while ((line = reader.readLine()) != null && linesRead < 100) {
-            html.append(line);
-            linesRead++;
-        }
-        reader.close();
-
-        Pattern pattern = Pattern.compile("<title>(.*?)</title>", Pattern.CASE_INSENSITIVE);
-        Matcher matcher = pattern.matcher(html.toString());
-        if (matcher.find()) {
-            title = matcher.group(1).trim();
-            // 如果标题超过20个字符，截取前20个字符并添加省略号
-            if (title.length() > 20) {
-                title = title.substring(0, 20) + "...";
-            }
-        }
-        return title;
     }
 
     @SuppressLint("ResourceType")

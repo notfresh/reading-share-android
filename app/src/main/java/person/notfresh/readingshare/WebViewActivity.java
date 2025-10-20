@@ -2,9 +2,13 @@ package person.notfresh.readingshare;
 
 import static person.notfresh.readingshare.WebViewManager.*;
 
+import android.content.ClipboardManager;
+import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -23,6 +27,12 @@ import android.content.Context;
 import android.os.Build;
 import android.webkit.PermissionRequest;
 import android.view.ViewGroup;
+
+import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.ShareUtil;
 
 public class WebViewActivity extends AppCompatActivity {
@@ -248,6 +258,48 @@ public class WebViewActivity extends AppCompatActivity {
             String url = webView != null ? webView.getUrl() : "";
             Log.d("ShareUtil", "WebViewActivityMenu share title=" + title + ", url=" + url);
             ShareUtil.shareText(this, title, null, url);
+            return true;
+        } else if (item.getItemId() == R.id.action_extract_content) {
+            Log.d("WebViewActivityMenu", "click extract");
+            String url = webView != null ? webView.getUrl() : "";
+            if(url.equals("")){
+                Log.d("WebViewActivityMenu", "null url");
+                Toast.makeText(this, "Url为空", Toast.LENGTH_SHORT).show();
+                return true;
+            }
+            
+            // 使用后台线程执行网络请求，避免NetworkOnMainThreadException
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            Handler handler = new Handler(Looper.getMainLooper());
+            
+            executor.execute(() -> {
+                try {
+                    Log.d("WebViewActivityMenu", "@1.01");
+                    String content = CrawlUtil.getArticleByUrl(url);
+                    Log.d("WebViewActivityMenu", "@2");
+                    // 切换回主线程更新UI
+                    handler.post(() -> {
+                        try {
+                            // 将提取的内容写入剪贴板
+                            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                            ClipData clip = ClipData.newPlainText("extracted_content", content);
+                            clipboard.setPrimaryClip(clip);
+                            Log.d("WebViewActivityMenu", "@3");
+                            Toast.makeText(this, "提取Web内容完成，已经写入剪切板", Toast.LENGTH_SHORT).show();
+                        } catch (Exception e) {
+                            Toast.makeText(this, "提取失败", Toast.LENGTH_SHORT).show();
+                            Log.d("WebViewActivityMenu", e.toString());
+                        }
+                    });
+                } catch (Exception e) {
+                    // 切换回主线程显示错误信息
+                    handler.post(() -> {
+                        Toast.makeText(this, "提取失败", Toast.LENGTH_SHORT).show();
+                        Log.d("WebViewActivityMenu", e.toString());
+                    });
+                }
+            });
+            
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -500,4 +552,4 @@ public class WebViewActivity extends AppCompatActivity {
             return url != null && url.contains("tongyi.aliyun.com");
         }
     }
-} 
+}

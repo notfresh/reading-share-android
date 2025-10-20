@@ -132,8 +132,6 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         arrowIndicator.setImageResource(R.drawable.ic_expand_less);
         arrowIndicator.setContentDescription("收起标签");
         
-        
-
         linkDao = new LinkDao(requireContext());
         linkDao.open();
 
