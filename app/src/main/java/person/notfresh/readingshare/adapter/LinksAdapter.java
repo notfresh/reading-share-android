@@ -537,6 +537,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             
             LinkItem linkItem = (LinkItem) item;
             boolean matchesTitle = linkItem.getTitle().toLowerCase().contains(query);
+            boolean matchesUrl = linkItem.getUrl().toLowerCase().contains(query);
             boolean matchesTags = false;
             
             // 检查标签
@@ -548,7 +549,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
             
             // 如果标题或标签匹配，添加到过滤结果中
-            if (matchesTitle || matchesTags) {
+            if (matchesTitle || matchesTags || matchesUrl) {
                 String date = formatDate(linkItem.getTimestamp());
                 filteredGroups.computeIfAbsent(date, k -> new ArrayList<>()).add(linkItem);
             }
