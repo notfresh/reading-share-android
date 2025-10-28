@@ -163,6 +163,32 @@ public class MainActivity extends AppCompatActivity {
 
             checkClipboardPermission();
             
+            // 设置FAB点击事件
+            binding.appBarMain.fab.setOnClickListener(view -> {
+                try {
+                    // 直接尝试启动腾讯邮箱，不检测
+                    Intent qqMailIntent = new Intent(Intent.ACTION_SENDTO);
+                    qqMailIntent.setPackage("com.tencent.androidqqmail");
+                    qqMailIntent.setData(Uri.parse("mailto:notfresh@foxmail.com"));
+                    qqMailIntent.putExtra(Intent.EXTRA_SUBJECT, "读享反馈");
+                    qqMailIntent.putExtra(Intent.EXTRA_TEXT, "请在此处输入您的反馈内容...");
+                    
+                    try {
+                        startActivity(qqMailIntent);
+                    } catch (Exception e) {
+                        // 如果腾讯邮箱启动失败，尝试标准邮件Intent
+                        Intent emailIntent = new Intent(Intent.ACTION_SENDTO);
+                        emailIntent.setData(Uri.parse("mailto:notfresh@foxmail.com"));
+                        emailIntent.putExtra(Intent.EXTRA_SUBJECT, "读享反馈");
+                        emailIntent.putExtra(Intent.EXTRA_TEXT, "请在此处输入您的反馈内容...");
+                        startActivity(emailIntent);
+                    }
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error opening email app", e);
+                    Toast.makeText(this, "打开邮件应用失败", Toast.LENGTH_SHORT).show();
+                }
+            });
+            
         } catch (Exception e) {
             Log.e("MainActivity", "onCreate failed", e);
             Toast.makeText(this, "应用启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
