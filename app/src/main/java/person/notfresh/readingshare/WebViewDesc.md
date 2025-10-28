@@ -72,3 +72,184 @@
 
 ### 结论
 - 现有方案能实现“WebView 存档与复用、后台继续播放”，但在缓存策略、权限安全与线程/生命周期严谨性方面有改进空间。完成上述优化后，稳定性、可维护性与安全性会显著提升。
+
+
+
+我来从上到下详细介绍这个 `WebViewActivity` 的整体框架结构，并标注关键行号：
+
+## 1. 类声明和导入 (1-37行)
+```java
+package person.notfresh.readingshare;
+
+import static person.notfresh.readingshare.WebViewManager.*;
+// ... 其他导入
+```
+- 导入了WebView、媒体控制、权限管理等必要的Android组件
+- 引入了自定义的工具类：`CrawlUtil`、`ShareUtil`、`WebViewManager`
+
+## 2. 成员变量定义 (38-46行)
+```java
+public class WebViewActivity extends AppCompatActivity {
+    private WebView webView;           // WebView实例
+    private Toolbar toolbar;           // 顶部工具栏
+    private String currentUrl;         // 当前页面URL
+    private boolean audioPlaying;      // 音频播放状态
+    private MediaSessionCompat mediaSession;  // 媒体会话
+    private PowerManager.WakeLock wakeLock;   // 电源锁
+    private boolean preserveCache;     // 是否保留缓存
+    private String pageTitleCache;     // 页面标题缓存
+}
+```
+
+## 3. 核心生命周期方法
+
+### onCreate() - 初始化入口 (48-106行)
+```java
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    // 52行：设置布局
+    setContentView(R.layout.activity_webview);
+    
+    // 53-56行：初始化Toolbar
+    toolbar = findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
+    
+    // 58-64行：获取并验证URL
+    currentUrl = getIntent().getStringExtra("url");
+    
+    // 66-86行：WebView缓存管理
+    WebView cachedWebView = getInstance().getWebView(currentUrl);
+    if (cachedWebView != null) {
+        // 使用缓存的WebView
+    } else {
+        // 创建新的WebView
+    }
+    
+    // 88-105行：特殊网站处理（通义网站）
+}
+```
+
+### 菜单相关方法 (108-306行)
+- **onCreateOptionsMenu()** (108-117行)：创建菜单
+- **onOptionsItemSelected()** (212-306行)：处理菜单点击事件
+  - 在浏览器中打开 (213-226行)
+  - 强制返回 (227-231行) 
+  - 存档返回 (232-254行)
+  - 分享功能 (255-261行)
+  - 提取内容 (262-304行)
+
+## 4. 生命周期管理方法
+
+### finish() - 自定义结束逻辑 (120-138行)
+```java
+@Override
+public void finish() {
+    if (preserveCache) {
+        // 保留缓存时的处理
+    } else {
+        // 清除缓存的处理
+    }
+    super.finish();
+}
+```
+
+### onBackPressed() - 返回键处理 (141-148行)
+```java
+@Override
+public void onBackPressed() {
+    if (webView.canGoBack()) {
+        webView.goBack();  // WebView内部后退
+    } else {
+        super.onBackPressed();  // 关闭Activity
+    }
+}
+```
+
+### onDestroy() - 资源清理 (157-182行)
+```java
+@Override
+protected void onDestroy() {
+    if (!preserveCache) {
+        // 清理WebView缓存
+    }
+    // 释放媒体会话和电源锁
+}
+```
+
+### onPause()/onResume() - 前后台切换 (455-208行)
+- **onPause()** (455-493行)：启动后台服务保持音频播放
+- **onResume()** (194-208行)：停止后台服务，恢复WebView
+
+## 5. WebView配置方法
+
+### setupWebView() - WebView初始化 (309-450行)
+```java
+private void setupWebView() {
+    // 310-337行：基础设置
+    webView.getSettings().setJavaScriptEnabled(true);
+    webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+    
+    // 341-353行：Chrome客户端配置
+    webView.setWebChromeClient(new WebChromeClient() {
+        // 权限请求处理
+    });
+    
+    // 356行：添加JS接口
+    webView.addJavascriptInterface(new MediaInterfaceObject(), "AndroidMediaInterface");
+    
+    // 370-449行：WebViewClient配置
+    webView.setWebViewClient(new WebViewClient() {
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            // 页面加载完成后的处理
+            // 包括标题提取、特殊网站处理等
+        }
+    });
+}
+```
+
+## 6. 辅助方法
+
+### 音频播放检测 (498-505行)
+```java
+private boolean isAudioPlaying() {
+    if (webView == null) {
+        return false;
+    }
+    return audioPlaying;
+}
+```
+
+### 媒体会话初始化 (507-518行)
+```java
+private void initMediaSession() {
+    mediaSession = new MediaSessionCompat(this, "WebViewAudio");
+    // 设置媒体控制按钮
+}
+```
+
+## 7. 内部类
+
+### MediaInterfaceObject - JS接口类 (521-554行)
+```java
+private class MediaInterfaceObject {
+    @android.webkit.JavascriptInterface
+    public boolean isMediaSessionActive() { ... }
+    
+    @android.webkit.JavascriptInterface  
+    public void setMediaPlaying(boolean isPlaying) { ... }
+    
+    @android.webkit.JavascriptInterface
+    public boolean isTongyiSite(String url) { ... }
+}
+```
+
+## 整体架构特点
+
+1. **分层设计**：UI层(Activity) → 业务层(WebView管理) → 工具层(各种Util)
+2. **状态管理**：通过成员变量管理WebView状态、音频状态、缓存状态
+3. **生命周期感知**：在不同生命周期阶段执行相应操作
+4. **异常处理**：对特殊网站(通义)进行特殊处理，避免崩溃
+5. **资源管理**：在适当时机释放媒体会话、电源锁等资源
+
+这个框架实现了一个功能完整的应用内浏览器，特别适合需要支持媒体播放和页面缓存的阅读类应用。

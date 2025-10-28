@@ -369,6 +369,27 @@ public class WebViewActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                // 处理自定义 URI Scheme
+                if (url != null && !url.startsWith("http://") && !url.startsWith("https://")) {
+                    try {
+                        // 尝试用系统浏览器打开自定义 URI Scheme
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(intent);
+                        return true; // 表示已经处理了这个URL
+                    } catch (Exception e) {
+                        // 如果无法打开，显示错误信息
+                        Log.e("WebViewActivity", "无法打开自定义URI: " + url, e);
+                        Toast.makeText(WebViewActivity.this, "无法打开此链接: " + url, Toast.LENGTH_SHORT).show();
+                        return true;
+                    }
+                }
+                // 对于普通的 http/https URL，让 WebView 正常处理
+                return false;
+            }
+            
+            @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 try {
