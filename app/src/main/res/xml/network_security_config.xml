@@ -5,6 +5,8 @@
         <domain includeSubdomains="true">101.201.175.127</domain>
         <domain includeSubdomains="true">xhslink.com</domain>
         <domain includeSubdomains="true">duxiang.ai</domain>
+        <domain includeSubdomains="true">m.amap.com</domain>
+        <domain includeSubdomains="true">amap.com</domain>
     </domain-config>
     <debug-overrides>
         <trust-anchors>
