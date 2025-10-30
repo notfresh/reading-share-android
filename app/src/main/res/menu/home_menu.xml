@@ -26,6 +26,11 @@
         </menu>
     </item>
     <item
+        android:id="@+id/action_enter_selection"
+        android:title="多选"
+        android:visible="true"
+        app:showAsAction="always|withText"/>
+    <item
         android:id="@+id/action_statistics"
         android:icon="@drawable/ic_statistics"
         android:title="@string/add_statistics"

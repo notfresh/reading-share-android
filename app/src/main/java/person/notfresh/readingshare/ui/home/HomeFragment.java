@@ -35,6 +35,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.ClickStatisticsActivity;
+import person.notfresh.readingshare.util.ShareUtil;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -50,6 +51,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private boolean isSelectionMode = false;
     private MenuItem shareMenuItem;
     private MenuItem closeSelectionMenuItem;
+    private MenuItem enterSelectionMenuItem;
     private EditText searchEditText;
 
     @Override
@@ -66,6 +68,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         inflater.inflate(R.menu.home_menu, menu);
         shareMenuItem = menu.findItem(R.id.action_share);
         closeSelectionMenuItem = menu.findItem(R.id.action_close_selection);
+        enterSelectionMenuItem = menu.findItem(R.id.action_enter_selection);
         MenuItem statisticsMenuItem = menu.findItem(R.id.action_statistics);  // 新增的统计
 
         // 调整新增统计按钮的位置
@@ -86,6 +89,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
         shareMenuItem.setVisible(isSelectionMode);
         closeSelectionMenuItem.setVisible(isSelectionMode);
+        if (enterSelectionMenuItem != null) {
+            enterSelectionMenuItem.setVisible(!isSelectionMode);
+        }
 
         super.onCreateOptionsMenu(menu, inflater);
     }
@@ -95,6 +101,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         int id = item.getItemId();
         if (id == R.id.action_close_selection) {
             toggleSelectionMode();  // 退出选择模式
+            return true;
+        } else if (id == R.id.action_enter_selection) {
+            toggleSelectionMode();  // 进入选择模式
             return true;
         } else if (id == R.id.action_share_text) {
             shareAsText();
@@ -203,7 +212,6 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     @Override
     public void onDeleteLink(LinkItem link) {
-
         Log.d("HomeFragment", "onDeleteLink: " + link.getTitle() + ", link id " + link.getId());
         
         // 首先删除数据库中的链接
@@ -269,6 +277,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (closeSelectionMenuItem != null) {
             closeSelectionMenuItem.setVisible(isSelectionMode);
         }
+        if (enterSelectionMenuItem != null) {
+            enterSelectionMenuItem.setVisible(!isSelectionMode);
+        }
         // 更新标题
         if (isSelectionMode) {
             requireActivity().setTitle("选择要分享的链接");
@@ -281,73 +292,26 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     private void shareAsText() {
         Set<LinkItem> selectedItems = adapter.getSelectedItems();
-        if (selectedItems.isEmpty()) {
-            Toast.makeText(requireContext(), "请先选择要分享的链接", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        StringBuilder shareText = new StringBuilder();
-        for (LinkItem item : selectedItems) {
-            shareText.append(item.getTitle())
-                    .append("\n")
-                    .append(item.getUrl())
-                    .append("\n\n");
-        }
-
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
-        
-        // 创建选择器并排除自己的应用
-        Intent chooserIntent = Intent.createChooser(shareIntent, "分享到");
-        String myPackageName = requireContext().getPackageName();
-        chooserIntent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-        chooserIntent.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, 
-            new ComponentName[]{new ComponentName(myPackageName, myPackageName + ".MainActivity")});
-        
-        startActivity(chooserIntent);
+        ShareUtil.shareLinksAsText(requireContext(), new ArrayList<>(selectedItems));
     }
 
     private void shareAsFile(boolean isJson) {
         Set<LinkItem> selectedItems = adapter.getSelectedItems();
-        if (selectedItems.isEmpty()) {
-            Toast.makeText(requireContext(), "请先选择要分享的链接", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        try {
-            String filePath;
-            if (isJson) {
-                filePath = ExportUtil.exportToJson(requireContext(), new ArrayList<>(selectedItems));
-            } else {
-                filePath = ExportUtil.exportToCsv(requireContext(), new ArrayList<>(selectedItems));
+        ArrayList<LinkItem> items = new ArrayList<>(selectedItems);
+        ShareUtil.shareLinksAsFileWithDialog(requireContext(), items, isJson, deleteAfterShare -> {
+            if (deleteAfterShare) {
+                // 批量删除并刷新
+                for (LinkItem item : items) {
+                    linkDao.deleteLink(item.getId());
+                }
+                List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
+                adapter.setPinnedLinks(pinnedLinks);
+                Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
+                adapter.setGroupedLinks(groupedLinks);
+                adapter.notifyDataSetChanged();
+                Toast.makeText(requireContext(), "已删除已分享的链接", Toast.LENGTH_SHORT).show();
             }
-            
-            File file = new File(filePath);
-            Uri uri = androidx.core.content.FileProvider.getUriForFile(
-                requireContext(),
-                requireContext().getPackageName() + ".provider",
-                file);
-            
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("*/*");
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            
-            // 创建选择器并排除自己的应用
-            Intent chooserIntent = Intent.createChooser(shareIntent, "分享文件");
-            String myPackageName = requireContext().getPackageName();
-            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-            chooserIntent.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, 
-                new ComponentName[]{new ComponentName(myPackageName, myPackageName + ".MainActivity")});
-            
-            startActivity(chooserIntent);
-            
-        } catch (Exception e) {
-            Snackbar.make(requireView(), 
-                "分享失败：" + e.getMessage(), 
-                Snackbar.LENGTH_LONG).show();
-        }
+        });
     }
 
     @Override

@@ -23,6 +23,11 @@ import person.notfresh.readingshare.model.LinkItem;
  */
 public class ShareUtil {
 
+    // 回调：用于从对话框返回用户选项（如删除与否）
+    public interface OptionsCallback {
+        void onConfirmed(boolean deleteAfterShare);
+    }
+
     // 对外入口（常用优先）
     /**
      * 将单条链接导出为 JSON/CSV 文件后，通过文件方式分享。
@@ -59,35 +64,56 @@ public class ShareUtil {
      * @param isJson true 导出 JSON；false 导出 CSV
      */
     public static void shareLinksAsFileWithDialog(Context context, List<LinkItem> items, boolean isJson) {
+        shareLinksAsFileWithDialog(context, items, isJson, null);
+    }
+
+    /**
+     * 带文件名输入和“是否删除链接”勾选项的对话框，确认后回传用户选择。
+     */
+    public static void shareLinksAsFileWithDialog(Context context, List<LinkItem> items, boolean isJson, OptionsCallback callback) {
         if (items.isEmpty()) {
             Toast.makeText(context, "请先选择要分享的链接", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // 创建文件名输入对话框
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(context);
-        builder.setTitle("设置文件名");
-        
+        // 自定义视图：输入文件名 + 勾选是否删除
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(context);
+        android.widget.LinearLayout container = new android.widget.LinearLayout(context);
+        container.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int padding = (int) (16 * context.getResources().getDisplayMetrics().density);
+        container.setPadding(padding, padding, padding, 0);
+
         final android.widget.EditText input = new android.widget.EditText(context);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        
         String defaultFileName = "分享的链接_" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(new java.util.Date());
         input.setText(defaultFileName);
         input.setSelection(defaultFileName.length());
-        
-        builder.setView(input);
-        
-        builder.setPositiveButton("确定", (dialog, which) -> {
-            String fileName = input.getText().toString().trim();
-            if (fileName.isEmpty()) {
-                fileName = defaultFileName;
-            }
-            fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
-            
-            shareLinksAsFile(context, items, isJson, fileName);
-        });
-        
-        builder.setNegativeButton("取消", (dialog, which) -> dialog.cancel());
+        input.setHint("文件名");
+        container.addView(input);
+        final android.widget.CheckBox deleteCheck = new android.widget.CheckBox(context);
+        if(callback != null) {
+            deleteCheck.setText("分享后删除这些链接");
+            container.addView(deleteCheck);
+        }
+
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(context)
+                .setTitle("分享设置")
+                .setView(container)
+                .setPositiveButton("确定", (dialog, which) -> {
+                    String fileName = input.getText().toString().trim();
+                    if (fileName.isEmpty()) {
+                        fileName = defaultFileName;
+                    }
+                    fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+                    boolean deleteAfter = deleteCheck.isChecked();
+                    // 先导出，再删除！！
+                    if (callback != null) {
+                        callback.onConfirmed(deleteAfter);
+                    }
+                    shareLinksAsFile(context, items, isJson, fileName);
+                })
+                .setNegativeButton("取消", (dialog, which) -> dialog.cancel());
+
         builder.show();
     }
 
