@@ -59,6 +59,7 @@ import androidx.core.view.GravityCompat;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
+import person.notfresh.readingshare.util.StringUtil;
 
 import java.io.IOException;
 import android.widget.ImageView;
@@ -166,17 +167,21 @@ public class MainActivity extends AppCompatActivity {
             // 设置FAB点击事件
             binding.appBarMain.fab.setOnClickListener(view -> {
                 try {
-                    // 直接尝试启动腾讯邮箱，不检测
+                    // 直接打开腾讯邮箱的“写邮件”界面，避免出现“记事本”选项
                     Intent qqMailIntent = new Intent(Intent.ACTION_SENDTO);
                     qqMailIntent.setPackage("com.tencent.androidqqmail");
+                    qqMailIntent.setClassName(
+                            "com.tencent.androidqqmail",
+                            "com.tencent.qqmail.launcher.third.LaunchComposeMail"
+                    );
                     qqMailIntent.setData(Uri.parse("mailto:notfresh@foxmail.com"));
                     qqMailIntent.putExtra(Intent.EXTRA_SUBJECT, "读享反馈");
                     qqMailIntent.putExtra(Intent.EXTRA_TEXT, "请在此处输入您的反馈内容...");
-                    
+
                     try {
                         startActivity(qqMailIntent);
                     } catch (Exception e) {
-                        // 如果腾讯邮箱启动失败，尝试标准邮件Intent
+                        // 回退到通用的邮件撰写
                         Intent emailIntent = new Intent(Intent.ACTION_SENDTO);
                         emailIntent.setData(Uri.parse("mailto:notfresh@foxmail.com"));
                         emailIntent.putExtra(Intent.EXTRA_SUBJECT, "读享反馈");
@@ -195,7 +200,6 @@ public class MainActivity extends AppCompatActivity {
             finish();
         }
     }
-
     
     @Override 
     public void onWindowFocusChanged(boolean hasFocus) { //@mark
@@ -305,7 +309,7 @@ public class MainActivity extends AppCompatActivity {
                     // 保存完整的分享信息
                     if (title == null || title.isEmpty()) {
                         // 如果没有标题，尝试从分享文本中提取
-                        title = extractTitle(sharedText);
+                        title = StringUtil.extractTitle(sharedText);
                     }
 
                     // 收集目标Activity信息
@@ -325,7 +329,6 @@ public class MainActivity extends AppCompatActivity {
                         intent.toString(),  // 保存完整的Intent信息
                         targetActivityInfo.toString()  // 保存可以处理的Activity信息
                     );
-
                     linkDao.insertLink(newLink);
 
                     NavController navController = Navigation.findNavController(this, 
@@ -338,26 +341,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
-
-    // 从分享内容中提取标题
-    private String extractTitle(String text) {
-        // 移除 URL
-        String[] parts = text.split("\\s+");
-        StringBuilder title = new StringBuilder();
-        
-        for (String part : parts) {
-            if (!part.startsWith("http://") && !part.startsWith("https://")) {
-                if (title.length() > 0) {
-                    title.append(" ");
-                }
-                title.append(part);
-            }
-        }
-        
-        String result = title.toString().trim();
-        return result.isEmpty() ? "分享的内容" : result;
-    }
-
 
     private void checkClipboardPermission() {
         // 直接检查剪贴板，不需要请求权限
