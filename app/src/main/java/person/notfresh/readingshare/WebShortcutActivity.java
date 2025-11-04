@@ -41,8 +41,11 @@ public class WebShortcutActivity extends AppCompatActivity {
         }
         
         // 打开WebViewActivity
+        // 由于 WebViewActivity 使用 singleTask 模式，如果 Activity 已存在，
+        // 系统会调用 onNewIntent() 而不是 onCreate()
         Intent webViewIntent = new Intent(this, WebViewActivity.class);
         webViewIntent.putExtra("url", url);
+        webViewIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(webViewIntent);
         
         // 关闭当前Activity

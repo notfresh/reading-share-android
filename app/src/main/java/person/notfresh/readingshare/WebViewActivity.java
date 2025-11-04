@@ -191,6 +191,48 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent); // 重要：更新 Intent，这样 getIntent() 会返回最新的 Intent
+        
+        // 从新的 Intent 中获取 URL
+        String newUrl = intent.getStringExtra("url");
+        if (newUrl != null && !newUrl.isEmpty() && !newUrl.equals(currentUrl)) {
+            Log.d("WebViewActivity", "onNewIntent: Loading new URL from shortcut: " + newUrl);
+            currentUrl = newUrl;
+            
+            // 强制加载新的 URL
+            if (webView != null) {
+                // 检查是否有缓存的 WebView
+                WebView cachedWebView = getInstance().getWebView(newUrl);
+                ViewGroup webViewContainer = findViewById(R.id.webview_container);
+                
+                if (cachedWebView != null) {
+                    // 移除当前的 WebView
+                    if (webView.getParent() != null) {
+                        ((ViewGroup) webView.getParent()).removeView(webView);
+                    }
+                    // 使用缓存的 WebView
+                    webView = cachedWebView;
+                    if (webView.getParent() != null) {
+                        ((ViewGroup) webView.getParent()).removeView(webView);
+                    }
+                    webViewContainer.addView(webView);
+                    Toast.makeText(this, "已恢复存档页面", Toast.LENGTH_SHORT).show();
+                    initMediaSession();
+                } else {
+                    // 没有缓存，直接加载新 URL
+                    webView.loadUrl(newUrl);
+                }
+            }
+        } else if (newUrl == null || newUrl.isEmpty()) {
+            Log.w("WebViewActivity", "onNewIntent: No URL provided in intent");
+        } else {
+            Log.d("WebViewActivity", "onNewIntent: URL unchanged: " + newUrl);
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         if (webView != null) {
