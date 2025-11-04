@@ -327,7 +327,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         popup.getMenu().add(0, 4, 0, "切换置顶");
         popup.getMenu().add(0, 5, 0, "多选模式");
         popup.getMenu().add(0, 6, 0, "获取摘要");
-        // popup.getMenu().add(0, 7, 0, "备注");
+        popup.getMenu().add(0, 7, 0, "添加到桌面");
         
         popup.setOnMenuItemClickListener(menuItem -> {
             switch (menuItem.getItemId()) {
@@ -411,13 +411,19 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     }).start();
                     notifyItemChanged(position);
                     return true;
-                // case 7:
-                //     // 增加备注
-                //     Log.d("LinksAdapter", "追加备注");
-                    
-                //     Log.d("LinksAdapter", "刷新位置: " + position);
-                //     notifyItemChanged(position);
-                //     return true;
+                case 7:
+                    // 添加到桌面
+                    Log.d("LinksAdapter", "添加到桌面");
+                    String url = extractRealUrl(item.getUrl());
+                    boolean success = person.notfresh.readingshare.util.ShortcutUtil.createShortcut(
+                        view.getContext(), 
+                        item.getTitle(), 
+                        url
+                    );
+                    if (success) {
+                        Toast.makeText(view.getContext(), "已添加快捷方式", Toast.LENGTH_SHORT).show();
+                    }
+                    return true;
                 default:
                     return false;
             }
