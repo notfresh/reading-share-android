@@ -714,6 +714,9 @@ public class LinkDao {
                 
                 if (countCursor.moveToFirst()) {
                     int count = countCursor.getInt(0);
+                    if(count == 0){
+                        continue;// 标签下链接为0的，不显示
+                    }
                     tagCountMap.put(tag, count);
                 }
                 
