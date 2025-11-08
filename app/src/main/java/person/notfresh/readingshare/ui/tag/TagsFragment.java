@@ -28,7 +28,9 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.flexbox.FlexboxLayout;
+import com.google.android.flexbox.FlexboxLayoutManager;
+import com.google.android.flexbox.FlexDirection;
+import com.google.android.flexbox.FlexWrap;
 import com.google.android.material.snackbar.Snackbar;
 import android.widget.ScrollView;
 import android.widget.LinearLayout;
@@ -40,6 +42,7 @@ import android.graphics.Typeface;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.LinksAdapter;
+import person.notfresh.readingshare.adapter.TagsAdapter;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.ExportUtil;
@@ -77,15 +80,20 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private static final String TAG_VIEW_NO_TAG = "NO_TAG_VIEW";
     private static final String PREF_HIGHLIGHTED_TAGS = "highlighted_tags";
     
-    private FlexboxLayout tagsContainer;
+    private RecyclerView tagsRecyclerView;
+    private TagsAdapter tagsAdapter;
+    private ItemTouchHelper itemTouchHelper;
     private RecyclerView linksRecyclerView;
     private LinksAdapter linksAdapter;
     private LinkDao linkDao;
-    private Set<View> selectedTags = new HashSet<>();  // 使用Set存储选中的标签
+    private Set<String> selectedTagNames = new HashSet<>();  // 使用Set存储选中的标签名称
     private MenuItem shareMenuItem;
     private MenuItem closeSelectionMenuItem;
     private MenuItem selectAllMenuItem;  // 添加全选菜单项引用
+    private MenuItem sortMenuItem;  // 排序按钮
+    private MenuItem exitSortMenuItem;  // 退出排序按钮
     private boolean isSelectionMode = false;
+    private boolean isSortMode = false;  // 排序模式状态
     private ScrollView tagsScrollView;
     private View toggleTagsButton;
     private ImageView arrowIndicator;
@@ -105,9 +113,61 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         Log.d("TagsFragment", "onCreateView started");
         View root = inflater.inflate(R.layout.fragment_tags, container, false);
 
-        // 获取标签容器引用
-        tagsContainer = root.findViewById(R.id.container_tags);
-        Log.d("TagsFragment", "tagsContainer found: " + (tagsContainer != null));
+        // 初始化标签 RecyclerView
+        tagsRecyclerView = root.findViewById(R.id.recycler_tags);
+        FlexboxLayoutManager layoutManager = new FlexboxLayoutManager(requireContext());
+        layoutManager.setFlexDirection(FlexDirection.ROW);
+        layoutManager.setFlexWrap(FlexWrap.WRAP);
+        tagsRecyclerView.setLayoutManager(layoutManager);
+        
+        tagsAdapter = new TagsAdapter();
+        tagsAdapter.setOnTagClickListener((position, tag) -> {
+            if (!isSortMode) {
+                handleTagClick(tag.getName());
+            }
+        });
+        tagsAdapter.setOnTagLongClickListener((position, tag) -> {
+            if (!isSortMode) {
+                showTagOptionsDialog(tag.getName());
+            }
+        });
+        tagsRecyclerView.setAdapter(tagsAdapter);
+        
+        // 初始化 ItemTouchHelper（但先不附加，等排序模式开启时再附加）
+        ItemTouchHelper.Callback callback = new ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP | ItemTouchHelper.DOWN | 
+            ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT,
+            0
+        ) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, 
+                                 @NonNull RecyclerView.ViewHolder viewHolder, 
+                                 @NonNull RecyclerView.ViewHolder target) {
+                int fromPos = viewHolder.getAdapterPosition();
+                int toPos = target.getAdapterPosition();
+                tagsAdapter.swapItems(fromPos, toPos);
+                
+                // 保存排序到数据库
+                List<Long> orderedTagIds = new ArrayList<>();
+                for (TagsAdapter.TagItem tag : tagsAdapter.getTags()) {
+                    orderedTagIds.add(tag.getId());
+                }
+                linkDao.saveTagOrder(orderedTagIds);
+                
+                return true;
+            }
+            
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                // 不需要实现
+            }
+            
+            @Override
+            public boolean isLongPressDragEnabled() {
+                return isSortMode;  // 只在排序模式下启用
+            }
+        };
+        itemTouchHelper = new ItemTouchHelper(callback);
         
         // 获取标签容器和展开/折叠相关视图
         tagsScrollView = root.findViewById(R.id.tags_scrollview);
@@ -170,9 +230,15 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         shareMenuItem = menu.findItem(R.id.action_share);
         closeSelectionMenuItem = menu.findItem(R.id.action_close_selection);
         selectAllMenuItem = menu.findItem(R.id.action_select_all);  // 获取全选菜单项
+        sortMenuItem = menu.findItem(R.id.action_sort_tags);  // 获取排序按钮
+        exitSortMenuItem = menu.findItem(R.id.action_exit_sort);  // 获取退出排序按钮
+        
+        // 设置菜单项可见性
         shareMenuItem.setVisible(isSelectionMode);
         closeSelectionMenuItem.setVisible(isSelectionMode);
-        selectAllMenuItem.setVisible(isSelectionMode);  // 设置全选按钮可见性
+        selectAllMenuItem.setVisible(isSelectionMode);
+        sortMenuItem.setVisible(!isSortMode && !isSelectionMode);  // 非排序模式且非选择模式时显示
+        exitSortMenuItem.setVisible(isSortMode);  // 排序模式时显示
     }
 
     @Override
@@ -180,6 +246,12 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         int id = item.getItemId();
         if (id == R.id.action_add_tag) {
             showAddTagDialog();
+            return true;
+        } else if (id == R.id.action_sort_tags) {
+            toggleSortMode();
+            return true;
+        } else if (id == R.id.action_exit_sort) {
+            toggleSortMode();
             return true;
         } else if (id == R.id.action_close_selection) {
             toggleSelectionMode();
@@ -241,18 +313,10 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     }
 
     private void loadTags() {
-        // 添加空值检查，避免空指针异常
-        if (tagsContainer == null) {
-            Log.e("TagsFragment", "tagsContainer is null in loadTags()");
+        if (tagsAdapter == null) {
+            Log.e("TagsFragment", "tagsAdapter is null in loadTags()");
             return;
         }
-        
-        // 优化: 先显示正在加载，避免空白感
-        tagsContainer.removeAllViews();
-        TextView loadingView = new TextView(requireContext());
-        loadingView.setText("正在加载标签...");
-        loadingView.setPadding(16, 16, 16, 16);
-        tagsContainer.addView(loadingView);
         
         // 使用后台线程加载标签数据
         new Thread(() -> {
@@ -260,45 +324,35 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             Map<String, Integer> tagsWithCount = linkDao.getTagsWithCount();
             Log.d("TagsFragment", "Tags loaded: " + tagsWithCount.size());
             
+            // 获取无标签的链接数量
+            int noTagCount = linkDao.getLinksWithoutTags().size();
+            
             // 回到主线程更新UI
             requireActivity().runOnUiThread(() -> {
-                tagsContainer.removeAllViews();
+                List<TagsAdapter.TagItem> tagItems = new ArrayList<>();
                 
-                // 添加"无标签"选项
-                View noTagView = getLayoutInflater().inflate(R.layout.item_tag_with_count, tagsContainer, false);
-                TextView tagText = noTagView.findViewById(R.id.text_tag);
-                TextView countText = noTagView.findViewById(R.id.text_count);
-                
-                tagText.setText("无标签");
-                
-                // 获取无标签的链接数量
-                int noTagCount = linkDao.getLinksWithoutTags().size();
-                countText.setText(String.valueOf(noTagCount));
-                
-                noTagView.setBackgroundResource(R.drawable.tag_background_normal);
-                noTagView.setOnClickListener(v -> {
-                    Log.d("TagsFragment", "Clicked no tags");
-                    updateTagSelection(v);
-                });
-                
-                // 设置特殊标识
-                setTagViewId(noTagView, NO_TAG);
-                tagsContainer.addView(noTagView);
+                // 添加"无标签"选项（如果数量大于0）
+                if (noTagCount > 0) {
+                    tagItems.add(new TagsAdapter.TagItem(-1, NO_TAG, noTagCount));
+                }
                 
                 // 添加其他标签
                 for (Map.Entry<String, Integer> entry : tagsWithCount.entrySet()) {
-                    addTagView(entry.getKey(), entry.getValue(), false);
+                    long tagId = linkDao.getTagIdByName(entry.getKey());
+                    if (tagId != -1) {
+                        tagItems.add(new TagsAdapter.TagItem(tagId, entry.getKey(), entry.getValue()));
+                    }
                 }
                 
+                tagsAdapter.setTags(tagItems);
+                tagsAdapter.setHighlightedTags(highlightedTags);
+                tagsAdapter.setSelectedTagNames(selectedTagNames);
+                
                 // 标签加载完成后，检查是否需要显示展开按钮
-                tagsContainer.post(() -> {
-                    // 测量高度
-                    int height = tagsContainer.getHeight();
-                    // 计算折叠高度（像素）
+                tagsRecyclerView.post(() -> {
+                    int height = tagsRecyclerView.getHeight();
                     float density = getResources().getDisplayMetrics().density;
                     int collapsedHeightPx = (int) (COLLAPSED_HEIGHT_DP * density);
-                    
-                    // 如果内容高度大于折叠高度，显示按钮
                     toggleTagsButton.setVisibility(height > collapsedHeightPx ? View.VISIBLE : View.GONE);
                 });
                 // 恢复选择状态
@@ -306,92 +360,22 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             });
         }).start();
     }
-
-    private void addTagView(String tag, int count, boolean isSelected) {
-        // 使用自定义布局显示标签和使用次数
-        View tagItemView = getLayoutInflater().inflate(R.layout.item_tag_with_count, tagsContainer, false);
-        TextView tagText = tagItemView.findViewById(R.id.text_tag);
-        TextView countText = tagItemView.findViewById(R.id.text_count);
-        
-        tagText.setText(tag);
-        countText.setText(String.valueOf(count));
-        
-        if (isSelected) {
-            // 选中状态优先
-            tagItemView.setBackgroundResource(R.drawable.tag_background_selected);
-        }  else {
-            // 检查是否是高亮标签
-            boolean isHighlighted = highlightedTags.contains(tag);
-            if (isHighlighted) {
-                // 未选中但是高亮标签
-                tagItemView.setBackgroundResource(R.drawable.tag_background_highlighted);
-                // 设置金色文字和加粗
-                tagText.setTextColor(getResources().getColor(R.color.tag_highlight_color, null));
-                tagText.setTypeface(tagText.getTypeface(), Typeface.BOLD);
-            }else{// 普通标签
-                tagItemView.setBackgroundResource(R.drawable.tag_background_normal);
-            }
-        }
-        
-        // 使用设置标签名称的辅助方法
-        setTagViewId(tagItemView, tag);
-        
-        tagItemView.setOnClickListener(v -> {
-            updateTagSelection(tagItemView);
-        });
-        
-        tagItemView.setOnLongClickListener(v -> {
-            showTagOptionsDialog(tag);
-            return true;
-        });
-        
-        tagsContainer.addView(tagItemView);
-
-        // 可以在此处添加高度检测 (如果需要)
-        tagsContainer.post(() -> {
-            // 检查是否需要显示展开按钮
-            checkTagsVisibility();
-        });
-    }
-
-    private void setTagStyle(View tagView, boolean isSelected){
-        if (isSelected) {
-            tagView.setBackgroundResource(R.drawable.tag_background_selected);
-        }else{
-            // 检查是否是高亮标签
-            boolean isHighlighted = false;
-            TextView tagText = tagView.findViewById(R.id.text_tag);
-
-            if (tagText != null) {
-                String tag = (String) tagText.getText();
-                isHighlighted = highlightedTags.contains(tag);
-            }
-            if (isHighlighted) {
-                tagView.setBackgroundResource(R.drawable.tag_background_highlighted);
-                // 设置金色文字和加粗
-                tagText.setTextColor(getResources().getColor(R.color.tag_highlight_color, null));
-                tagText.setTypeface(tagText.getTypeface(), Typeface.BOLD);
-            }else{// 普通标签
-                tagView.setBackgroundResource(R.drawable.tag_background_normal);
-            }
+    
+    private void handleTagClick(String tagName) {
+        if (NO_TAG.equals(tagName)) {
+            Log.d("TagsFragment", "Clicked no tags");
+            updateTagSelectionByName(tagName);
+        } else {
+            updateTagSelectionByName(tagName);
         }
     }
     
-    private void updateTagSelection(View tagView) {
-        if (selectedTags.contains(tagView)) {
-            // 取消选择这个标签
-//            tagView.setBackgroundResource(R.drawable.tag_background_normal);
-//            // 检查是否是高亮标签
-//            TextView tagText = tagView.findViewById(R.id.text_tag);
-//            if (tagText != null) {
-//                tagText.setTextColor(getResources().getColor(android.R.color.black, null));
-//            }
-            setTagStyle(tagView, false);
-
-            selectedTags.remove(tagView);
-
-            if (selectedTags.isEmpty()) {
-                // 如果没有选中的标签，显示所有内容
+    private void updateTagSelectionByName(String tagName) {
+        if (selectedTagNames.contains(tagName)) {
+            // 取消选择
+            selectedTagNames.remove(tagName);
+            
+            if (selectedTagNames.isEmpty()) {
                 requireActivity().setTitle("全部内容");
                 List<LinkItem> allLinks = linkDao.getAllLinks();
                 linksAdapter.setLinks(allLinks);
@@ -402,36 +386,26 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             }
         } else {
             // 选中新标签
-            tagView.setBackgroundResource(R.drawable.tag_background_selected);
-            
-            // 如果使用复合视图，需要更新文本颜色
-            TextView tagText = tagView.findViewById(R.id.text_tag);
-            if (tagText != null) {
-                tagText.setTextColor(getResources().getColor(android.R.color.white, null));
-            }
-            
-            selectedTags.add(tagView);
+            selectedTagNames.add(tagName);
             updateContentBySelectedTags();
         }
-    }
-
-    /**
-     * 处理标签点击事件
-     * @param tag 标签名称
-     * @param tagView 标签视图组件
-     */
-    private void handleTagClick(String tag, View tagView) {
-        if (tag.equals(NO_TAG)) {
-            Log.d("TagsFragment", "Clicked no tags");
+        
+        // 更新适配器显示
+        if (tagsAdapter != null) {
+            tagsAdapter.setSelectedTagNames(selectedTagNames);
         }
-        updateTagSelection(tagView);
-
-        // 保存选择状态
-        SharedPreferences prefs = requireActivity().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putString(KEY_LAST_TAG, tag);
-        editor.apply();
     }
+
+    // 已废弃：使用 TagsAdapter 替代
+    // private void addTagView(String tag, int count, boolean isSelected) { ... }
+
+    // 已废弃：样式由 TagsAdapter 管理
+    // private void setTagStyle(View tagView, boolean isSelected) { ... }
+    
+    // 已废弃：使用 updateTagSelectionByName 替代
+    // private void updateTagSelection(View tagView) { ... }
+
+    // 已废弃：使用新的 handleTagClick(String tagName) 替代
 
     private void showTagOptionsDialog(String tag) {
         String[] options = {"删除标签",  "删除标签及所有关联链接","发布到网站","切换高亮"};
@@ -475,15 +449,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         Log.d("TagsFragment", "标签已从数据库删除");
                         
                         // 从当前选中的标签集合中移除
-                        Iterator<View> iterator = selectedTags.iterator();
-                        while (iterator.hasNext()) {
-                            View tagView = iterator.next();
-                            String viewTagName = getTagNameFromView(tagView);
-                            if (tag.equals(viewTagName)) {
-                                iterator.remove();
-                                break;
-                            }
-                        }
+                        selectedTagNames.remove(tag);
                         Log.d("TagsFragment", "标签已从选中集合移除");
                         
                         // 重新加载标签
@@ -518,8 +484,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
 
         // 可以在此处添加高度检测 (如果需要)
-        if (tagsContainer != null) {
-            tagsContainer.post(this::checkTagsVisibility);
+        if (tagsRecyclerView != null) {
+            tagsRecyclerView.post(this::checkTagsVisibility);
         }
     }
 
@@ -704,21 +670,20 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     private void updateContentBySelectedTags() {
         List<LinkItem> links = new ArrayList<>();
-        Set<String> selectedTagNames = new HashSet<>();
+        Set<String> tagNames = new HashSet<>();
         boolean hasNoTagFilter = false;
 
         // 收集选中的标签名称
-        for (View tagView : selectedTags) {
-            String tagName = getTagNameFromView(tagView);
+        for (String tagName : selectedTagNames) {
             if (NO_TAG.equals(tagName)) {
                 hasNoTagFilter = true;
             } else {
-                selectedTagNames.add(tagName);
+                tagNames.add(tagName);
             }
         }
 
         // 根据选择获取链接
-        if (selectedTags.isEmpty()) {
+        if (selectedTagNames.isEmpty()) {
             // 如果没有选中任何标签，显示所有链接
             links = linkDao.getAllLinks();
         } else {
@@ -727,13 +692,13 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 links.addAll(linkDao.getLinksWithoutTags());
             }
             // 如果还选中了其他标签
-            if (!selectedTagNames.isEmpty()) {
-                links.addAll(linkDao.getLinksByTags(selectedTagNames));
+            if (!tagNames.isEmpty()) {
+                links.addAll(linkDao.getLinksByTags(tagNames));
             }
         }
 
         // 更新标题
-        updateTitle(selectedTagNames, hasNoTagFilter);
+        updateTitle(tagNames, hasNoTagFilter);
 
         // 按日期分组显示
         Map<String, List<LinkItem>> groupedLinks = new TreeMap<>(Collections.reverseOrder());
@@ -754,7 +719,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
         
         // 计算置顶与筛选结果的交集，仅当有交集时展示
-        if (selectedTags.isEmpty()) {
+        if (selectedTagNames.isEmpty()) {
             // 未选择任何标签时不显示置顶区
             linksAdapter.setPinnedLinks(Collections.emptyList());
         } else {
@@ -776,7 +741,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linksAdapter.setGroupedLinks(groupedLinks);
 
         // 保存选择状态
-        saveSelections(selectedTagNames, hasNoTagFilter);
+        saveSelections(tagNames, hasNoTagFilter);
     }
 
     private void updateTitle(Set<String> tags, boolean includeNoTag) {
@@ -821,20 +786,20 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         boolean noTagSelected = prefs.getBoolean(KEY_NO_TAG_SELECTED, false);
 
         // 恢复选择状态
-        for (int i = 0; i < tagsContainer.getChildCount(); i++) {
-            View child = tagsContainer.getChildAt(i);
-            String tagName = getTagNameFromView(child);
-            
-            // 对于无标签选项的处理
-            if (NO_TAG.equals(tagName) && noTagSelected) {
-                updateTagSelection(child);
-                continue;
-            }
-            
-            // 对于普通标签
-            if (savedTags.contains(tagName)) {
-                updateTagSelection(child);
-            }
+        selectedTagNames.clear();
+        if (noTagSelected) {
+            selectedTagNames.add(NO_TAG);
+        }
+        selectedTagNames.addAll(savedTags);
+        
+        // 更新内容显示
+        if (!selectedTagNames.isEmpty()) {
+            updateContentBySelectedTags();
+        }
+        
+        // 刷新适配器
+        if (tagsAdapter != null) {
+            tagsAdapter.notifyDataSetChanged();
         }
     }
 
@@ -871,82 +836,22 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 1. 检查标签是否存在
         List<String> existingTags = linkDao.getAllTags();
         boolean isNewTag = !existingTags.contains(tag);
-        View targetTagView = null;  // 用于存储要选中的标签视图
         
         // 2. 如果是新标签，先创建标签
         if (isNewTag) {
             long tagId = linkDao.addTag(tag);
             if (tagId != -1) {
-                // 2.1 立即在顶部标签列表添加新标签 (使用新的复合视图布局)
-                View newTagView = getLayoutInflater().inflate(R.layout.item_tag_with_count, tagsContainer, false);
-                TextView tagText = newTagView.findViewById(R.id.text_tag);
-                TextView countText = newTagView.findViewById(R.id.text_count);
-                
-                tagText.setText(tag);
-                countText.setText("1"); // 新标签的初始计数为1
-                
-                newTagView.setBackgroundResource(R.drawable.tag_background_normal);
-                newTagView.setOnClickListener(v -> updateTagSelection(v));
-                newTagView.setTag(tag);
-                tagsContainer.addView(newTagView);
-                
-                targetTagView = newTagView;  // 保存引用
-                
-                // 2.2 显示提示
+                // 显示提示
                 Snackbar.make(requireView(), "已创建新标签：" + tag, Snackbar.LENGTH_SHORT).show();
-            }
-        } else {
-            // 如果标签已存在，找到它
-            for (int i = 0; i < tagsContainer.getChildCount(); i++) {
-                View child = tagsContainer.getChildAt(i);
-                TextView tagText = child.findViewById(R.id.text_tag);
-                if (tagText != null && tag.equals(tagText.getText().toString())) {
-                    targetTagView = child;
-                    
-                    // 更新计数
-                    TextView countText = child.findViewById(R.id.text_count);
-                    if (countText != null) {
-                        int currentCount = Integer.parseInt(countText.getText().toString());
-                        countText.setText(String.valueOf(currentCount + 1));
-                    }
-                    break;
-                }
+                // 重新加载标签列表
+                loadTags();
             }
         }
         
         // 3. 为链接添加标签
         //linkDao.addTagToLink(item.getId(), tag);
         
-        // 4. 如果找到了目标标签视图，添加到选中集合（不清除现有选择）,这是不合理的，取消！！！
-//        if (targetTagView != null && !selectedTags.contains(targetTagView)) {
-//            // 选中新标签，但保持其他标签的选中状态
-//            targetTagView.setBackgroundResource(R.drawable.tag_background_selected);
-//
-//            TextView tagText = targetTagView.findViewById(R.id.text_tag);
-//            if (tagText != null) {
-//                tagText.setTextColor(getResources().getColor(android.R.color.white, null));
-//            }
-//
-//            selectedTags.add(targetTagView);
-//
-//            // 更新顶栏标题
-//            Set<String> selectedTagNames = new HashSet<>();
-//            boolean hasNoTagFilter = false;
-//            for (View tagView : selectedTags) {
-//                String tagName = getTagNameFromView(tagView);
-//                if (NO_TAG.equals(tagName)) {
-//                    hasNoTagFilter = true;
-//                } else {
-//                    selectedTagNames.add(tagName);
-//                }
-//            }
-//            updateTitle(selectedTagNames, hasNoTagFilter);
-//
-//            // 更新显示内容
-//            updateContentBySelectedTags();
-//        }
-        
-        // 5. 显示提示
+        // 4. 显示提示
         Snackbar.make(requireView(), 
             String.format("已将 %s 添加到标签：%s", item.getTitle(), tag), 
             Snackbar.LENGTH_LONG).show();
@@ -995,6 +900,37 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         requireActivity().invalidateOptionsMenu();
     }
 
+    private void toggleSortMode() {
+        isSortMode = !isSortMode;
+        
+        // 更新菜单项可见性
+        if (sortMenuItem != null) {
+            sortMenuItem.setVisible(!isSortMode && !isSelectionMode);
+        }
+        if (exitSortMenuItem != null) {
+            exitSortMenuItem.setVisible(isSortMode);
+        }
+        
+        // 启用/禁用拖拽功能
+        if (itemTouchHelper != null) {
+            if (isSortMode) {
+                itemTouchHelper.attachToRecyclerView(tagsRecyclerView);
+            } else {
+                itemTouchHelper.attachToRecyclerView(null);
+            }
+        }
+        
+        // 更新标题
+        if (isSortMode) {
+            requireActivity().setTitle("拖拽排序标签");
+            Toast.makeText(requireContext(), "长按标签可拖拽排序", Toast.LENGTH_SHORT).show();
+        } else {
+            requireActivity().setTitle("标签");
+        }
+        
+        requireActivity().invalidateOptionsMenu();
+    }
+
     private void shareAsText() {
         Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
         ShareUtil.shareLinksAsText(requireContext(), new ArrayList<>(selectedItems));
@@ -1009,19 +945,18 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void selectAllItems() {
         // 获取当前标签过滤后的链接
         List<LinkItem> links;
-        if (selectedTags.isEmpty()) {
+        if (selectedTagNames.isEmpty()) {
             links = linkDao.getAllLinks();  // 如果没有选中标签，获取所有链接
         } else {
             // 收集选中的标签名称
-            Set<String> selectedTagNames = new HashSet<>();
+            Set<String> tagNames = new HashSet<>();
             boolean hasNoTagFilter = false;
             
-            for (View tagView : selectedTags) {
-                String tag = getTagNameFromView(tagView);
-                if (NO_TAG.equals(tag)) {
+            for (String tagName : selectedTagNames) {
+                if (NO_TAG.equals(tagName)) {
                     hasNoTagFilter = true;
                 } else {
-                    selectedTagNames.add(tag);
+                    tagNames.add(tagName);
                 }
             }
             
@@ -1030,8 +965,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             if (hasNoTagFilter) {
                 links.addAll(linkDao.getLinksWithoutTags());
             }
-            if (!selectedTagNames.isEmpty()) {
-                links.addAll(linkDao.getLinksByTags(selectedTagNames));
+            if (!tagNames.isEmpty()) {
+                links.addAll(linkDao.getLinksByTags(tagNames));
             }
         }
 
@@ -1044,20 +979,19 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     private void updateLinksList() {
         // 根据当前选中的标签更新链接列表
-        Set<String> selectedTagNames = new HashSet<>();
+        Set<String> tagNames = new HashSet<>();
         boolean hasNoTagFilter = false;
         // 收集选中的标签名称
-        for (View tagView : selectedTags) {
-            String tag = getTagNameFromView(tagView);
-            if (NO_TAG.equals(tag)) {
+        for (String tagName : selectedTagNames) {
+            if (NO_TAG.equals(tagName)) {
                 hasNoTagFilter = true;
             } else {
-                selectedTagNames.add(tag);
+                tagNames.add(tagName);
             }
         }
         List<LinkItem> links = new ArrayList<>();
         
-        if (selectedTags.isEmpty()) {
+        if (selectedTagNames.isEmpty()) {
             // 如果没有选中任何标签，显示所有链接
             links = linkDao.getAllLinks();
         } else {
@@ -1066,8 +1000,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 links.addAll(linkDao.getLinksWithoutTags());
             }
             // 如果有选中的标签
-            if (!selectedTagNames.isEmpty()) {
-                links.addAll(linkDao.getLinksByTags(selectedTagNames));
+            if (!tagNames.isEmpty()) {
+                links.addAll(linkDao.getLinksByTags(tagNames));
             }
         }
 
@@ -1076,31 +1010,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linksAdapter.notifyDataSetChanged();
     }
 
-    private void setTagViewId(View tagView, String tagName) {
-        // 对于特殊的"无标签"，使用特殊标识
-        if (NO_TAG.equals(tagName)) {
-            tagView.setTag(TAG_VIEW_NO_TAG);
-        } else {
-            // 为普通标签视图设置标签名称作为id
-            tagView.setTag(tagName);
-        }
-    }
-
-    private String getTagNameFromView(View tagView) {
-        // 首先检查是否是"无标签"视图
-        if (TAG_VIEW_NO_TAG.equals(tagView.getTag())) {
-            return NO_TAG;
-        }
-        
-        // 对于普通标签，优先从内部TextView获取文本
-        TextView tagText = tagView.findViewById(R.id.text_tag);
-        if (tagText != null) {
-            return tagText.getText().toString();
-        }
-        
-        // 如果无法获取到标签名，返回一个默认值
-        return "";
-    }
+    // 已废弃：不再需要，TagsAdapter 直接使用 TagItem 对象
+    // private void setTagViewId(View tagView, String tagName) { ... }
+    // private String getTagNameFromView(View tagView) { ... }
 
     private boolean isNoTagView(View tagView) {
         return TAG_VIEW_NO_TAG.equals(tagView.getTag());
@@ -1135,10 +1047,10 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     // 添加一个新的方法来检查标签高度和更新按钮可见性
     private void checkTagsVisibility() {
-        if (tagsContainer == null || toggleTagsButton == null) return;
+        if (tagsRecyclerView == null || toggleTagsButton == null) return;
         
         // 测量高度
-        int height = tagsContainer.getHeight();
+        int height = tagsRecyclerView.getHeight();
         // 计算折叠高度（像素）
         float density = getResources().getDisplayMetrics().density;
         int collapsedHeightPx = (int) (COLLAPSED_HEIGHT_DP * density);
@@ -1156,8 +1068,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     // 修复 refreshTags 方法
     public void refreshTags() {
         // 重新加载标签或检查可见性
-        if (tagsContainer != null) {
-            tagsContainer.post(this::checkTagsVisibility);
+        if (tagsRecyclerView != null) {
+            tagsRecyclerView.post(this::checkTagsVisibility);
         }
     }
 

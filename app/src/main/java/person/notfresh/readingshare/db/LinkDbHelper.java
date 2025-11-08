@@ -10,7 +10,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     private static String databaseName = "links.db";
     //private static final int DATABASE_VERSION = 4;
     // private static final int DATABASE_VERSION = 5; // 添加summary字段
-    private static final int DATABASE_VERSION = 8; // 添加点击数量字段
+    private static final int DATABASE_VERSION = 9; // 添加配置表
 
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
@@ -32,6 +32,11 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String TABLE_LINK_TAGS = "link_tags";
     public static final String COLUMN_LINK_ID = "link_id";
     public static final String COLUMN_TAG_ID_REF = "tag_id";
+    
+    // 配置表（KV存储）
+    public static final String TABLE_CONFIG = "config";
+    public static final String COLUMN_CONFIG_KEY = "key";
+    public static final String COLUMN_CONFIG_VALUE = "value";
 
     private static final String SQL_CREATE_LINKS =
             "CREATE TABLE " + TABLE_LINKS + " (" +
@@ -59,6 +64,11 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     "PRIMARY KEY (" + COLUMN_LINK_ID + ", " + COLUMN_TAG_ID_REF + "), " +
                     "FOREIGN KEY (" + COLUMN_LINK_ID + ") REFERENCES " + TABLE_LINKS + "(" + COLUMN_ID + "), " +
                     "FOREIGN KEY (" + COLUMN_TAG_ID_REF + ") REFERENCES " + TABLE_TAGS + "(" + COLUMN_TAG_ID + "))";
+
+    private static final String SQL_CREATE_CONFIG =
+            "CREATE TABLE " + TABLE_CONFIG + " (" +
+                    COLUMN_CONFIG_KEY + " TEXT PRIMARY KEY, " +
+                    COLUMN_CONFIG_VALUE + " TEXT NOT NULL)";
 
     private static final String CREATE_RSS_SOURCES_TABLE =
         "CREATE TABLE rss_sources (" +
@@ -108,6 +118,9 @@ public class LinkDbHelper extends SQLiteOpenHelper {
             db.execSQL(SQL_CREATE_TAGS);
             db.execSQL(SQL_CREATE_LINK_TAGS);
             
+            // 创建配置表
+            db.execSQL(SQL_CREATE_CONFIG);
+            
             // 创建 RSS 相关的表
             Log.d("LinkDbHelper", "Creating RSS tables");
             db.execSQL(CREATE_RSS_SOURCES_TABLE);
@@ -125,17 +138,26 @@ public class LinkDbHelper extends SQLiteOpenHelper {
         try {
             Log.d("LinkDbHelper", "Upgrading database from " + oldVersion + " to " + newVersion);
 
-            // 备份现有数据（如果需要的话） TODO
+            if (oldVersion < 9) {
+                // 版本9：添加配置表
+                db.execSQL(SQL_CREATE_CONFIG);
+                Log.d("LinkDbHelper", "Created config table");
+            }
             
-            // 删除旧表
-            db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINKS);
-            db.execSQL("DROP TABLE IF EXISTS " + TABLE_TAGS);
-            db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINK_TAGS);
-            db.execSQL("DROP TABLE IF EXISTS rss_sources");
-            db.execSQL("DROP TABLE IF EXISTS rss_entries");
-            
-            // 重新创建所有表
-            onCreate(db);
+            // 如果版本差异较大，使用原来的删除重建方式
+            if (oldVersion < 8) {
+                // 备份现有数据（如果需要的话） TODO
+                
+                // 删除旧表
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINKS);
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_TAGS);
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_LINK_TAGS);
+                db.execSQL("DROP TABLE IF EXISTS rss_sources");
+                db.execSQL("DROP TABLE IF EXISTS rss_entries");
+                
+                // 重新创建所有表
+                onCreate(db);
+            }
             
             Log.d("LinkDbHelper", "Database upgrade completed successfully");
         } catch (Exception e) {

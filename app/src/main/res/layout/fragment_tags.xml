@@ -26,15 +26,11 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <com.google.android.flexbox.FlexboxLayout
-                    android:id="@+id/container_tags"
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_tags"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="8dp"
-                    app:flexWrap="wrap"
-                    app:alignItems="flex_start"
-                    app:alignContent="flex_start"
-                    app:flexDirection="row" />
+                    android:padding="8dp" />
             </LinearLayout>
         </ScrollView>
 

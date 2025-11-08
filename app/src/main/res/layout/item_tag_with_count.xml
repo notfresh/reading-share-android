@@ -15,14 +15,14 @@
         android:id="@+id/text_tag"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@color/tag_text_color"
+        android:textColor="@android:color/black"
         android:textSize="12sp" />
 
     <TextView
         android:id="@+id/text_count"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@color/tag_text_color"
+        android:textColor="@android:color/black"
         android:textSize="10sp"
         android:layout_marginStart="4dp"
         android:background="@drawable/tag_count_background"

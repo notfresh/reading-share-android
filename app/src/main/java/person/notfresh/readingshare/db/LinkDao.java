@@ -19,6 +19,10 @@ import java.util.Date;
 import java.util.Set;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+
+import org.json.JSONArray;
+import org.json.JSONException;
 
 import person.notfresh.readingshare.model.LinkItem;
 
@@ -695,37 +699,74 @@ public class LinkDao {
     }
 
     /**
-     * 获取所有标签及其使用次数
+     * 获取所有标签及其使用次数（按配置的排序）
      * @return Map<String, Integer> 标签名称和使用次数的映射
      */
     public Map<String, Integer> getTagsWithCount() {
         Map<String, Integer> tagCountMap = new LinkedHashMap<>();
-        SQLiteDatabase db =  dbHelper.getReadableDatabase();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
         
-        // 首先获取所有标签
-        Cursor cursor = db.rawQuery("SELECT name FROM tags order by _id", null);
+        // 1. 获取配置的排序
+        List<Long> orderedTagIds = getTagOrder();
+        Set<Long> orderedSet = new HashSet<>(orderedTagIds);
+        
+        // 2. 获取所有标签及计数（不排序）
+        Map<Long, TagCountInfo> allTags = new HashMap<>();
+        Cursor cursor = db.rawQuery(
+            "SELECT t." + LinkDbHelper.COLUMN_TAG_ID + 
+            ", t." + LinkDbHelper.COLUMN_TAG_NAME + 
+            ", COUNT(lt." + LinkDbHelper.COLUMN_LINK_ID + ") as count " +
+            "FROM " + LinkDbHelper.TABLE_TAGS + " t " +
+            "LEFT JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt " +
+            "ON t." + LinkDbHelper.COLUMN_TAG_ID + " = lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " " +
+            "GROUP BY t." + LinkDbHelper.COLUMN_TAG_ID + ", t." + LinkDbHelper.COLUMN_TAG_NAME, null);
         
         if (cursor.moveToFirst()) {
             do {
-                String tag = cursor.getString(0);
-                // 对每个标签，计算其在数据库中出现的次数
-                Cursor countCursor = db.rawQuery("SELECT COUNT(lt.link_id) FROM tags t , link_tags lt  WHERE t._id = lt.tag_id and name = ?",
-                        new String[] { tag });
-                
-                if (countCursor.moveToFirst()) {
-                    int count = countCursor.getInt(0);
-                    if(count == 0){
-                        continue;// 标签下链接为0的，不显示
-                    }
-                    tagCountMap.put(tag, count);
+                long tagId = cursor.getLong(0);
+                String tagName = cursor.getString(1);
+                int count = cursor.getInt(2);
+                if (count > 0) {  // 只保存有链接的标签
+                    allTags.put(tagId, new TagCountInfo(tagName, count));
                 }
-                
-                countCursor.close();
             } while (cursor.moveToNext());
         }
-        
         cursor.close();
+        
+        // 3. 按配置的顺序添加
+        for (Long tagId : orderedTagIds) {
+            TagCountInfo info = allTags.get(tagId);
+            if (info != null) {
+                tagCountMap.put(info.name, info.count);
+            }
+        }
+        
+        // 4. 添加未在配置中的新标签（按tag_id排序）
+        List<Long> unorderedTagIds = new ArrayList<>();
+        for (Long tagId : allTags.keySet()) {
+            if (!orderedSet.contains(tagId)) {
+                unorderedTagIds.add(tagId);
+            }
+        }
+        Collections.sort(unorderedTagIds);
+        for (Long tagId : unorderedTagIds) {
+            TagCountInfo info = allTags.get(tagId);
+            if (info != null) {
+                tagCountMap.put(info.name, info.count);
+            }
+        }
+        
         return tagCountMap;
+    }
+    
+    // 辅助类
+    private static class TagCountInfo {
+        String name;
+        int count;
+        TagCountInfo(String name, int count) {
+            this.name = name;
+            this.count = count;
+        }
     }
 
     public void updateLinkRemark(long linkId, String remark) {
@@ -740,5 +781,99 @@ public class LinkDao {
         );
         
         Log.d("LinkDao", "更新链接备注: linkId=" + linkId + ", remark is " + remark);
+    }
+
+    /**
+     * 保存标签排序
+     * @param tagIds 按排序顺序排列的标签ID列表
+     */
+    public void saveTagOrder(List<Long> tagIds) {
+        try {
+            JSONArray jsonArray = new JSONArray();
+            for (Long tagId : tagIds) {
+                jsonArray.put(tagId);
+            }
+            
+            ContentValues values = new ContentValues();
+            values.put(LinkDbHelper.COLUMN_CONFIG_KEY, "tag_order");
+            values.put(LinkDbHelper.COLUMN_CONFIG_VALUE, jsonArray.toString());
+            
+            // 先删除，再插入（实现 INSERT OR REPLACE）
+            database.delete(LinkDbHelper.TABLE_CONFIG,
+                LinkDbHelper.COLUMN_CONFIG_KEY + " = ?",
+                new String[]{"tag_order"});
+            database.insert(LinkDbHelper.TABLE_CONFIG, null, values);
+            
+            Log.d("LinkDao", "保存标签排序: " + tagIds.size() + " 个标签");
+        } catch (Exception e) {
+            Log.e("LinkDao", "保存标签排序失败", e);
+        }
+    }
+
+    /**
+     * 获取标签排序
+     * @return 按排序顺序排列的标签ID列表，如果不存在则返回空列表
+     */
+    public List<Long> getTagOrder() {
+        List<Long> tagIds = new ArrayList<>();
+        Cursor cursor = database.query(
+            LinkDbHelper.TABLE_CONFIG,
+            new String[]{LinkDbHelper.COLUMN_CONFIG_VALUE},
+            LinkDbHelper.COLUMN_CONFIG_KEY + " = ?",
+            new String[]{"tag_order"},
+            null, null, null);
+        
+        if (cursor.moveToFirst()) {
+            try {
+                String value = cursor.getString(0);
+                JSONArray jsonArray = new JSONArray(value);
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    tagIds.add(jsonArray.getLong(i));
+                }
+                Log.d("LinkDao", "获取标签排序: " + tagIds.size() + " 个标签");
+            } catch (JSONException e) {
+                Log.e("LinkDao", "解析标签排序失败", e);
+            }
+        }
+        cursor.close();
+        return tagIds;
+    }
+
+    /**
+     * 根据标签ID获取标签名称
+     */
+    public String getTagNameById(long tagId) {
+        Cursor cursor = database.query(
+            LinkDbHelper.TABLE_TAGS,
+            new String[]{LinkDbHelper.COLUMN_TAG_NAME},
+            LinkDbHelper.COLUMN_TAG_ID + " = ?",
+            new String[]{String.valueOf(tagId)},
+            null, null, null);
+        
+        String tagName = null;
+        if (cursor.moveToFirst()) {
+            tagName = cursor.getString(0);
+        }
+        cursor.close();
+        return tagName;
+    }
+
+    /**
+     * 根据标签名称获取标签ID
+     */
+    public long getTagIdByName(String tagName) {
+        Cursor cursor = database.query(
+            LinkDbHelper.TABLE_TAGS,
+            new String[]{LinkDbHelper.COLUMN_TAG_ID},
+            LinkDbHelper.COLUMN_TAG_NAME + " = ?",
+            new String[]{tagName},
+            null, null, null);
+        
+        long tagId = -1;
+        if (cursor.moveToFirst()) {
+            tagId = cursor.getLong(0);
+        }
+        cursor.close();
+        return tagId;
     }
 } 
