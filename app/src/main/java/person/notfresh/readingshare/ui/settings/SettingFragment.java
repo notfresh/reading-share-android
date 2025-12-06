@@ -2,45 +2,50 @@ package person.notfresh.readingshare.ui.settings;
 
 import static android.app.Activity.RESULT_OK;
 
+import android.app.ProgressDialog;
+import android.content.ClipData;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
+import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.Spinner;
+import android.widget.Toast;
 import android.app.AlertDialog;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.stream.Collectors;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.db.LinkDao;
 import com.google.android.material.snackbar.Snackbar;
 import person.notfresh.readingshare.util.ExportUtil;
+import person.notfresh.readingshare.util.ImportUtil;
+import person.notfresh.readingshare.util.ShareUtil;
 import com.google.android.material.textfield.TextInputEditText;
 
 public class SettingFragment extends Fragment {
 
-    private static final int REQUEST_CODE_IMPORT_CSV = 1; // 定义常量
+    private static final int REQUEST_CODE_IMPORT_FILE = 1; // 改为通用文件导入
     private static final String DEFAULT_SERVER_URL = "https://duxiang.ai";
 
     private Spinner defaultTabSpinner;
@@ -104,9 +109,9 @@ public class SettingFragment extends Fragment {
             }
         });
 
-        // 添加导入 CSV 按钮
+        // 添加导入文件按钮
         root.findViewById(R.id.button_import_csv).setOnClickListener(v -> {
-            importCsv();  // 直接调用本地的 importCsv 方法
+            importFile();  // 支持 CSV 和 JSON
         });
 
         // 添加导出按钮的点击事件
@@ -125,177 +130,304 @@ public class SettingFragment extends Fragment {
         }
     }
 
-    // 添加导入 CSV 的方法
-    private void importCsv() {
+    // 添加导入文件的方法（支持 CSV 和 JSON）
+    private void importFile() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("text/csv");
+        // 使用通配符，支持多种文件类型
+        intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(Intent.createChooser(intent, "选择 CSV 文件"), REQUEST_CODE_IMPORT_CSV);
+        startActivityForResult(Intent.createChooser(intent, "选择 CSV 或 JSON 文件"), REQUEST_CODE_IMPORT_FILE);
     }
+
+    private Uri pendingImportUri; // 待导入的文件 URI
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_CODE_IMPORT_CSV && resultCode == RESULT_OK) {
-            if (data != null) {
-                Uri uri = data.getData();
-                importCsvFromUri(uri);
+        if (requestCode == REQUEST_CODE_IMPORT_FILE && resultCode == RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            if (uri != null) {
+                // 保存 URI，显示去重选项对话框
+                pendingImportUri = uri;
+                showImportOptionsDialog();
             }
         }
     }
 
-    private void importCsvFromUri(Uri uri) {
-        try {
-            // 检查文件后缀是否为csv
-            String path = uri.getPath();
-            if (!path.endsWith(".csv")) {
-                throw new Exception("文件不是CSV格式");
-            }
-
-            InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-            String line;
-            Log.d("importCsvFromUri", "Line123");
-            reader.readLine(); //
-            while ((line = reader.readLine()) != null) {
-                Log.d("importCsvFromUri", "read line: " + line);
-                try {
-                    // 使用正则表达式来处理逗号分隔的问题
-                    String[] columns = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
-                    // 检查列数，允许最少3列（标签可以为空）
-                    if (columns.length >= 3) {
-                        // 移除双引号
-                        String title = columns[0].trim().replaceFirst("^\"|\"$", "");
-                        String url = columns[1].trim().replaceFirst("^\"|\"$", "");
-                        String dateStr = columns[2].trim().replaceFirst("^\"|\"$", "");
-                        Date date = null;
-                        String[] dateFormats = {
-                            "yyyy-MM-dd HH:mm:ss",
-                            "yyyy/MM/dd HH:mm",
-                            "yyyy-MM-dd HH:mm", 
-                            "yyyy/MM/dd"
-                        };
-                        
-                        for (String format : dateFormats) {
-                            try {
-                                SimpleDateFormat sdf = new SimpleDateFormat(format);
-                                date = sdf.parse(dateStr);
-                                break;
-                            } catch (ParseException e) {
-                                continue;
-                            }
-                        }
-                        
-                        if (date == null) {
-                            throw new ParseException("无法解析日期: " + dateStr, 0);
-                        }
-                        long timestamp = date.getTime();
-                        
-                        // 处理标签列
-                        List<String> tags = new ArrayList<>();
-                        if (columns.length >= 4) {
-                            String tagsString = columns[3].trim();
-                            if (!tagsString.isEmpty()) {
-                                if (tagsString.startsWith("\"") && tagsString.endsWith("\"")) {
-                                    // 如果标签字符串被双引号包围，说明可能包含多个标签
-                                    // 去掉首尾的双引号
-                                    tagsString = tagsString.substring(1, tagsString.length() - 1);
-                                    // 按逗号分割，并处理每个标签
-                                    String[] tagArray = tagsString.split(",");
-                                    for (String tag : tagArray) {
-                                        String cleanTag = tag.trim();
-                                        if (!cleanTag.isEmpty()) {
-                                            tags.add(cleanTag);
-                                        }
-                                    }
-                                } else {
-                                    // 如果没有双引号包围，说明只有一个标签
-                                    tags.add(tagsString);
-                                }
-                            }
-                            Log.d("importCsvFromUri", "处理标签: 原始值=" + columns[3] + 
-                                  ", 解析结果=" + tags.toString());
-                        }
-                        int clickCount = 0;
-                        if (columns.length >= 5) {
-                            try {
-                                clickCount = Integer.parseInt(columns[4].trim());
-                            } catch (NumberFormatException e) {
-                                Log.e("importCsvFromUri", "点击数转换失败: " + columns[4], e);
-                                clickCount = 0;
-                            }
-                        }
-                        String summary = "";    
-                        if (columns.length >= 6) {
-                            summary = columns[5].trim();
-                        }
-                        
-                        LinkItem newLink = new LinkItem(title, url, "imported", "", "");
-                        newLink.setTimestamp(timestamp);
-                        newLink.setTags(tags);
-                        newLink.setClickCount(clickCount);
-                        newLink.setSummary(summary);
-
-                        Log.d("importCsvFromUri", "创建新链接: " + newLink.toString() + 
-                              ", 标签数量=" + tags.size());
-                        linkDao.insertLink(newLink);
-                    }
-                } catch (Exception e) {
-                    Log.e("importCsvFromUri", "处理行时出错: " + line + ", 错误: " + e.getMessage());
-                    continue;
-                }
-            }
-            reader.close();
-            Snackbar.make(requireView(), "CSV 导入成功", Snackbar.LENGTH_LONG).show();
-        } catch (Exception e) {
-            Snackbar.make(requireView(), "导入失败：" + e.getMessage(), Snackbar.LENGTH_LONG).show();
-        }
-    }
-
-    private void showExportDialog() {
-        String[] items = {"导出为CSV", "导出为JSON"};
+    /**
+     * 显示导入选项对话框（去重选项）
+     */
+    private void showImportOptionsDialog() {
+        // 创建复选框
+        CheckBox checkBox = new CheckBox(requireContext());
+        checkBox.setText("去重（跳过已存在的链接）");
+        checkBox.setChecked(true); // 默认勾选去重
+        
+        // 创建布局容器
+        LinearLayout layout = new LinearLayout(requireContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        layout.addView(checkBox);
+        
         new AlertDialog.Builder(requireContext())
-            .setTitle("选择导出格式")
-            .setItems(items, (dialog, which) -> {
-                switch (which) {
-                    case 0:
-                        exportToFile(false); // CSV
-                        break;
-                    case 1:
-                        exportToFile(true);  // JSON
-                        break;
-                }
+            .setTitle("导入选项")
+            .setView(layout)
+            .setPositiveButton("确定", (dialog, which) -> {
+                boolean removeDuplicates = checkBox.isChecked();
+                performImport(removeDuplicates);
             })
+            .setNegativeButton("取消", null)
             .show();
     }
 
-    private void exportToFile(boolean isJson) {
-        try {
-            String filePath;
-            if (isJson) {
-                filePath = ExportUtil.exportToJson(requireContext(), linkDao.getAllLinks());
-            } else {
-                filePath = ExportUtil.exportToCsv(requireContext(), linkDao.getAllLinks());
+    /**
+     * 执行导入操作
+     * @param removeDuplicates 是否去重
+     */
+    private void performImport(boolean removeDuplicates) {
+        if (pendingImportUri == null) {
+            return;
+        }
+        
+        // 使用 ImportUtil 导入文件
+        ImportUtil.ImportResult result = ImportUtil.importFromUri(requireContext(), pendingImportUri);
+        
+        if (result.items == null || result.items.isEmpty()) {
+            Snackbar.make(requireView(), "没有可导入的链接", Snackbar.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // 如果启用去重，过滤掉已存在的链接
+        List<LinkItem> itemsToImport = result.items;
+        int duplicateCount = 0;
+        
+        if (removeDuplicates) {
+            List<LinkItem> filteredItems = new ArrayList<>();
+            for (LinkItem item : itemsToImport) {
+                if (!linkDao.urlExists(item.getUrl())) {
+                    filteredItems.add(item);
+                } else {
+                    duplicateCount++;
+                }
+            }
+            itemsToImport = filteredItems;
+        }
+        
+        // 将导入的链接保存到数据库
+        int importedCount = 0;
+        for (LinkItem item : itemsToImport) {
+            try {
+                linkDao.insertLink(item);
+                importedCount++;
+            } catch (Exception e) {
+                // 忽略插入失败的情况
+            }
+        }
+        
+        // 显示导入结果
+        StringBuilder message = new StringBuilder();
+        message.append(result.format).append(" 导入完成");
+        
+        if (importedCount > 0) {
+            message.append("，成功导入 ").append(importedCount).append(" 条");
+        }
+        
+        if (removeDuplicates && duplicateCount > 0) {
+            message.append("，跳过 ").append(duplicateCount).append(" 条重复链接");
+        }
+        
+        if (result.errorCount > 0) {
+            message.append("，失败 ").append(result.errorCount).append(" 条");
+        }
+        
+        Snackbar.make(requireView(), message.toString(), Snackbar.LENGTH_LONG).show();
+        
+        // 清空待导入的 URI
+        pendingImportUri = null;
+    }
+
+    private void showExportDialog() {
+        // 使用 XML 布局文件
+        View dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_export_options, null);
+        
+        RadioGroup formatGroup = dialogView.findViewById(R.id.format_group);
+        RadioGroup actionGroup = dialogView.findViewById(R.id.action_group);
+        RadioButton csvRadio = dialogView.findViewById(R.id.radio_csv);
+        RadioButton jsonRadio = dialogView.findViewById(R.id.radio_json);
+        RadioButton shareRadio = dialogView.findViewById(R.id.radio_share);
+        RadioButton saveRadio = dialogView.findViewById(R.id.radio_save);
+        
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+            .setTitle("选择导出方式")
+            .setView(dialogView)
+            .setPositiveButton("确定", (d, which) -> {
+                boolean isJson = (formatGroup.getCheckedRadioButtonId() == jsonRadio.getId());
+                boolean isSave = (actionGroup.getCheckedRadioButtonId() == saveRadio.getId());
+                
+                if (isSave) {
+                    exportAndSave(isJson);
+                } else {
+                    exportAndShare(isJson);
+                }
+            })
+            .setNegativeButton("取消", null)
+            .create();
+        
+        dialog.show();
+    }
+
+    /**
+     * 导出并分享文件（包含保存到公共目录的逻辑）
+     */
+    private void exportAndShare(boolean isJson) {
+        // 显示进度对话框
+        ProgressDialog progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage("正在导出数据...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+        
+        // 在后台线程执行导出操作
+        new Thread(() -> {
+            boolean success = false;
+            Uri fileUri = null;
+            String fileName = null;
+            String errorMessage = null;
+            
+//            try {
+//                // 生成文件名（已包含扩展名）
+//                String timeStamp = ExportUtil.getCurrentTime();
+//                fileName = isJson
+//                    ? "links_" + timeStamp + "_readshare.json"
+//                    : "links_" + timeStamp + "_readshare.csv";
+//
+//                // 先保存到公共 Documents 目录
+//                fileUri = ExportUtil.exportToPublicDirectory(
+//                    requireContext(),
+//                    linkDao.getAllLinks(),
+//                    isJson,
+//                    fileName
+//                );
+//                success = true;
+//            } catch (Exception e) {
+//                Log.e("SettingFragment", "导出失败", e);
+//                errorMessage = e.getMessage();
+//            }
+            
+            final Uri finalFileUri = fileUri;
+            final String finalFileName = fileName;
+            final boolean finalSuccess = success;
+            final String finalErrorMessage = errorMessage;
+            
+            // 在 UI 线程中更新界面
+            requireActivity().runOnUiThread(() -> {
+                progressDialog.dismiss();
+                
+                if (finalSuccess && finalFileUri != null && finalFileName != null) {
+                    // 保存成功后，分享文件
+                    try {
+                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        shareIntent.setType(isJson ? "application/json" : "text/csv");
+                        shareIntent.putExtra(Intent.EXTRA_STREAM, finalFileUri);
+                        shareIntent.putExtra(Intent.EXTRA_SUBJECT, finalFileName); // 方式1：EXTRA_SUBJECT
+                        
+                        // 方式2：使用 ClipData 传递文件信息（更好的兼容性）
+                        android.content.ClipData clipData = android.content.ClipData.newUri(
+                            requireContext().getContentResolver(), finalFileName, finalFileUri);
+                        shareIntent.setClipData(clipData);
+                        
+                        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        
+                        startActivity(Intent.createChooser(shareIntent, "分享导出文件"));
+                        
+                        // 显示提示信息
+                        String format = isJson ? "JSON" : "CSV";
+                        Snackbar.make(requireView(), 
+                            format + " 文件已保存到 Documents 目录，正在分享...", 
+                            Snackbar.LENGTH_SHORT).show();
+                    } catch (Exception e) {
+                        Snackbar.make(requireView(), 
+                            "分享失败：" + e.getMessage(), 
+                            Snackbar.LENGTH_LONG).show();
+                    }
+                } else {
+                    Snackbar.make(requireView(), 
+                        "导出失败：" + (finalErrorMessage != null ? finalErrorMessage : "请重试"), 
+                        Snackbar.LENGTH_LONG).show();
+                }
+            });
+        }).start();
+    }
+    
+    /**
+     * 导出并保存到公共 Documents 目录（新逻辑）
+     */
+    private void exportAndSave(boolean isJson) {
+        // 显示进度对话框
+        ProgressDialog progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage("正在导出数据...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+        
+        // 在后台线程执行导出操作
+        new Thread(() -> {
+            boolean success = false;
+            Uri fileUri = null;
+            String errorMessage = null;
+            
+            try {
+                fileUri = ExportUtil.exportToPublicDirectory(
+                    requireContext(), 
+                    linkDao.getAllLinks(), 
+                    isJson
+                );
+                success = true;
+            } catch (Exception e) {
+                Log.e("SettingFragment", "导出失败", e);
+                errorMessage = e.getMessage();
             }
             
-            File file = new File(filePath);
-            Uri uri = androidx.core.content.FileProvider.getUriForFile(
-                requireContext(),
-                requireContext().getPackageName() + ".provider",
-                file);
+            final Uri finalFileUri = fileUri;
+            final boolean finalSuccess = success;
+            final String finalErrorMessage = errorMessage;
             
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("*/*");
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            
-            startActivity(Intent.createChooser(shareIntent, "分享导出文件"));
-            
-        } catch (Exception e) {
-            Snackbar.make(requireView(), 
-                "导出失败：" + e.getMessage(), 
-                Snackbar.LENGTH_LONG).show();
-        }
+            // 在 UI 线程中更新界面
+            requireActivity().runOnUiThread(() -> {
+                progressDialog.dismiss();
+                
+                if (finalSuccess) {
+                    showExportSuccessDialog(isJson, finalFileUri);
+                } else {
+                    Snackbar.make(requireView(), 
+                        "导出失败：" + (finalErrorMessage != null ? finalErrorMessage : "请重试"), 
+                        Snackbar.LENGTH_LONG).show();
+                }
+            });
+        }).start();
+    }
+    
+    /**
+     * 显示导出成功对话框
+     */
+    private void showExportSuccessDialog(boolean isJson, Uri fileUri) {
+        String format = isJson ? "JSON" : "CSV";
+        new AlertDialog.Builder(requireContext())
+            .setTitle("导出成功")
+            .setMessage(format + " 文件已保存到 Documents 目录")
+            .setPositiveButton("打开文件", (dialog, which) -> {
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setDataAndType(fileUri, isJson ? "application/json" : "text/csv");
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(requireContext(), 
+                        "无法打开文件：" + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("确定", null)
+            .show();
     }
 
     // 添加获取服务器URL的公共方法
@@ -306,4 +438,5 @@ public class SettingFragment extends Fragment {
         );
         return prefs.getString("server_url", DEFAULT_SERVER_URL);
     }
+    
 }

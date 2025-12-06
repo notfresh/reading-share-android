@@ -81,8 +81,15 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private static final String PREF_HIGHLIGHTED_TAGS = "highlighted_tags";
     
     private RecyclerView tagsRecyclerView;
+    private RecyclerView tagsRecyclerViewCollapsed;  // 折叠标签区
     private TagsAdapter tagsAdapter;
+    private TagsAdapter tagsAdapterCollapsed;  // 折叠标签区的适配器
     private ItemTouchHelper itemTouchHelper;
+    private View expandMoreTagsButton;  // 展开更多标签按钮
+    private TextView textExpandMore;
+    private ImageView iconExpandMore;
+    private boolean isMoreTagsExpanded = false;  // 是否展开更多标签
+    private static final int FIXED_TAGS_COUNT = 10;  // 固定显示的标签数量
     private RecyclerView linksRecyclerView;
     private LinksAdapter linksAdapter;
     private LinkDao linkDao;
@@ -113,8 +120,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         Log.d("TagsFragment", "onCreateView started");
         View root = inflater.inflate(R.layout.fragment_tags, container, false);
 
-        // 初始化标签 RecyclerView
-        tagsRecyclerView = root.findViewById(R.id.recycler_tags);
+        // 初始化固定标签 RecyclerView
+        tagsRecyclerView = root.findViewById(R.id.recycler_tags_fixed);
         FlexboxLayoutManager layoutManager = new FlexboxLayoutManager(requireContext());
         layoutManager.setFlexDirection(FlexDirection.ROW);
         layoutManager.setFlexWrap(FlexWrap.WRAP);
@@ -133,7 +140,34 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         });
         tagsRecyclerView.setAdapter(tagsAdapter);
         
+        // 初始化折叠标签 RecyclerView
+        tagsRecyclerViewCollapsed = root.findViewById(R.id.recycler_tags_collapsed);
+        FlexboxLayoutManager layoutManagerCollapsed = new FlexboxLayoutManager(requireContext());
+        layoutManagerCollapsed.setFlexDirection(FlexDirection.ROW);
+        layoutManagerCollapsed.setFlexWrap(FlexWrap.WRAP);
+        tagsRecyclerViewCollapsed.setLayoutManager(layoutManagerCollapsed);
+        
+        tagsAdapterCollapsed = new TagsAdapter();
+        tagsAdapterCollapsed.setOnTagClickListener((position, tag) -> {
+            if (!isSortMode) {
+                handleTagClick(tag.getName());
+            }
+        });
+        tagsAdapterCollapsed.setOnTagLongClickListener((position, tag) -> {
+            if (!isSortMode) {
+                showTagOptionsDialog(tag.getName());
+            }
+        });
+        tagsRecyclerViewCollapsed.setAdapter(tagsAdapterCollapsed);
+        
+        // 初始化展开更多标签按钮
+        expandMoreTagsButton = root.findViewById(R.id.btn_expand_more_tags);
+        textExpandMore = root.findViewById(R.id.text_expand_more);
+        iconExpandMore = root.findViewById(R.id.icon_expand_more);
+        expandMoreTagsButton.setOnClickListener(v -> toggleMoreTagsExpansion());
+        
         // 初始化 ItemTouchHelper（但先不附加，等排序模式开启时再附加）
+        // 用于固定标签区的拖拽
         ItemTouchHelper.Callback callback = new ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP | ItemTouchHelper.DOWN | 
             ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT,
@@ -143,18 +177,17 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             public boolean onMove(@NonNull RecyclerView recyclerView, 
                                  @NonNull RecyclerView.ViewHolder viewHolder, 
                                  @NonNull RecyclerView.ViewHolder target) {
-                int fromPos = viewHolder.getAdapterPosition();
-                int toPos = target.getAdapterPosition();
-                tagsAdapter.swapItems(fromPos, toPos);
-                
-                // 保存排序到数据库
-                List<Long> orderedTagIds = new ArrayList<>();
-                for (TagsAdapter.TagItem tag : tagsAdapter.getTags()) {
-                    orderedTagIds.add(tag.getId());
+                // 在排序模式下，所有标签都在固定区，直接交换即可
+                if (isSortMode && recyclerView == tagsRecyclerView) {
+                    int fromPos = viewHolder.getAdapterPosition();
+                    int toPos = target.getAdapterPosition();
+                    tagsAdapter.swapItems(fromPos, toPos);
+                    
+                    // 保存排序到数据库
+                    saveTagOrderToDatabase();
+                    return true;
                 }
-                linkDao.saveTagOrder(orderedTagIds);
-                
-                return true;
+                return false;
             }
             
             @Override
@@ -174,16 +207,13 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         toggleTagsButton = root.findViewById(R.id.btn_toggle_tags);
         arrowIndicator = root.findViewById(R.id.arrow_indicator);
 
-        // 设置初始高度为 wrap_content
+        // 设置初始高度为 wrap_content，让内容自然决定高度
         ViewGroup.LayoutParams params = tagsScrollView.getLayoutParams();
-        if(!isTagsExpanded){
-            // 设置为屏幕高度的25%
-            int screenHeight = getResources().getDisplayMetrics().heightPixels;
-            params.height = screenHeight / 4;
-        }else{
-            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-        }
+        params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
         tagsScrollView.setLayoutParams(params);
+        
+        // 固定标签区域使用 wrap_content，让标签自然换行
+        // 高度限制通过 ScrollView 的 maxHeight 来控制
         
         // 设置展开/折叠按钮点击事件
         toggleTagsButton.setOnClickListener(v -> toggleTagsExpansion());
@@ -313,7 +343,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     }
 
     private void loadTags() {
-        if (tagsAdapter == null) {
+        if (tagsAdapter == null || tagsAdapterCollapsed == null) {
             Log.e("TagsFragment", "tagsAdapter is null in loadTags()");
             return;
         }
@@ -329,31 +359,83 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             
             // 回到主线程更新UI
             requireActivity().runOnUiThread(() -> {
-                List<TagsAdapter.TagItem> tagItems = new ArrayList<>();
+                List<TagsAdapter.TagItem> allTagItems = new ArrayList<>();
                 
                 // 添加"无标签"选项（如果数量大于0）
                 if (noTagCount > 0) {
-                    tagItems.add(new TagsAdapter.TagItem(-1, NO_TAG, noTagCount));
+                    allTagItems.add(new TagsAdapter.TagItem(-1, NO_TAG, noTagCount));
                 }
                 
                 // 添加其他标签
                 for (Map.Entry<String, Integer> entry : tagsWithCount.entrySet()) {
                     long tagId = linkDao.getTagIdByName(entry.getKey());
                     if (tagId != -1) {
-                        tagItems.add(new TagsAdapter.TagItem(tagId, entry.getKey(), entry.getValue()));
+                        allTagItems.add(new TagsAdapter.TagItem(tagId, entry.getKey(), entry.getValue()));
                     }
                 }
                 
-                tagsAdapter.setTags(tagItems);
-                tagsAdapter.setHighlightedTags(highlightedTags);
-                tagsAdapter.setSelectedTagNames(selectedTagNames);
+                // 在排序模式下，显示所有标签在一个区域
+                if (isSortMode) {
+                    tagsAdapter.setTags(allTagItems);
+                    tagsAdapter.setHighlightedTags(highlightedTags);
+                    tagsAdapter.setSelectedTagNames(selectedTagNames);
+                    tagsAdapterCollapsed.setTags(new ArrayList<>());
+                    tagsRecyclerViewCollapsed.setVisibility(View.GONE);
+                    expandMoreTagsButton.setVisibility(View.GONE);
+                } else {
+                    // 非排序模式：分成固定区和折叠区
+                    List<TagsAdapter.TagItem> fixedTags = new ArrayList<>();
+                    List<TagsAdapter.TagItem> collapsedTags = new ArrayList<>();
+                    
+                    for (int i = 0; i < allTagItems.size(); i++) {
+                        if (i < FIXED_TAGS_COUNT) {
+                            fixedTags.add(allTagItems.get(i));
+                        } else {
+                            collapsedTags.add(allTagItems.get(i));
+                        }
+                    }
+                    
+                    tagsAdapter.setTags(fixedTags);
+                    tagsAdapter.setHighlightedTags(highlightedTags);
+                    tagsAdapter.setSelectedTagNames(selectedTagNames);
+                    
+                    tagsAdapterCollapsed.setTags(collapsedTags);
+                    tagsAdapterCollapsed.setHighlightedTags(highlightedTags);
+                    tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
+                    
+                    // 如果有折叠标签，显示展开按钮；否则隐藏以减少空白
+                    if (collapsedTags.size() > 0) {
+                        if (expandMoreTagsButton != null) {
+                            expandMoreTagsButton.setVisibility(View.VISIBLE);
+                            updateExpandMoreButtonState();
+                        }
+                    } else {
+                        if (expandMoreTagsButton != null) {
+                            expandMoreTagsButton.setVisibility(View.GONE);
+                        }
+                    }
+                    
+                    // 根据展开状态显示/隐藏折叠标签区
+                    tagsRecyclerViewCollapsed.setVisibility(
+                        isMoreTagsExpanded && collapsedTags.size() > 0 ? View.VISIBLE : View.GONE);
+                }
                 
-                // 标签加载完成后，检查是否需要显示展开按钮
+                // 标签加载完成后，检查是否需要显示展开按钮（排序模式下不显示）
                 tagsRecyclerView.post(() -> {
+                    // 排序模式下，按钮应该隐藏
+                    if (isSortMode) {
+                        if (toggleTagsButton != null) {
+                            toggleTagsButton.setVisibility(View.GONE);
+                        }
+                        return;
+                    }
+                    // 非排序模式下，根据内容高度决定是否显示
                     int height = tagsRecyclerView.getHeight();
                     float density = getResources().getDisplayMetrics().density;
                     int collapsedHeightPx = (int) (COLLAPSED_HEIGHT_DP * density);
-                    toggleTagsButton.setVisibility(height > collapsedHeightPx ? View.VISIBLE : View.GONE);
+                    if (toggleTagsButton != null) {
+                        toggleTagsButton.setVisibility(height > collapsedHeightPx ? View.VISIBLE : View.GONE);
+                    }
                 });
                 // 恢复选择状态
                 restoreSelections();
@@ -390,9 +472,12 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             updateContentBySelectedTags();
         }
         
-        // 更新适配器显示
+        // 更新适配器显示（两个适配器都需要更新）
         if (tagsAdapter != null) {
             tagsAdapter.setSelectedTagNames(selectedTagNames);
+        }
+        if (tagsAdapterCollapsed != null) {
+            tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
         }
     }
 
@@ -797,9 +882,14 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             updateContentBySelectedTags();
         }
         
-        // 刷新适配器
+        // 刷新适配器（两个适配器都需要更新）
         if (tagsAdapter != null) {
+            tagsAdapter.setSelectedTagNames(selectedTagNames);
             tagsAdapter.notifyDataSetChanged();
+        }
+        if (tagsAdapterCollapsed != null) {
+            tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
+            tagsAdapterCollapsed.notifyDataSetChanged();
         }
     }
 
@@ -811,7 +901,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 刷新列表
         loadTags(); // 使用已有的 loadTags() 方法重新加载标签和链接
         restoreSelections();
-        linksAdapter.notifyDataSetChanged();
+        //linksAdapter.notifyDataSetChanged();
+        linksAdapter.removeLinkItem(link);
     }
     
     @Override
@@ -879,6 +970,11 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         updateContentBySelectedTags();
     }
 
+    @Override
+    public void onRequestCustomIcon(LinkItem item, String url) {
+        // 空实现，暂不支持自定义图标
+    }
+
     private void toggleSelectionMode() {
         isSelectionMode = !isSelectionMode;
         linksAdapter.toggleSelectionMode();
@@ -914,11 +1010,39 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 启用/禁用拖拽功能
         if (itemTouchHelper != null) {
             if (isSortMode) {
+                // 排序模式下，只附加到固定标签区（因为所有标签都在这里）
                 itemTouchHelper.attachToRecyclerView(tagsRecyclerView);
             } else {
                 itemTouchHelper.attachToRecyclerView(null);
             }
         }
+        
+        // 显示/隐藏底部收起按钮（排序模式下隐藏）
+        if (toggleTagsButton != null) {
+            toggleTagsButton.setVisibility(isSortMode ? View.GONE : View.VISIBLE);
+        }
+        
+        // 调整标签区域高度
+        updateTagsScrollViewHeight();
+        
+        // 调整固定标签区域的高度（非排序模式下限制最大高度）
+        if (tagsRecyclerView != null) {
+            ViewGroup.LayoutParams recyclerParams = tagsRecyclerView.getLayoutParams();
+            if (!isSortMode) {
+                // 非排序模式下，固定区域最大高度限制为能放10个标签的高度
+                // 每个标签大约40dp（包括padding和margin），10个标签约400dp
+                // 但使用 wrap_content 以便标签可以换行，通过 maxHeight 限制
+                recyclerParams.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                // 注意：RecyclerView 不支持直接设置 maxHeight，所以通过父容器 ScrollView 来控制
+            } else {
+                // 排序模式下，不限制高度
+                recyclerParams.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            }
+            tagsRecyclerView.setLayoutParams(recyclerParams);
+        }
+        
+        // 重新加载标签（排序模式下显示所有标签，非排序模式下分成两部分）
+        loadTags();
         
         // 更新标题
         if (isSortMode) {
@@ -930,6 +1054,93 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         
         requireActivity().invalidateOptionsMenu();
     }
+    
+    /**
+     * 保存标签排序到数据库
+     */
+    private void saveTagOrderToDatabase() {
+        List<Long> orderedTagIds = new ArrayList<>();
+        
+        // 在排序模式下，所有标签都在固定区
+        // 在非排序模式下，合并固定区和折叠区的标签
+        List<TagsAdapter.TagItem> allTags = new ArrayList<>();
+        allTags.addAll(tagsAdapter.getTags());
+        if (tagsAdapterCollapsed != null && !isSortMode) {
+            allTags.addAll(tagsAdapterCollapsed.getTags());
+        }
+        
+        for (TagsAdapter.TagItem tag : allTags) {
+            orderedTagIds.add(tag.getId());
+        }
+        
+        linkDao.saveTagOrder(orderedTagIds);
+    }
+    
+    /**
+     * 切换展开/折叠更多标签
+     */
+    private void toggleMoreTagsExpansion() {
+        isMoreTagsExpanded = !isMoreTagsExpanded;
+        updateExpandMoreButtonState();
+        
+        // 显示/隐藏折叠标签区
+        if (tagsAdapterCollapsed != null) {
+            List<TagsAdapter.TagItem> collapsedTags = tagsAdapterCollapsed.getTags();
+            boolean shouldShowCollapsed = isMoreTagsExpanded && collapsedTags.size() > 0;
+            tagsRecyclerViewCollapsed.setVisibility(shouldShowCollapsed ? View.VISIBLE : View.GONE);
+        }
+        
+        // 调整标签区域高度
+        updateTagsScrollViewHeight();
+    }
+    
+    /**
+     * 更新标签滚动区域的高度
+     * 当排序模式或展开更多标签时，占满屏幕；否则恢复原来的高度逻辑
+     */
+    private void updateTagsScrollViewHeight() {
+        if (tagsScrollView != null) {
+            ViewGroup.LayoutParams params = tagsScrollView.getLayoutParams();
+            // 如果展开更多标签状态，占满屏幕
+            if (isMoreTagsExpanded) {
+                int screenHeight = getResources().getDisplayMetrics().heightPixels;
+                params.height = screenHeight;
+            } else if (isSortMode) {
+                // 排序模式下，使用 wrap_content，让内容自然决定高度
+                params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            } else {
+                // 非排序模式下，限制最大高度为 120dp（通过设置固定高度，但允许内容滚动）
+                // 如果内容较少，使用 wrap_content；如果内容较多，限制为 120dp
+                float density = getResources().getDisplayMetrics().density;
+                int maxHeightPx = (int) (120 * density);
+                // 先测量内容高度
+                tagsScrollView.measure(
+                    View.MeasureSpec.makeMeasureSpec(params.width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+                int measuredHeight = tagsScrollView.getMeasuredHeight();
+                // 如果测量高度小于最大高度，使用 wrap_content；否则使用最大高度
+                params.height = measuredHeight <= maxHeightPx 
+                    ? ViewGroup.LayoutParams.WRAP_CONTENT 
+                    : maxHeightPx;
+            }
+            tagsScrollView.setLayoutParams(params);
+        }
+    }
+    
+    /**
+     * 更新展开更多标签按钮的状态
+     */
+    private void updateExpandMoreButtonState() {
+        if (textExpandMore != null && iconExpandMore != null) {
+            if (isMoreTagsExpanded) {
+                textExpandMore.setText("收起标签");
+                iconExpandMore.setImageResource(R.drawable.ic_expand_less);
+            } else {
+                textExpandMore.setText("展开更多标签");
+                iconExpandMore.setImageResource(R.drawable.ic_expand_more);
+            }
+        }
+    }
 
     private void shareAsText() {
         Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
@@ -938,7 +1149,16 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     private void shareAsFile(boolean isJson) {
         Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
-        ShareUtil.shareLinksAsFileWithDialog(requireContext(), new ArrayList<>(selectedItems), isJson);
+        ShareUtil.shareLinksAsFileWithDialog(requireContext(), new ArrayList<>(selectedItems), isJson,deleteAfterShare -> {
+            if (deleteAfterShare) {
+                // 批量删除并刷新（直接从适配器移除，避免重新查询数据库）
+                for (LinkItem item : selectedItems) {
+                    linkDao.deleteLink(item.getId());
+                    linksAdapter.removeLinkItem(item);
+                }
+                Toast.makeText(requireContext(), "已删除已分享的链接", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
 
@@ -1048,6 +1268,12 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     // 添加一个新的方法来检查标签高度和更新按钮可见性
     private void checkTagsVisibility() {
         if (tagsRecyclerView == null || toggleTagsButton == null) return;
+        
+        // 排序模式下，隐藏按钮
+        if (isSortMode) {
+            toggleTagsButton.setVisibility(View.GONE);
+            return;
+        }
         
         // 测量高度
         int height = tagsRecyclerView.getHeight();

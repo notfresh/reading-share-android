@@ -8,6 +8,8 @@ import androidx.core.content.pm.ShortcutInfoCompat;
 import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.graphics.drawable.IconCompat;
 
+import android.graphics.Bitmap;
+
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.WebShortcutActivity;
 
@@ -56,8 +58,9 @@ public class ShortcutUtil {
 
     /**
      * 使用 ShortcutManager 创建快捷方式（现代方式）
+     * @param iconBitmap 可选，favicon 图标 Bitmap，如果为 null 则使用默认图标
      */
-    private static boolean tryCreateShortcutModern(Context context, String title, String url) {
+    private static boolean tryCreateShortcutModern(Context context, String title, String url, Bitmap iconBitmap) {
         try {
             // 生成快捷方式ID（使用URL的hash值）
             String shortcutId = "shortcut_" + url.hashCode();
@@ -70,11 +73,21 @@ public class ShortcutUtil {
             shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
+            // 构建图标
+            IconCompat icon;
+            if (iconBitmap != null) {
+                icon = IconCompat.createWithBitmap(iconBitmap);
+                android.util.Log.d("ShortcutUtil", "Using favicon bitmap icon");
+            } else {
+                icon = IconCompat.createWithResource(context, R.mipmap.ic_launcher);
+                android.util.Log.d("ShortcutUtil", "Using default icon");
+            }
+
             // 构建快捷方式信息
             ShortcutInfoCompat shortcutInfo = new ShortcutInfoCompat.Builder(context, shortcutId)
                     .setShortLabel(title)
                     .setLongLabel(title)
-                    .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+                    .setIcon(icon)
                     .setIntent(shortcutIntent)
                     .build();
 
@@ -98,12 +111,20 @@ public class ShortcutUtil {
             return false;
         }
     }
+    
+    /**
+     * 使用 ShortcutManager 创建快捷方式（现代方式）- 兼容旧接口
+     */
+    private static boolean tryCreateShortcutModern(Context context, String title, String url) {
+        return tryCreateShortcutModern(context, title, url, null);
+    }
 
 
     /**
      * 使用 INSTALL_SHORTCUT 广播创建快捷方式（传统方式，兼容性更好）
+     * @param iconBitmap 可选，favicon 图标 Bitmap，如果为 null 则使用默认图标
      */
-    private static boolean createShortcutLegacy(Context context, String title, String url) {
+    private static boolean createShortcutLegacy(Context context, String title, String url, Bitmap iconBitmap) {
         try {
             android.util.Log.d("ShortcutUtil", "Using legacy INSTALL_SHORTCUT method");
             android.util.Log.d("ShortcutUtil", "Title: " + title + ", URL: " + url);
@@ -120,25 +141,33 @@ public class ShortcutUtil {
             addIntent.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
             addIntent.putExtra(Intent.EXTRA_SHORTCUT_NAME, title);
             
+            // 优先使用传入的 favicon Bitmap
+            if (iconBitmap != null) {
+                addIntent.putExtra(Intent.EXTRA_SHORTCUT_ICON, iconBitmap);
+                android.util.Log.d("ShortcutUtil", "Using favicon bitmap icon, size: " + iconBitmap.getWidth() + "x" + iconBitmap.getHeight());
+            }
+            
             // 尝试使用图标资源ID（更可靠，某些启动器可能不支持Bitmap图标）
             Intent.ShortcutIconResource iconResource = 
                 Intent.ShortcutIconResource.fromContext(context, R.mipmap.ic_launcher);
             addIntent.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE, iconResource);
             android.util.Log.d("ShortcutUtil", "Icon resource: " + iconResource.packageName + "/" + iconResource.resourceName);
             
-            // 同时尝试设置Bitmap图标（如果启动器支持）
-            try {
-                android.graphics.drawable.Drawable drawable = androidx.core.content.ContextCompat.getDrawable(context, R.mipmap.ic_launcher);
-                if (drawable != null && drawable instanceof android.graphics.drawable.BitmapDrawable) {
-                    android.graphics.drawable.BitmapDrawable bitmapDrawable = (android.graphics.drawable.BitmapDrawable) drawable;
-                    android.graphics.Bitmap bitmap = bitmapDrawable.getBitmap();
-                    if (bitmap != null) {
-                        addIntent.putExtra(Intent.EXTRA_SHORTCUT_ICON, bitmap);
-                        android.util.Log.d("ShortcutUtil", "Bitmap icon set, size: " + bitmap.getWidth() + "x" + bitmap.getHeight());
+            // 如果没有传入 favicon，尝试使用默认图标的 Bitmap
+            if (iconBitmap == null) {
+                try {
+                    android.graphics.drawable.Drawable drawable = androidx.core.content.ContextCompat.getDrawable(context, R.mipmap.ic_launcher);
+                    if (drawable != null && drawable instanceof android.graphics.drawable.BitmapDrawable) {
+                        android.graphics.drawable.BitmapDrawable bitmapDrawable = (android.graphics.drawable.BitmapDrawable) drawable;
+                        android.graphics.Bitmap bitmap = bitmapDrawable.getBitmap();
+                        if (bitmap != null) {
+                            addIntent.putExtra(Intent.EXTRA_SHORTCUT_ICON, bitmap);
+                            android.util.Log.d("ShortcutUtil", "Default bitmap icon set, size: " + bitmap.getWidth() + "x" + bitmap.getHeight());
+                        }
                     }
+                } catch (Exception e) {
+                    android.util.Log.w("ShortcutUtil", "Failed to set bitmap icon, using resource ID only", e);
                 }
-            } catch (Exception e) {
-                android.util.Log.w("ShortcutUtil", "Failed to set bitmap icon, using resource ID only", e);
             }
             
             // 设置不允许重复创建（可选）
@@ -157,6 +186,50 @@ public class ShortcutUtil {
             android.util.Log.e("ShortcutUtil", "Failed to create shortcut with INSTALL_SHORTCUT", e);
             android.util.Log.e("ShortcutUtil", "Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             e.printStackTrace();
+            Toast.makeText(context, "创建快捷方式失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+            return false;
+        }
+    }
+    
+    /**
+     * 使用 INSTALL_SHORTCUT 广播创建快捷方式（传统方式，兼容性更好）- 兼容旧接口
+     */
+    private static boolean createShortcutLegacy(Context context, String title, String url) {
+        return createShortcutLegacy(context, title, url, null);
+    }
+    
+    /**
+     * 创建桌面快捷方式（支持 favicon）
+     * @param context 上下文
+     * @param title 快捷方式名称
+     * @param url 要打开的URL
+     * @param iconBitmap 可选，favicon 图标 Bitmap，如果为 null 则使用默认图标
+     * @return 是否创建成功
+     */
+    public static boolean createShortcut(Context context, String title, String url, Bitmap iconBitmap) {
+        try {
+            // 优先尝试使用 ShortcutManager（API 26+），微信就是这样做的
+            // 即使在小手机上，如果用户授予了权限，ShortcutManager 也可以工作
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                if (ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
+                    android.util.Log.d("ShortcutUtil", "Trying ShortcutManager first");
+                    boolean modernSuccess = tryCreateShortcutModern(context, title, url, iconBitmap);
+                    if (modernSuccess) {
+                        // 如果成功，返回true（系统会显示确认对话框）
+                        return true;
+                    }
+                    android.util.Log.d("ShortcutUtil", "ShortcutManager failed, fallback to INSTALL_SHORTCUT");
+                } else {
+                    android.util.Log.d("ShortcutUtil", "ShortcutManager not supported, use INSTALL_SHORTCUT");
+                }
+            }
+            
+            // 降级到 INSTALL_SHORTCUT 广播方式
+            android.util.Log.d("ShortcutUtil", "Using INSTALL_SHORTCUT method");
+            return createShortcutLegacy(context, title, url, iconBitmap);
+            
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutUtil", "Failed to create shortcut", e);
             Toast.makeText(context, "创建快捷方式失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
             return false;
         }

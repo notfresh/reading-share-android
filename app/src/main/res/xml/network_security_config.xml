@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- 允许所有域名的明文流量（HTTP） -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    
+    <!-- 保留特定域名的配置（如果需要特殊处理） -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">www.ruanyifeng.com</domain>
         <domain includeSubdomains="true">101.201.175.127</domain>
@@ -8,6 +16,7 @@
         <domain includeSubdomains="true">m.amap.com</domain>
         <domain includeSubdomains="true">amap.com</domain>
     </domain-config>
+    
     <debug-overrides>
         <trust-anchors>
             <certificates src="system" />

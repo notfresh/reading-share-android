@@ -11,7 +11,7 @@
         android:id="@+id/action_force_back"
         android:icon="@drawable/ic_close"
         android:title="@string/force_back"
-        app:showAsAction="never" />
+        app:showAsAction="ifRoom" />
     <item
         android:id="@+id/action_archive_back"
         android:title="@string/archive_back"

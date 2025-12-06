@@ -2,6 +2,7 @@ package person.notfresh.readingshare.ui.home;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
@@ -36,6 +37,7 @@ import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.ClickStatisticsActivity;
 import person.notfresh.readingshare.util.ShareUtil;
+import person.notfresh.readingshare.util.ImageUtil;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -45,6 +47,8 @@ import java.util.Set;
 
 public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
 
+    private static final int REQUEST_CODE_PICK_ICON = 1001;
+
     private FragmentHomeBinding binding;
     private LinksAdapter adapter;
     private LinkDao linkDao;
@@ -53,6 +57,10 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private MenuItem closeSelectionMenuItem;
     private MenuItem enterSelectionMenuItem;
     private EditText searchEditText;
+    
+    // 用于保存图片选择时的临时数据
+    private LinkItem pendingIconItem;
+    private String pendingIconUrl;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -214,19 +222,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     public void onDeleteLink(LinkItem link) {
         Log.d("HomeFragment", "onDeleteLink: " + link.getTitle() + ", link id " + link.getId());
         
-        // 首先删除数据库中的链接
+        // 删除数据库中的链接
         linkDao.deleteLink(link.getId());
         
-        // 重新加载置顶链接
-        List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
-        adapter.setPinnedLinks(pinnedLinks);
-        
-        // 重新加载分组链接
-        Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
-        adapter.setGroupedLinks(groupedLinks);
-        
-        // 通知适配器数据已更改
-        adapter.notifyDataSetChanged();
+        // 直接从适配器中移除，避免重新查询数据库
+        adapter.removeLinkItem(link);
         
         Log.d("HomeFragment", "链接删除完成，UI已更新");
     }
@@ -346,5 +346,69 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     public void onLinkRemarkUpdated(LinkItem item) {
         // 如果需要刷新UI，可以在这里处理
         // 目前LinkDao中更新了数据库，而adapter中已经更新了视图，所以这里不需要额外操作
+    }
+
+    @Override
+    public void onRequestCustomIcon(LinkItem item, String url) {
+        Log.d("HomeFragment", "onRequestCustomIcon: " + item.getTitle() + ", URL: " + url);
+        
+        // 保存临时数据
+        pendingIconItem = item;
+        pendingIconUrl = url;
+        
+        // 打开相册选择图片
+        Intent intent = ImageUtil.createGalleryPickerIntent();
+        startActivityForResult(intent, REQUEST_CODE_PICK_ICON);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        
+        if (requestCode == REQUEST_CODE_PICK_ICON && resultCode == android.app.Activity.RESULT_OK) {
+            if (data != null && data.getData() != null && pendingIconItem != null) {
+                Uri selectedImageUri = data.getData();
+                Log.d("HomeFragment", "图片选择成功: " + selectedImageUri);
+                
+                try {
+                    // 1. 将 URI 转换为 Bitmap
+                    Bitmap bitmap = ImageUtil.uriToBitmap(requireContext(), selectedImageUri);
+                    
+                    if (bitmap != null) {
+                        // 2. 缩放为正方形（快捷方式图标需要 256x256）
+                        Bitmap squareBitmap = ImageUtil.resizeToSquareForShortcut(bitmap);
+                        
+                        // 3. 释放原图内存
+                        if (squareBitmap != bitmap) {
+                            bitmap.recycle();
+                        }
+                        
+                        // 4. 创建快捷方式
+                        adapter.createShortcutWithCustomIcon(
+                            requireContext(), 
+                            pendingIconItem, 
+                            pendingIconUrl, 
+                            squareBitmap
+                        );
+                        
+                        Log.d("HomeFragment", "快捷方式创建成功（使用自定义图标）");
+                    } else {
+                        Toast.makeText(requireContext(), "无法读取图片", Toast.LENGTH_SHORT).show();
+                        Log.e("HomeFragment", "无法从 URI 读取图片");
+                    }
+                } catch (Exception e) {
+                    Log.e("HomeFragment", "处理图片时出错: " + e.getMessage(), e);
+                    Toast.makeText(requireContext(), "处理图片时出错: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                } finally {
+                    // 清理临时数据
+                    pendingIconItem = null;
+                    pendingIconUrl = null;
+                }
+            } else {
+                Log.w("HomeFragment", "图片选择失败：data 或 pendingIconItem 为 null");
+                pendingIconItem = null;
+                pendingIconUrl = null;
+            }
+        }
     }
 }

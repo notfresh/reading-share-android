@@ -54,6 +54,7 @@ import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.SwipeActionsHelper;
 import person.notfresh.readingshare.util.ShareUtil;
+import person.notfresh.readingshare.util.ShortcutUtil;
 
 public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_PINNED_HEADER = -1;
@@ -86,6 +87,12 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         void updateLinkTags(LinkItem item);
         void onEnterSelectionMode();  // 添加新的回调方法
         void onPinStatusChanged();
+        /**
+         * 请求选择自定义图标（从相册选择图片）
+         * @param item 链接项
+         * @param url 链接URL
+         */
+        void onRequestCustomIcon(LinkItem item, String url);
 //        void updateLinkRemark(LinkItem item);
 //        void onLinkRemarkUpdated(LinkItem item);
     }
@@ -266,6 +273,58 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     /////////////////////////////////////////////////////////////
 
+    /**
+     * 从适配器中直接移除链接项，无需重新查询数据库
+     * @param item 要移除的链接项
+     * @return 是否成功移除
+     */
+    public boolean removeLinkItem(LinkItem item) {
+        if (item == null) {
+            return false;
+        }
+        
+        // 找到 item 在 items 列表中的位置
+        int position = -1;
+        for (int i = 0; i < items.size(); i++) {
+            Object obj = items.get(i);
+            if (obj instanceof LinkItem) {
+                LinkItem linkItem = (LinkItem) obj;
+                if (linkItem.getId() == item.getId()) {
+                    position = i;
+                    break;
+                }
+            }
+        }
+        
+        if (position == -1) {
+            Log.w("LinksAdapter", "未找到要删除的链接项: " + item.getTitle());
+            return false;
+        }
+        
+        // 从选中项中移除
+        selectedItems.remove(item);
+        
+        // 从 items 列表中移除
+        items.remove(position);
+        
+        // 从 originalItems 中移除
+        originalItems.remove(item);
+        
+        // 从 pinnedLinks 中移除
+        pinnedLinks.removeIf(link -> link.getId() == item.getId());
+        
+        // 从 groupedLinks 中移除
+        for (Map.Entry<String, List<LinkItem>> entry : groupedLinks.entrySet()) {
+            entry.getValue().removeIf(link -> link.getId() == item.getId());
+        }
+        
+        // 通知适配器项目已移除（最小改动，只移除项目本身）
+        notifyItemRemoved(position);
+        
+        Log.d("LinksAdapter", "已从适配器中移除链接: " + item.getTitle() + ", 位置: " + position);
+        return true;
+    }
+
     public void addTagToLink(LinkItem item, String tagName) {
         item.addTag(tagName);
         notifyDataSetChanged();
@@ -299,16 +358,202 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     // 提取真实URL的辅助方法
     String extractRealUrl(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        
+        // 使用正则表达式匹配完整的 URL
+        // 匹配 http:// 或 https:// 开头，后跟有效的域名和路径
+        java.util.regex.Pattern urlPattern = java.util.regex.Pattern.compile(
+            "(https?://[^\\s<>\"'{}|\\\\^`\\[\\]]+?)(?:[\\s<>\"'{}|\\\\^`\\[\\]]|$)"
+        );
+        java.util.regex.Matcher matcher = urlPattern.matcher(text);
+        
+        if (matcher.find()) {
+            String url = matcher.group(1);
+            
+            // 清理 URL：移除末尾的标点符号（如果不是 URL 的一部分）
+            url = url.replaceAll("[。，、；：！？]+$", "");
+            
+            // 尝试修复格式错误的 URL（如果域名在末尾）
+            url = fixMalformedUrl(url);
+            
+            // 验证 URL 格式
+            if (isValidUrl(url)) {
+                return url;
+            } else {
+                // 如果验证失败，尝试提取域名部分
+                String fixedUrl = extractDomainFromMalformedUrl(url);
+                if (fixedUrl != null && isValidUrl(fixedUrl)) {
+                    Log.w("LinksAdapter", "Fixed malformed URL: " + url + " -> " + fixedUrl);
+                    return fixedUrl;
+                }
+                Log.w("LinksAdapter", "Invalid URL format: " + url);
+                return url; // 仍然返回，让 WebView 尝试处理
+            }
+        }
+        
+        // 如果没有匹配到，尝试简单的查找方式（向后兼容）
         int urlStart = text.indexOf("http");
         if (urlStart != -1) {
             String url = text.substring(urlStart);
+            // 查找 URL 的结束位置
             int spaceIndex = url.indexOf(" ");
+            int newlineIndex = url.indexOf("\n");
+            int tabIndex = url.indexOf("\t");
+            
+            int endIndex = url.length();
             if (spaceIndex != -1) {
-                url = url.substring(0, spaceIndex);
+                endIndex = Math.min(endIndex, spaceIndex);
             }
+            if (newlineIndex != -1) {
+                endIndex = Math.min(endIndex, newlineIndex);
+            }
+            if (tabIndex != -1) {
+                endIndex = Math.min(endIndex, tabIndex);
+            }
+            
+            url = url.substring(0, endIndex);
+            url = url.replaceAll("[。，、；：！？]+$", "");
+            url = fixMalformedUrl(url);
+            
             return url;
         }
+        
         return text;
+    }
+    
+    // 修复格式错误的 URL（例如：域名在末尾的情况）
+    private String fixMalformedUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return url;
+        }
+        
+        try {
+            // 检查 URL 中是否包含 @ 符号（可能是格式错误的 URL）
+            int atIndex = url.lastIndexOf('@');
+            if (atIndex > 0 && atIndex < url.length() - 1) {
+                // 提取 @ 后面的部分作为可能的域名
+                String possibleDomain = url.substring(atIndex + 1);
+                
+                // 检查是否是有效的域名格式（包含点或符合域名规则）
+                if (possibleDomain.matches("^[a-zA-Z0-9][a-zA-Z0-9\\-_.]*\\.[a-zA-Z]{2,}.*$") ||
+                    possibleDomain.startsWith("xn--")) {
+                    // 提取 scheme（http:// 或 https://）
+                    String scheme = url.startsWith("https://") ? "https://" : "http://";
+                    // 构建正确的 URL
+                    String fixedUrl = scheme + possibleDomain;
+                    // 如果原 URL 有路径，保留路径
+                    if (possibleDomain.contains("/")) {
+                        return fixedUrl;
+                    }
+                    return fixedUrl;
+                }
+            }
+            
+            // 尝试查找有效的域名位置
+            // 匹配域名模式：字母数字、连字符、点，后跟顶级域名
+            java.util.regex.Pattern domainPattern = java.util.regex.Pattern.compile(
+                "([a-zA-Z0-9][a-zA-Z0-9\\-_.]*\\.[a-zA-Z]{2,}|xn--[a-zA-Z0-9]+)"
+            );
+            java.util.regex.Matcher domainMatcher = domainPattern.matcher(url);
+            
+            // 从后往前查找最后一个匹配的域名
+            String lastDomain = null;
+            int lastDomainStart = -1;
+            while (domainMatcher.find()) {
+                lastDomain = domainMatcher.group(1);
+                lastDomainStart = domainMatcher.start();
+            }
+            
+            if (lastDomain != null && lastDomainStart > 0) {
+                // 检查域名前是否有 scheme
+                String beforeDomain = url.substring(0, lastDomainStart);
+                String scheme = url.startsWith("https://") ? "https://" : "http://";
+                
+                // 如果域名前没有正确的 scheme，尝试修复
+                if (!beforeDomain.endsWith("://") && !beforeDomain.endsWith("/")) {
+                    // 可能域名前有大量编码内容，尝试提取
+                    int schemeEnd = url.indexOf("://");
+                    if (schemeEnd != -1) {
+                        return scheme + lastDomain + (url.length() > lastDomainStart + lastDomain.length() ? 
+                            url.substring(lastDomainStart + lastDomain.length()) : "");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("LinksAdapter", "Error fixing malformed URL: " + e.getMessage());
+        }
+        
+        return url;
+    }
+    
+    // 从格式错误的 URL 中提取域名
+    private String extractDomainFromMalformedUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            // 查找 @ 符号后的域名
+            int atIndex = url.lastIndexOf('@');
+            if (atIndex > 0 && atIndex < url.length() - 1) {
+                String afterAt = url.substring(atIndex + 1);
+                // 提取域名部分（到第一个 / 或末尾）
+                int slashIndex = afterAt.indexOf('/');
+                String domain = slashIndex > 0 ? afterAt.substring(0, slashIndex) : afterAt;
+                
+                // 验证是否是有效域名
+                if (domain.matches("^[a-zA-Z0-9][a-zA-Z0-9\\-_.]*\\.[a-zA-Z]{2,}$") ||
+                    domain.startsWith("xn--")) {
+                    String scheme = url.startsWith("https://") ? "https://" : "http://";
+                    return scheme + domain;
+                }
+            }
+            
+            // 使用正则表达式提取域名
+            java.util.regex.Pattern domainPattern = java.util.regex.Pattern.compile(
+                "(?:https?://)?([a-zA-Z0-9][a-zA-Z0-9\\-_.]*\\.[a-zA-Z]{2,}|xn--[a-zA-Z0-9]+)"
+            );
+            java.util.regex.Matcher matcher = domainPattern.matcher(url);
+            if (matcher.find()) {
+                String domain = matcher.group(1);
+                String scheme = url.startsWith("https://") ? "https://" : "http://";
+                return scheme + domain;
+            }
+        } catch (Exception e) {
+            Log.e("LinksAdapter", "Error extracting domain: " + e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    // 验证 URL 格式是否有效
+    private boolean isValidUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return false;
+        }
+        try {
+            // 使用 Android 的 Uri 类验证
+            Uri uri = Uri.parse(url);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!scheme.equals("http") && !scheme.equals("https"))) {
+                return false;
+            }
+            String host = uri.getHost();
+            // 检查是否有有效的主机名（至少包含一个点，或者 localhost）
+            if (host == null || host.isEmpty()) {
+                return false;
+            }
+            // 基本格式检查：主机名不应该包含空格或特殊字符
+            if (host.contains(" ") || host.contains("\n") || host.contains("\t")) {
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            Log.e("LinksAdapter", "URL validation error: " + e.getMessage());
+            return false;
+        }
     }
 
     // 检查是否有应用可以处理该Intent
@@ -415,14 +660,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     // 添加到桌面
                     Log.d("LinksAdapter", "添加到桌面");
                     String url = extractRealUrl(item.getUrl());
-                    boolean success = person.notfresh.readingshare.util.ShortcutUtil.createShortcut(
-                        view.getContext(), 
-                        item.getTitle(), 
-                        url
-                    );
-                    if (success) {
-                        Toast.makeText(view.getContext(), "已添加快捷方式", Toast.LENGTH_SHORT).show();
-                    }
+                    
+                    // 显示图标选择对话框
+                    showIconSelectionDialog(view, item, url);
                     return true;
                 default:
                     return false;
@@ -449,6 +689,146 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+    /**
+     * 显示图标选择对话框
+     */
+    private void showIconSelectionDialog(View view, LinkItem item, String url) {
+        String[] options = {"使用网站图标", "从相册选择", "使用默认图标"};
+        
+        new AlertDialog.Builder(view.getContext())
+                .setTitle("选择快捷方式图标")
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            // 使用网站图标
+                            createShortcutWithWebsiteIcon(view, item, url);
+                            break;
+                        case 1:
+                            // 从相册选择
+                            if (listener != null) {
+                                listener.onRequestCustomIcon(item, url);
+                            } else {
+                                Toast.makeText(view.getContext(), "无法打开相册", Toast.LENGTH_SHORT).show();
+                            }
+                            break;
+                        case 2:
+                            // 使用默认图标
+                            createShortcutWithDefaultIcon(view, item, url);
+                            break;
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    /**
+     * 使用网站图标创建快捷方式
+     */
+    private void createShortcutWithWebsiteIcon(View view, LinkItem item, String url) {
+        // 显示加载对话框
+        ProgressDialog shortcutProgressDialog = new ProgressDialog(view.getContext());
+        shortcutProgressDialog.setMessage("正在获取网站图标...");
+        shortcutProgressDialog.setCancelable(true);
+        shortcutProgressDialog.show();
+        
+        // 异步获取 favicon 并创建快捷方式
+        new Thread(() -> {
+            android.graphics.Bitmap faviconBitmap = null;
+            String errorMessage = null;
+            
+            try {
+                // 1. 获取 favicon URL
+                Log.d("LinksAdapter", "开始获取 favicon URL: " + url);
+                String faviconUrl = CrawlUtil.getFaviconUrl(url);
+                
+                // 2. 下载 favicon 图片
+                if (faviconUrl != null && !faviconUrl.isEmpty()) {
+                    Log.d("LinksAdapter", "开始下载 favicon: " + faviconUrl);
+                    faviconBitmap = CrawlUtil.downloadFavicon(faviconUrl);
+                    if (faviconBitmap != null) {
+                        Log.d("LinksAdapter", "Favicon 下载成功");
+                    } else {
+                        Log.w("LinksAdapter", "Favicon 下载失败，将使用默认图标");
+                    }
+                } else {
+                    Log.w("LinksAdapter", "未找到 favicon URL，将使用默认图标");
+                }
+                
+                // 3. 创建快捷方式（使用 favicon 或默认图标）
+                final android.graphics.Bitmap finalFaviconBitmap = faviconBitmap;
+                final String finalErrorMessage = errorMessage;
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    shortcutProgressDialog.dismiss();
+                    boolean success = ShortcutUtil.createShortcut(
+                        view.getContext(), 
+                        item.getTitle(), 
+                        url,
+                        finalFaviconBitmap
+                    );
+                    if (success) {
+                        Toast.makeText(view.getContext(), "已添加快捷方式", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                
+            } catch (Exception e) {
+                Log.e("LinksAdapter", "获取 favicon 失败: " + e.getMessage(), e);
+                errorMessage = e.getMessage();
+                // 即使获取 favicon 失败，也尝试使用默认图标创建快捷方式
+                final String finalErrorMessage = errorMessage;
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    shortcutProgressDialog.dismiss();
+                    boolean success = ShortcutUtil.createShortcut(
+                        view.getContext(), 
+                        item.getTitle(), 
+                        url,
+                        null  // 使用默认图标
+                    );
+                    if (success) {
+                        Toast.makeText(view.getContext(), "已添加快捷方式", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(view.getContext(), 
+                            "创建快捷方式失败" + (finalErrorMessage != null ? ": " + finalErrorMessage : ""), 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * 使用默认图标创建快捷方式
+     */
+    private void createShortcutWithDefaultIcon(View view, LinkItem item, String url) {
+        boolean success = ShortcutUtil.createShortcut(
+            view.getContext(), 
+            item.getTitle(), 
+            url,
+            null  // 使用默认图标
+        );
+        if (success) {
+            Toast.makeText(view.getContext(), "已添加快捷方式", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(view.getContext(), "创建快捷方式失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * 使用自定义图标创建快捷方式（由 Fragment 调用）
+     */
+    public void createShortcutWithCustomIcon(Context context, LinkItem item, String url, android.graphics.Bitmap customIcon) {
+        boolean success = ShortcutUtil.createShortcut(
+            context, 
+            item.getTitle(), 
+            url,
+            customIcon
+        );
+        if (success) {
+            Toast.makeText(context, "已添加快捷方式", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(context, "创建快捷方式失败", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
