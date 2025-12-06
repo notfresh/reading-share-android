@@ -14,10 +14,12 @@ import android.util.Log;
 import android.content.ClipData;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
 import androidx.core.content.FileProvider;
+import org.json.JSONException;
 
 import person.notfresh.readingshare.model.LinkItem;
 
@@ -40,7 +42,6 @@ public class ShareUtil {
      * @param isJson true 导出 JSON；false 导出 CSV
      */
     public static void shareLinksAsFile(Context context, List<LinkItem> items, boolean isJson, String fileName, boolean ifSaveOnly) {
-
         try {
             Uri fileUri = null;
             if(ifSaveOnly){
@@ -49,31 +50,77 @@ public class ShareUtil {
                 String format = isJson ? "JSON" : "CSV";
                 Toast.makeText(context, format + " 文件已保存到 Documents 目录", Toast.LENGTH_SHORT).show();
                 return;
-            }else{
+            } else {
+                // 导出文件到应用目录
                 String filePath = isJson 
                     ? ExportUtil.exportToJson(context, items, fileName)
                     : ExportUtil.exportToCsv(context, items, fileName);
-                fileUri = Uri.parse("file://" + filePath);
+                
+                // 使用 FileProvider 生成 URI（而不是 file:// URI）
+                File file = new File(filePath);
+                if (!file.exists()) {
+                    throw new IOException("文件创建失败，文件不存在: " + filePath);
+                }
+                
+                try {
+                    // 使用 FileProvider 获取 URI
+                    fileUri = FileProvider.getUriForFile(
+                        context, 
+                        context.getPackageName() + ".provider", 
+                        file
+                    );
+                    Log.d("ShareUtil", "文件URI生成成功: " + fileUri);
+                } catch (IllegalArgumentException e) {
+                    Log.e("ShareUtil", "FileProvider URI生成失败", e);
+                    throw new IOException("无法生成文件URI，请检查FileProvider配置: " + e.getMessage());
+                }
             }
-            // 文件名应该已经在用户输入时处理过了，这里直接使用
-            // 先保存到公共 Documents 目录
-            // 使用保存到公共目录的文件进行分享（多种方式传递文件名）
+            
+            // 构建分享 Intent
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType(isJson ? "application/json" : "text/csv");
             shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-            shareIntent.putExtra(Intent.EXTRA_SUBJECT, fileName); // 方式1：EXTRA_SUBJECT
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, fileName);
             
-            // 方式2：使用 ClipData 传递文件信息（更好的兼容性）
+            // 授予临时读取权限
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            // 使用 ClipData 传递文件信息（更好的兼容性）
             ClipData clipData = ClipData.newUri(context.getContentResolver(), fileName, fileUri);
             shareIntent.setClipData(clipData);
-            
-            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
+            // 创建分享选择器
             Intent chooser = Intent.createChooser(shareIntent, "分享文件");
             excludeSelfFromChooser(context, chooser);
+            
+            // 授予选择器临时权限
+            chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
             context.startActivity(chooser);
+            Log.d("ShareUtil", "分享选择器已启动");
+            
+        } catch (IOException e) {
+            Log.e("ShareUtil", "文件操作失败", e);
+            String errorMsg = "文件操作失败: " + e.getMessage();
+            if (e.getMessage() != null && e.getMessage().contains("权限")) {
+                errorMsg = "文件权限不足，请检查应用权限设置";
+            }
+            Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show();
+        } catch (JSONException e) {
+            Log.e("ShareUtil", "JSON处理失败", e);
+            Toast.makeText(context, "JSON格式错误: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        } catch (SecurityException e) {
+            Log.e("ShareUtil", "权限错误", e);
+            Toast.makeText(context, "分享权限不足: " + e.getMessage(), Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            Toast.makeText(context, "分享失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e("ShareUtil", "分享失败", e);
+            String errorMsg = "分享失败";
+            if (e.getMessage() != null && !e.getMessage().isEmpty()) {
+                errorMsg += ": " + e.getMessage();
+            } else {
+                errorMsg += ": " + e.getClass().getSimpleName();
+            }
+            Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show();
         }
     }
 
