@@ -1,12 +1,17 @@
 package person.notfresh.readingshare.util;
 
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
+import android.provider.MediaStore;
 import android.widget.Toast;
 import android.webkit.WebView;
 import android.util.Log;
+import android.content.ClipData;
 
 import java.io.File;
 import java.util.Collections;
@@ -31,24 +36,37 @@ public class ShareUtil {
     // 对外入口（常用优先）
     /**
      * 将单条链接导出为 JSON/CSV 文件后，通过文件方式分享。
+     * 先保存到公共 Documents 目录，然后再分享。
      * @param isJson true 导出 JSON；false 导出 CSV
      */
-    public static void shareLinksAsFile(Context context, List<LinkItem> items, boolean isJson, String fileName) {
+    public static void shareLinksAsFile(Context context, List<LinkItem> items, boolean isJson, String fileName, boolean ifSaveOnly) {
+
         try {
-            String filePath = isJson
+            Uri fileUri = null;
+            if(ifSaveOnly){
+                fileUri = ExportUtil.exportToPublicDirectory(context, items, isJson, fileName);
+                // 显示保存成功提示
+                String format = isJson ? "JSON" : "CSV";
+                Toast.makeText(context, format + " 文件已保存到 Documents 目录", Toast.LENGTH_SHORT).show();
+                return;
+            }else{
+                String filePath = isJson 
                     ? ExportUtil.exportToJson(context, items, fileName)
                     : ExportUtil.exportToCsv(context, items, fileName);
-
-            File file = new File(filePath);
-            Uri uri = FileProvider.getUriForFile(
-                    context,
-                    context.getPackageName() + ".provider",
-                    file
-            );
-
+                fileUri = Uri.parse("file://" + filePath);
+            }
+            // 文件名应该已经在用户输入时处理过了，这里直接使用
+            // 先保存到公共 Documents 目录
+            // 使用保存到公共目录的文件进行分享（多种方式传递文件名）
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("*/*");
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            shareIntent.setType(isJson ? "application/json" : "text/csv");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, fileName); // 方式1：EXTRA_SUBJECT
+            
+            // 方式2：使用 ClipData 传递文件信息（更好的兼容性）
+            ClipData clipData = ClipData.newUri(context.getContentResolver(), fileName, fileUri);
+            shareIntent.setClipData(clipData);
+            
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
             Intent chooser = Intent.createChooser(shareIntent, "分享文件");
@@ -60,6 +78,46 @@ public class ShareUtil {
     }
 
     /**
+     * 处理文件名：确保有正确的扩展名和格式
+     * @param fileName 用户输入的文件名
+     * @param isJson 是否为 JSON 格式
+     * @return 处理后的文件名
+     */
+    public static String processFileName(String fileName, boolean isJson) {
+        if (fileName == null || fileName.isEmpty()) {
+            return fileName;
+        }
+        
+        // 清理非法字符
+        fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+        
+        String lowerFileName = fileName.toLowerCase();
+        if (isJson) {
+            if (!lowerFileName.endsWith(".json")) {
+                // 没有扩展名或扩展名不对，添加 _readshare.json
+                // 先移除可能存在的其他扩展名
+                int lastDot = fileName.lastIndexOf('.');
+                if (lastDot > 0) {
+                    fileName = fileName.substring(0, lastDot);
+                }
+                fileName += "_readshare.json";
+            }
+        } else {
+            if (!lowerFileName.endsWith(".csv")) {
+                // 没有扩展名或扩展名不对，添加 _readshare.csv
+                // 先移除可能存在的其他扩展名
+                int lastDot = fileName.lastIndexOf('.');
+                if (lastDot > 0) {
+                    fileName = fileName.substring(0, lastDot);
+                }
+                fileName += "_readshare.csv";
+            }
+        }
+        
+        return fileName;
+    }
+    
+    /**
      * 批量分享链接为文件（带文件名输入对话框）
      * @param isJson true 导出 JSON；false 导出 CSV
      */
@@ -68,7 +126,7 @@ public class ShareUtil {
     }
 
     /**
-     * 带文件名输入和“是否删除链接”勾选项的对话框，确认后回传用户选择。
+     * 带文件名输入和"是否删除链接"勾选项的对话框，确认后回传用户选择。
      */
     public static void shareLinksAsFileWithDialog(Context context, List<LinkItem> items, boolean isJson, OptionsCallback callback) {
         if (items.isEmpty()) {
@@ -85,7 +143,9 @@ public class ShareUtil {
 
         final android.widget.EditText input = new android.widget.EditText(context);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        String defaultFileName = "分享的链接_" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(new java.util.Date());
+        // 生成默认文件名时直接带上后缀
+        String baseName = "分享的链接_" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(new java.util.Date());
+        String defaultFileName = baseName + (isJson ? "_readshare.json" : "_readshare.csv");
         input.setText(defaultFileName);
         input.setSelection(defaultFileName.length());
         input.setHint("文件名");
@@ -94,6 +154,11 @@ public class ShareUtil {
         if(callback != null) {
             deleteCheck.setText("分享后删除这些链接");
             container.addView(deleteCheck);
+        }
+        final android.widget.CheckBox saveOnlyCheck = new android.widget.CheckBox(context);
+        if(callback != null) {
+            saveOnlyCheck.setText("保存到本地");
+            container.addView(saveOnlyCheck);
         }
 
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(context)
@@ -104,13 +169,17 @@ public class ShareUtil {
                     if (fileName.isEmpty()) {
                         fileName = defaultFileName;
                     }
-                    fileName = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+                    // 统一处理文件名（确保有正确的扩展名）
+                    fileName = processFileName(fileName, isJson);
                     boolean deleteAfter = deleteCheck.isChecked();
                     // 先导出，再删除！！
                     if (callback != null) {
                         callback.onConfirmed(deleteAfter);
                     }
-                    shareLinksAsFile(context, items, isJson, fileName);
+
+                    shareLinksAsFile(context, items, isJson, fileName, saveOnlyCheck.isChecked());
+
+
                 })
                 .setNegativeButton("取消", (dialog, which) -> dialog.cancel());
 
@@ -128,12 +197,11 @@ public class ShareUtil {
 
         StringBuilder shareText = new StringBuilder();
         for (LinkItem item : items) {
-//            shareText.append(item.getTitle())
-//                    .append("\n")
-//                    .append(item.getUrl())
-//                    .append("\n\n");
-            shareText.append(buildShareText(item.getTitle(), item.getUrl(), item.getRemark()));
+            // 修正参数顺序：title, remark, url
+            shareText.append(buildShareText(item.getTitle(), item.getRemark(), item.getUrl(), false));
         }
+        // 批量分享时，只在最后添加一次"来自：ReadingShare"
+        shareText.append("来自：ReadingShare\n");
 
         sharePlainText(context, shareText.toString());
     }
@@ -177,8 +245,10 @@ public class ShareUtil {
      */
     public static void shareLinkAsFile(Context context, LinkItem item, boolean isJson) {
         List<LinkItem> singleList = Collections.singletonList(item);
-        String fileName = "分享的链接_" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(new java.util.Date());
-        shareLinksAsFile(context, singleList, isJson, fileName);
+        // 生成默认文件名时直接带上后缀
+        String baseName = "分享的链接_" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(new java.util.Date());
+        String fileName = baseName + (isJson ? "_readshare.json" : "_readshare.csv");
+        shareLinksAsFile(context, singleList, isJson, fileName, true);
     }
 
     /**
@@ -205,10 +275,11 @@ public class ShareUtil {
     //  文本模板与摘要
 
     /**
-     * 构建符合“微信卡片信息结构”的裸文本。
-     * 【标题】\n(可选)摘要：...\n链接：...\n来自：ReadingShare
+     * 构建符合"微信卡片信息结构"的裸文本。
+     * 【标题】\n(可选)摘要：...\n链接：...
+     * @param includeSource 是否包含"来自：ReadingShare"（批量分享时只在最后加一次）
      */
-    private static String buildShareText(String title, String remark, String url) {
+    private static String buildShareText(String title, String remark, String url, boolean includeSource) {
         String safeTitle = (title == null || title.isEmpty()) ? "新链接" : truncate(title, 60);
         String safeUrl = (url == null) ? "" : url;
         String safeRemark = summarize(remark, 80);
@@ -219,8 +290,18 @@ public class ShareUtil {
             sb.append("摘要：").append(safeRemark).append("\n");
         }
         sb.append("链接：").append(safeUrl).append("\n");
-        sb.append("来自：ReadingShare\n");
+        if (includeSource) {
+            sb.append("来自：ReadingShare\n");
+        }
         return sb.toString();
+    }
+    
+    /**
+     * 构建符合"微信卡片信息结构"的裸文本（单条分享，包含来源）。
+     * 【标题】\n(可选)摘要：...\n链接：...\n来自：ReadingShare
+     */
+    private static String buildShareText(String title, String remark, String url) {
+        return buildShareText(title, remark, url, true);
     }
 
     /**

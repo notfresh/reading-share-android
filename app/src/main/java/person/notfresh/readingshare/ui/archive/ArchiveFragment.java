@@ -1,9 +1,14 @@
 package person.notfresh.readingshare.ui.archive;
 
+import android.content.ClipData;
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Intent;
+import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -38,6 +43,7 @@ import person.notfresh.readingshare.databinding.FragmentHomeBinding;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.ExportUtil;
+import person.notfresh.readingshare.util.ShareUtil;
 
 public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
 
@@ -297,22 +303,29 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         }
 
         try {
-            String filePath;
-            if (isJson) {
-                filePath = ExportUtil.exportToJson(requireContext(), new ArrayList<>(selectedItems));
-            } else {
-                filePath = ExportUtil.exportToCsv(requireContext(), new ArrayList<>(selectedItems));
-            }
+            // 先保存到公共 Documents 目录
+            Uri fileUri = ExportUtil.exportToPublicDirectory(
+                requireContext(), 
+                new ArrayList<>(selectedItems), 
+                isJson
+            );
             
-            File file = new File(filePath);
-            Uri uri = androidx.core.content.FileProvider.getUriForFile(
-                requireContext(),
-                requireContext().getPackageName() + ".provider",
-                file);
+            // 生成文件名（已包含扩展名）
+            String fileName = isJson 
+                ? "links_" + ExportUtil.getCurrentTime() + "_readshare.json"
+                : "links_" + ExportUtil.getCurrentTime() + "_readshare.csv";
             
+            // 使用保存到公共目录的文件进行分享（多种方式传递文件名）
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("*/*");
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            shareIntent.setType(isJson ? "application/json" : "text/csv");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, fileName); // 方式1：EXTRA_SUBJECT
+            
+            // 方式2：使用 ClipData 传递文件信息（更好的兼容性）
+            ClipData clipData = ClipData.newUri(
+                requireContext().getContentResolver(), fileName, fileUri);
+            shareIntent.setClipData(clipData);
+            
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             
             // 创建选择器并排除自己的应用
@@ -323,6 +336,12 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
                 new ComponentName[]{new ComponentName(myPackageName, myPackageName + ".MainActivity")});
             
             startActivity(chooserIntent);
+            
+            // 显示提示信息
+            String format = isJson ? "JSON" : "CSV";
+            Snackbar.make(requireView(), 
+                format + " 文件已保存到 Documents 目录，正在分享...", 
+                Snackbar.LENGTH_SHORT).show();
             
         } catch (Exception e) {
             Snackbar.make(requireView(), 
@@ -341,6 +360,11 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         Log.d("HomeFragment", "置顶链接数量: " + pinnedLinks.size());
         adapter.setPinnedLinks(pinnedLinks);
         adapter.setGroupedLinks(groupedLinks);
+    }
+
+    @Override
+    public void onRequestCustomIcon(LinkItem item, String url) {
+        // 空实现，暂不支持自定义图标
     }
 
     private void scrollToDate(RecyclerView recyclerView, String date) {

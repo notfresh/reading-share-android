@@ -73,6 +73,27 @@ public class LinkDao {
     }
 
     /**
+     * 检查 URL 是否已存在于数据库中
+     * @param url 要检查的 URL
+     * @return 如果 URL 已存在返回 true，否则返回 false
+     */
+    public boolean urlExists(String url) {
+        Cursor cursor = database.query(
+                LinkDbHelper.TABLE_LINKS,
+                new String[]{LinkDbHelper.COLUMN_ID},
+                LinkDbHelper.COLUMN_URL + " = ?",
+                new String[]{url},
+                null,
+                null,
+                null,
+                "1"  // 只查询一条记录即可
+        );
+        boolean exists = cursor.getCount() > 0;
+        cursor.close();
+        return exists;
+    }
+
+    /**
      * 删除一个链接及其所有相关标签关联
      */
     public boolean deleteLink(long linkId) {

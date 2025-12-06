@@ -153,6 +153,7 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void openGallery() {
+        // TODO: 可以改为使用 ImageUtil.createGalleryPickerIntent() 复用代码
         Intent intent = new Intent(Intent.ACTION_PICK, 
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         startActivityForResult(intent, REQUEST_GALLERY);
@@ -189,6 +190,7 @@ public class UserProfileActivity extends AppCompatActivity {
 
                 if (bitmap != null) {
                     // 压缩图片
+                    // TODO: 可以改为使用 ImageUtil.resizeBitmap() 复用代码
                     bitmap = getResizedBitmap(bitmap, 500); // 限制最大尺寸为 500px
                     
                     // 保存到应用私有目录
@@ -210,6 +212,7 @@ public class UserProfileActivity extends AppCompatActivity {
         }
     }
 
+    // TODO: 可以改为使用 ImageUtil.resizeBitmap() 复用代码
     private Bitmap getResizedBitmap(Bitmap image, int maxSize) {
         int width = image.getWidth();
         int height = image.getHeight();
