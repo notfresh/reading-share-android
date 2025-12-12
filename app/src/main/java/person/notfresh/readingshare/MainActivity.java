@@ -261,6 +261,9 @@ public class MainActivity extends AppCompatActivity {
         if ("documents".equals(navigateTo)) {
             // 从外部打开PDF后返回，导航到文档列表
             destinationId = R.id.nav_documents;
+        } else if ("home".equals(navigateTo)) {
+            // 从外部打开WebView后返回，导航到首页
+            destinationId = R.id.nav_home;
         } else {
             // 读取默认Tab设置并导航
             SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);

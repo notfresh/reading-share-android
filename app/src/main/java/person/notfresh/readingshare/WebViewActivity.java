@@ -44,6 +44,7 @@ public class WebViewActivity extends AppCompatActivity {
     private PowerManager.WakeLock wakeLock;
     private boolean preserveCache = false;
     private String pageTitleCache = "";
+    private boolean isExternalOpen = false; // 是否从外部打开
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,8 +56,37 @@ public class WebViewActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
+        // 检查是否从外部打开（通过分享、其他应用或桌面快捷方式）
+        Intent intent = getIntent();
+        String action = intent != null ? intent.getAction() : null;
+        boolean fromShortcut = intent != null && intent.getBooleanExtra("from_shortcut", false);
+        isExternalOpen = Intent.ACTION_SEND.equals(action) || Intent.ACTION_VIEW.equals(action) || fromShortcut;
+        
+        // 设置返回按钮点击事件
+        toolbar.setNavigationOnClickListener(v -> {
+            if (isExternalOpen) {
+                // 从外部打开，返回应用主界面并导航到首页
+                Intent mainIntent = new Intent(this, MainActivity.class);
+                mainIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                mainIntent.putExtra("navigate_to", "home");
+                startActivity(mainIntent);
+                finish();
+            } else {
+                // 从应用内部打开，正常返回
+                finish();
+            }
+        });
+
         // 获取传入的URL
         currentUrl = getIntent().getStringExtra("url");
+        if (currentUrl == null || currentUrl.isEmpty()) {
+            // 尝试从 Intent data 中获取 URL（可能是从外部分享）
+            Uri data = intent != null ? intent.getData() : null;
+            if (data != null) {
+                currentUrl = data.toString();
+            }
+        }
+        
         if (currentUrl == null || currentUrl.isEmpty()) {
             Toast.makeText(this, "无效的URL", Toast.LENGTH_SHORT).show();
             finish();
@@ -194,6 +224,11 @@ public class WebViewActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent); // 重要：更新 Intent，这样 getIntent() 会返回最新的 Intent
+        
+        // 更新外部打开标志
+        String action = intent != null ? intent.getAction() : null;
+        boolean fromShortcut = intent != null && intent.getBooleanExtra("from_shortcut", false);
+        isExternalOpen = Intent.ACTION_SEND.equals(action) || Intent.ACTION_VIEW.equals(action) || fromShortcut;
         
         // 从新的 Intent 中获取 URL
         String newUrl = intent.getStringExtra("url");

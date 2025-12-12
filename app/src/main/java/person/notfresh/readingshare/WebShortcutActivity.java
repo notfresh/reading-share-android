@@ -45,6 +45,7 @@ public class WebShortcutActivity extends AppCompatActivity {
         // 系统会调用 onNewIntent() 而不是 onCreate()
         Intent webViewIntent = new Intent(this, WebViewActivity.class);
         webViewIntent.putExtra("url", url);
+        webViewIntent.putExtra("from_shortcut", true); // 标记这是从快捷方式打开的
         webViewIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(webViewIntent);
         
