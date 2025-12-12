@@ -15,9 +15,19 @@
             android:title="@string/menu_gallery" 
             android:textAppearance="@style/NavigationDrawerText"/>
         <item
+            android:id="@+id/nav_archive"
+            android:icon="@drawable/ic_archive"
+            android:title="@string/menu_archive"
+            android:textAppearance="@style/NavigationDrawerText"/>
+        <item
             android:id="@+id/nav_rss"
             android:icon="@drawable/rss"
             android:title="@string/menu_rss" 
+            android:textAppearance="@style/NavigationDrawerText"/>
+        <item
+            android:id="@+id/nav_documents"
+            android:icon="@drawable/ic_documents"
+            android:title="@string/menu_documents"
             android:textAppearance="@style/NavigationDrawerText"/>
         <item
             android:id="@+id/nav_slideshow"
@@ -25,10 +35,6 @@
             android:title="@string/menu_settings"
             android:textAppearance="@style/NavigationDrawerText"/>
         
-        <item
-            android:id="@+id/nav_archive"
-            android:icon="@drawable/ic_archive"
-            android:title="@string/menu_archive"
-            android:textAppearance="@style/NavigationDrawerText"/>
+        
     </group>
 </menu>

@@ -11,9 +11,10 @@
     <string name="menu_home">首页</string>
     <string name="menu_gallery">标签</string>
     <string name="menu_rss">RSS</string>
-    <string name="menu_settings">设置</string>
     <string name="menu_archive">归档</string>
+    <string name="menu_documents">文档</string>
     
+        <string name="menu_settings">设置</string>
 
     <string-array name="default_tabs_array">
         <item>首页</item>

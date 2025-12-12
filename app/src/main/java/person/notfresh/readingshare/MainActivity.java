@@ -95,27 +95,12 @@ public class MainActivity extends AppCompatActivity {
             // 先设置导航控制器
             navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
             
-            // 读取默认Tab设置并导航
-            SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
-            int defaultTab = prefs.getInt("default_tab", 0); // 默认为0，即首页
-            
-            // 根据设置选择目标页面ID
-            int destinationId;
-            switch (defaultTab) {
-                case 1: // 标签页
-                    destinationId = R.id.nav_tags;
-                    break;
-                default: // 首页
-                    destinationId = R.id.nav_home;
-                    break;
-            }
-            
-            // 导航到默认页面
-            navController.navigate(destinationId);
+            // 处理导航（包括从DocumentViewerActivity返回的情况）
+            handleNavigation(getIntent());
             
             // 然后设置 AppBarConfiguration
             mAppBarConfiguration = new AppBarConfiguration.Builder(
-                    R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive)
+                    R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive, R.id.nav_documents)
                     .setOpenableLayout(drawer)
                     .build();
 
@@ -152,6 +137,8 @@ public class MainActivity extends AppCompatActivity {
                             navController.navigate(R.id.nav_slideshow);
                         } else if (id == R.id.nav_archive) {
                             navController.navigate(R.id.nav_archive);
+                        } else if (id == R.id.nav_documents) {
+                            navController.navigate(R.id.nav_documents);
                         }
                     } catch (Exception e) {
                         Log.e("MainActivity", "Navigation failed", e);
@@ -252,7 +239,50 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        setIntent(intent);
+        // 处理导航（从DocumentViewerActivity返回时）
+        if (navController != null) {
+            handleNavigation(intent);
+        }
         handleIntent(intent);
+    }
+
+    /**
+     * 处理导航逻辑
+     */
+    private void handleNavigation(Intent intent) {
+        if (intent == null || navController == null) {
+            return;
+        }
+        
+        String navigateTo = intent.getStringExtra("navigate_to");
+        int destinationId;
+        
+        if ("documents".equals(navigateTo)) {
+            // 从外部打开PDF后返回，导航到文档列表
+            destinationId = R.id.nav_documents;
+        } else {
+            // 读取默认Tab设置并导航
+            SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
+            int defaultTab = prefs.getInt("default_tab", 0); // 默认为0，即首页
+            
+            // 根据设置选择目标页面ID
+            switch (defaultTab) {
+                case 1: // 标签页
+                    destinationId = R.id.nav_tags;
+                    break;
+                default: // 首页
+                    destinationId = R.id.nav_home;
+                    break;
+            }
+        }
+        
+        // 导航到目标页面
+        try {
+            navController.navigate(destinationId);
+        } catch (Exception e) {
+            Log.e("MainActivity", "导航失败", e);
+        }
     }
 
     private void handleIntent(Intent intent) {

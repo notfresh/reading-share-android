@@ -41,6 +41,12 @@
         android:label="@string/menu_archive"
         tools:layout="@layout/fragment_archive" />
 
+    <fragment
+        android:id="@+id/nav_documents"
+        android:name="person.notfresh.readingshare.ui.document.DocumentFragment"
+        android:label="@string/menu_documents"
+        tools:layout="@layout/fragment_document" />
+
     <action
         android:id="@+id/action_nav_home_to_nav_statistics"
         app:destination="@id/nav_statistics" />

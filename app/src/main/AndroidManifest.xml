@@ -64,6 +64,41 @@
             android:label="@string/read_statistics"
             android:theme="@style/Theme.MyApplication.NoActionBar" />
         <activity
+            android:name=".ui.document.DocumentViewerActivity"
+            android:label="文档阅读"
+            android:theme="@style/Theme.MyApplication.NoActionBar"
+            android:exported="true">
+            <!-- 支持从文件管理器打开PDF -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+            <!-- 支持通过文件扩展名打开 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:pathPattern=".*\\.pdf" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <!-- 支持content:// URI -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+                <data android:scheme="content" />
+            </intent-filter>
+            <!-- 支持分享PDF文件 -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".WebShortcutActivity"
             android:label="快捷方式"
             android:theme="@style/Theme.MyApplication.NoActionBar"

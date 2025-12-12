@@ -10,7 +10,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     private static String databaseName = "links.db";
     //private static final int DATABASE_VERSION = 4;
     // private static final int DATABASE_VERSION = 5; // 添加summary字段
-    private static final int DATABASE_VERSION = 9; // 添加配置表
+    private static final int DATABASE_VERSION = 10; // 添加文档表
 
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
@@ -37,6 +37,18 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String TABLE_CONFIG = "config";
     public static final String COLUMN_CONFIG_KEY = "key";
     public static final String COLUMN_CONFIG_VALUE = "value";
+    
+    // 文档表
+    public static final String TABLE_DOCUMENTS = "documents";
+    public static final String COLUMN_DOC_ID = "_id";
+    public static final String COLUMN_DOC_TITLE = "title";
+    public static final String COLUMN_DOC_FILE_PATH = "file_path";
+    public static final String COLUMN_DOC_TYPE = "document_type";
+    public static final String COLUMN_DOC_TIMESTAMP = "timestamp";
+    public static final String COLUMN_DOC_FILE_SIZE = "file_size";
+    public static final String COLUMN_DOC_REMARK = "remark";
+    public static final String COLUMN_DOC_IS_PINNED = "is_pinned";
+    public static final String COLUMN_DOC_CLICK_COUNT = "click_count";
 
     private static final String SQL_CREATE_LINKS =
             "CREATE TABLE " + TABLE_LINKS + " (" +
@@ -88,6 +100,18 @@ public class LinkDbHelper extends SQLiteOpenHelper {
         "FOREIGN KEY(source_id) REFERENCES rss_sources(id)" +
         ")";
 
+    private static final String SQL_CREATE_DOCUMENTS =
+            "CREATE TABLE " + TABLE_DOCUMENTS + " (" +
+                    COLUMN_DOC_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_DOC_TITLE + " TEXT NOT NULL, " +
+                    COLUMN_DOC_FILE_PATH + " TEXT NOT NULL UNIQUE, " +
+                    COLUMN_DOC_TYPE + " TEXT NOT NULL, " +
+                    COLUMN_DOC_TIMESTAMP + " INTEGER NOT NULL, " +
+                    COLUMN_DOC_FILE_SIZE + " INTEGER DEFAULT 0, " +
+                    COLUMN_DOC_REMARK + " TEXT, " +
+                    COLUMN_DOC_IS_PINNED + " INTEGER DEFAULT 0, " +
+                    COLUMN_DOC_CLICK_COUNT + " INTEGER DEFAULT 0)";
+
     // 原有构造函数，使用默认数据库名
     public LinkDbHelper(Context context) {
         this(context, DEFAULT_DATABASE_NAME);
@@ -126,6 +150,10 @@ public class LinkDbHelper extends SQLiteOpenHelper {
             db.execSQL(CREATE_RSS_SOURCES_TABLE);
             db.execSQL(CREATE_RSS_ENTRIES_TABLE);
             
+            // 创建文档表
+            Log.d("LinkDbHelper", "Creating documents table");
+            db.execSQL(SQL_CREATE_DOCUMENTS);
+            
             Log.d("LinkDbHelper", "Database tables created successfully");
         } catch (Exception e) {
             Log.e("LinkDbHelper", "Error creating database tables", e);
@@ -138,6 +166,12 @@ public class LinkDbHelper extends SQLiteOpenHelper {
         try {
             Log.d("LinkDbHelper", "Upgrading database from " + oldVersion + " to " + newVersion);
 
+            if (oldVersion < 10) {
+                // 版本10：添加文档表
+                db.execSQL(SQL_CREATE_DOCUMENTS);
+                Log.d("LinkDbHelper", "Created documents table");
+            }
+            
             if (oldVersion < 9) {
                 // 版本9：添加配置表
                 db.execSQL(SQL_CREATE_CONFIG);
