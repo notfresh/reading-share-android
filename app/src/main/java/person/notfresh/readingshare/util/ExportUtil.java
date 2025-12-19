@@ -58,7 +58,9 @@ public class ExportUtil {
         // 使用 UTF-8 编码明确指定
         OutputStreamWriter writer = new OutputStreamWriter(
             new FileOutputStream(file), StandardCharsets.UTF_8);
-        writer.write(jsonArray.toString(4)); // 缩进4个空格，使JSON更易读
+        // 将 JSONObject 转义的反斜杠还原（\/ -> /），使 JSON 更易读
+        String jsonString = jsonArray.toString(4).replace("\\/", "/");
+        writer.write(jsonString);
         writer.flush();
         writer.close();
         
@@ -236,7 +238,9 @@ public class ExportUtil {
                     Log.e("ExportUtil", "Error creating JSON object", e);
                 }
             }
-            writer.write(jsonArray.toString(4)); // 缩进4个空格，使JSON更易读
+            // 将 JSONObject 转义的反斜杠还原（\/ -> /），使 JSON 更易读
+            String jsonString = jsonArray.toString(4).replace("\\/", "/");
+            writer.write(jsonString);
         } else {
             // 写入 CSV 数据
             StringBuilder csv = new StringBuilder();
