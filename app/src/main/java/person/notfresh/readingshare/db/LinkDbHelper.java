@@ -10,7 +10,8 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     private static String databaseName = "links.db";
     //private static final int DATABASE_VERSION = 4;
     // private static final int DATABASE_VERSION = 5; // 添加summary字段
-    private static final int DATABASE_VERSION = 10; // 添加文档表
+    //private static final int DATABASE_VERSION = 10; // 添加文档表
+    private static final int DATABASE_VERSION = 11; // 添加主题表
 
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
@@ -49,6 +50,29 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String COLUMN_DOC_REMARK = "remark";
     public static final String COLUMN_DOC_IS_PINNED = "is_pinned";
     public static final String COLUMN_DOC_CLICK_COUNT = "click_count";
+
+    // 主题表
+    public static final String TABLE_SUBJECTS = "subjects";
+    public static final String COLUMN_SUBJECT_ID = "_id";
+    public static final String COLUMN_SUBJECT_TITLE = "title";
+    public static final String COLUMN_SUBJECT_DESCRIBE = "describe";
+    public static final String COLUMN_SUBJECT_CREATE_TIME = "create_time";
+
+    // 主题项表
+    public static final String TABLE_SUBJECT_ITEMS = "subject_items";
+    public static final String COLUMN_SUBJECT_ITEM_ID = "_id";
+    public static final String COLUMN_SUBJECT_ITEM_SUBJECT_ID = "subject_id";
+    public static final String COLUMN_SUBJECT_ITEM_LINK_ID = "link_id";
+    public static final String COLUMN_SUBJECT_ITEM_IS_LINK_DELETED = "is_link_deleted";
+    public static final String COLUMN_SUBJECT_ITEM_REMARK = "remark";
+    public static final String COLUMN_SUBJECT_ITEM_ADD_TIME = "add_time";
+    public static final String COLUMN_SUBJECT_ITEM_ORDER_INDEX = "order_index";
+
+    // 主题项图片表
+    public static final String TABLE_SUBJECT_ITEM_IMAGES = "subject_item_images";
+    public static final String COLUMN_SUBJECT_ITEM_IMAGE_ID = "_id";
+    public static final String COLUMN_SUBJECT_ITEM_IMAGE_ITEM_ID = "subject_item_id";
+    public static final String COLUMN_SUBJECT_ITEM_IMAGE_PATH = "image_path";
 
     private static final String SQL_CREATE_LINKS =
             "CREATE TABLE " + TABLE_LINKS + " (" +
@@ -112,6 +136,31 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     COLUMN_DOC_IS_PINNED + " INTEGER DEFAULT 0, " +
                     COLUMN_DOC_CLICK_COUNT + " INTEGER DEFAULT 0)";
 
+    private static final String SQL_CREATE_SUBJECTS =
+            "CREATE TABLE " + TABLE_SUBJECTS + " (" +
+                    COLUMN_SUBJECT_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_SUBJECT_TITLE + " TEXT NOT NULL, " +
+                    COLUMN_SUBJECT_DESCRIBE + " TEXT, " +
+                    COLUMN_SUBJECT_CREATE_TIME + " INTEGER NOT NULL)";
+
+    private static final String SQL_CREATE_SUBJECT_ITEMS =
+            "CREATE TABLE " + TABLE_SUBJECT_ITEMS + " (" +
+                    COLUMN_SUBJECT_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_SUBJECT_ITEM_SUBJECT_ID + " INTEGER NOT NULL, " +
+                    COLUMN_SUBJECT_ITEM_LINK_ID + " INTEGER, " +
+                    COLUMN_SUBJECT_ITEM_IS_LINK_DELETED + " INTEGER DEFAULT 0, " +
+                    COLUMN_SUBJECT_ITEM_REMARK + " TEXT, " +
+                    COLUMN_SUBJECT_ITEM_ADD_TIME + " INTEGER NOT NULL, " +
+                    COLUMN_SUBJECT_ITEM_ORDER_INDEX + " INTEGER DEFAULT 0, " +
+                    "FOREIGN KEY (" + COLUMN_SUBJECT_ITEM_SUBJECT_ID + ") REFERENCES " + TABLE_SUBJECTS + "(" + COLUMN_SUBJECT_ID + "))";
+
+    private static final String SQL_CREATE_SUBJECT_ITEM_IMAGES =
+            "CREATE TABLE " + TABLE_SUBJECT_ITEM_IMAGES + " (" +
+                    COLUMN_SUBJECT_ITEM_IMAGE_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_SUBJECT_ITEM_IMAGE_ITEM_ID + " INTEGER NOT NULL, " +
+                    COLUMN_SUBJECT_ITEM_IMAGE_PATH + " TEXT NOT NULL, " +
+                    "FOREIGN KEY (" + COLUMN_SUBJECT_ITEM_IMAGE_ITEM_ID + ") REFERENCES " + TABLE_SUBJECT_ITEMS + "(" + COLUMN_SUBJECT_ITEM_ID + "))";
+
     // 原有构造函数，使用默认数据库名
     public LinkDbHelper(Context context) {
         this(context, DEFAULT_DATABASE_NAME);
@@ -154,6 +203,12 @@ public class LinkDbHelper extends SQLiteOpenHelper {
             Log.d("LinkDbHelper", "Creating documents table");
             db.execSQL(SQL_CREATE_DOCUMENTS);
             
+            // 创建主题相关表
+            Log.d("LinkDbHelper", "Creating subject tables");
+            db.execSQL(SQL_CREATE_SUBJECTS);
+            db.execSQL(SQL_CREATE_SUBJECT_ITEMS);
+            db.execSQL(SQL_CREATE_SUBJECT_ITEM_IMAGES);
+            
             Log.d("LinkDbHelper", "Database tables created successfully");
         } catch (Exception e) {
             Log.e("LinkDbHelper", "Error creating database tables", e);
@@ -165,6 +220,14 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         try {
             Log.d("LinkDbHelper", "Upgrading database from " + oldVersion + " to " + newVersion);
+
+            if (oldVersion < 11) {
+                // 版本11：添加主题相关表
+                db.execSQL(SQL_CREATE_SUBJECTS);
+                db.execSQL(SQL_CREATE_SUBJECT_ITEMS);
+                db.execSQL(SQL_CREATE_SUBJECT_ITEM_IMAGES);
+                Log.d("LinkDbHelper", "Created subject tables");
+            }
 
             if (oldVersion < 10) {
                 // 版本10：添加文档表

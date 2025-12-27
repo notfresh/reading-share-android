@@ -44,7 +44,11 @@ import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.LinksAdapter;
 import person.notfresh.readingshare.adapter.TagsAdapter;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.db.SubjectDao;
+import person.notfresh.readingshare.core.model.SubjectItem;
+import person.notfresh.readingshare.core.model.SubjectUtil;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.ui.subject.SelectSubjectDialog;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.ShareUtil;
 
@@ -297,6 +301,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             return true;
         } else if (id == R.id.action_share_csv) {
             shareAsFile(false);  // false 表示 CSV
+            return true;
+        } else if (id == R.id.action_add_to_subject) {
+            addToSubject();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -1145,6 +1152,51 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void shareAsText() {
         Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
         ShareUtil.shareLinksAsText(requireContext(), new ArrayList<>(selectedItems));
+    }
+
+    private void addToSubject() {
+        Set<LinkItem> selectedItems = linksAdapter.getSelectedItems();
+        if (selectedItems.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择要添加的链接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 获取选中的链接ID列表
+        List<Long> linkIds = new ArrayList<>();
+        for (LinkItem item : selectedItems) {
+            linkIds.add(item.getId());
+        }
+
+        // 显示选择主题对话框
+        SelectSubjectDialog dialog = SelectSubjectDialog.newInstance(linkIds);
+        dialog.setOnSubjectSelectedListener((subjectId, selectedLinkIds) -> {
+            // 批量创建 SubjectItem
+            SubjectDao subjectDao = new SubjectDao(requireContext());
+            subjectDao.open();
+            try {
+                // 获取现有主题项，用于计算 orderIndex
+                List<SubjectItem> existingItems = subjectDao.getSubjectItemsBySubjectId(subjectId);
+                
+                // 为每个链接创建 SubjectItem
+                List<SubjectItem> newItems = new ArrayList<>();
+                for (Long linkId : selectedLinkIds) {
+                    SubjectItem item = new SubjectItem(subjectId);
+                    item.setLinkId(linkId);
+                    // 计算 orderIndex
+                    int orderIndex = SubjectUtil.calculateOrderIndex(existingItems, -1);
+                    item.setOrderIndex(orderIndex);
+                    existingItems.add(item); // 添加到列表，用于下一个项的计算
+                    newItems.add(item);
+                }
+                
+                // 批量插入
+                subjectDao.batchInsertSubjectItems(newItems);
+                Toast.makeText(requireContext(), "已添加 " + newItems.size() + " 个链接到主题", Toast.LENGTH_SHORT).show();
+            } finally {
+                subjectDao.close();
+            }
+        });
+        dialog.show(getParentFragmentManager(), "SelectSubjectDialog");
     }
 
     private void shareAsFile(boolean isJson) {

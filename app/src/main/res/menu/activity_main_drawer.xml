@@ -30,6 +30,11 @@
             android:title="@string/menu_documents"
             android:textAppearance="@style/NavigationDrawerText"/>
         <item
+            android:id="@+id/nav_subject"
+            android:icon="@drawable/ic_subject"
+            android:title="@string/menu_subject"
+            android:textAppearance="@style/NavigationDrawerText"/>
+        <item
             android:id="@+id/nav_slideshow"
             android:icon="@drawable/ic_settings"
             android:title="@string/menu_settings"

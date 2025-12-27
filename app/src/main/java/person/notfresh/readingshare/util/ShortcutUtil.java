@@ -12,6 +12,7 @@ import android.graphics.Bitmap;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.WebShortcutActivity;
+import person.notfresh.readingshare.ui.subject.SubjectDetailActivity;
 
 /**
  * 桌面快捷方式创建工具类
@@ -230,6 +231,144 @@ public class ShortcutUtil {
             
         } catch (Exception e) {
             android.util.Log.e("ShortcutUtil", "Failed to create shortcut", e);
+            Toast.makeText(context, "创建快捷方式失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+            return false;
+        }
+    }
+
+    /**
+     * 创建主题桌面快捷方式
+     * @param context 上下文
+     * @param title 快捷方式名称（主题标题）
+     * @param subjectId 主题ID
+     * @return 是否创建成功
+     */
+    public static boolean createSubjectShortcut(Context context, String title, long subjectId) {
+        try {
+            // 优先尝试使用 ShortcutManager（API 26+）
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                if (ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
+                    android.util.Log.d("ShortcutUtil", "Trying ShortcutManager for subject shortcut");
+                    boolean modernSuccess = tryCreateSubjectShortcutModern(context, title, subjectId);
+                    if (modernSuccess) {
+                        return true;
+                    }
+                    android.util.Log.d("ShortcutUtil", "ShortcutManager failed, fallback to INSTALL_SHORTCUT");
+                } else {
+                    android.util.Log.d("ShortcutUtil", "ShortcutManager not supported, use INSTALL_SHORTCUT");
+                }
+            }
+            
+            // 降级到 INSTALL_SHORTCUT 广播方式
+            android.util.Log.d("ShortcutUtil", "Using INSTALL_SHORTCUT method for subject");
+            return createSubjectShortcutLegacy(context, title, subjectId);
+            
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutUtil", "Failed to create subject shortcut", e);
+            Toast.makeText(context, "创建快捷方式失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+            return false;
+        }
+    }
+
+    /**
+     * 使用 ShortcutManager 创建主题快捷方式（现代方式）
+     */
+    private static boolean tryCreateSubjectShortcutModern(Context context, String title, long subjectId) {
+        try {
+            // 生成快捷方式ID（使用主题ID）
+            String shortcutId = "subject_" + subjectId;
+            android.util.Log.d("ShortcutUtil", "Creating subject shortcut: " + title + ", ID: " + shortcutId);
+
+            // 创建Intent，用于点击快捷方式时启动SubjectDetailActivity
+            Intent shortcutIntent = new Intent(context, SubjectDetailActivity.class);
+            shortcutIntent.putExtra(SubjectDetailActivity.EXTRA_SUBJECT_ID, subjectId);
+            shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            // 构建图标
+            IconCompat icon = IconCompat.createWithResource(context, R.mipmap.ic_launcher);
+
+            // 构建快捷方式信息
+            ShortcutInfoCompat shortcutInfo = new ShortcutInfoCompat.Builder(context, shortcutId)
+                    .setShortLabel(title)
+                    .setLongLabel(title)
+                    .setIcon(icon)
+                    .setIntent(shortcutIntent)
+                    .build();
+
+            // 请求创建固定快捷方式
+            boolean success = ShortcutManagerCompat.requestPinShortcut(context, shortcutInfo, null);
+            
+            android.util.Log.d("ShortcutUtil", "requestPinShortcut returned: " + success);
+
+            if (success) {
+                android.util.Log.d("ShortcutUtil", "Subject shortcut creation request sent, ID: " + shortcutId);
+                return true;
+            } else {
+                android.util.Log.w("ShortcutUtil", "Subject shortcut creation request failed");
+                return false;
+            }
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutUtil", "Failed to create subject shortcut with ShortcutManager", e);
+            return false;
+        }
+    }
+
+    /**
+     * 使用 INSTALL_SHORTCUT 广播创建主题快捷方式（传统方式）
+     */
+    private static boolean createSubjectShortcutLegacy(Context context, String title, long subjectId) {
+        try {
+            android.util.Log.d("ShortcutUtil", "Using legacy INSTALL_SHORTCUT method for subject");
+            android.util.Log.d("ShortcutUtil", "Title: " + title + ", SubjectId: " + subjectId);
+            
+            // 创建Intent，用于点击快捷方式时启动SubjectDetailActivity
+            Intent shortcutIntent = new Intent(context, SubjectDetailActivity.class);
+            shortcutIntent.putExtra(SubjectDetailActivity.EXTRA_SUBJECT_ID, subjectId);
+            shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            // 创建快捷方式Intent
+            Intent addIntent = new Intent("com.android.launcher.action.INSTALL_SHORTCUT");
+            addIntent.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
+            addIntent.putExtra(Intent.EXTRA_SHORTCUT_NAME, title);
+            
+            // 使用图标资源ID
+            Intent.ShortcutIconResource iconResource = 
+                Intent.ShortcutIconResource.fromContext(context, R.mipmap.ic_launcher);
+            addIntent.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE, iconResource);
+            android.util.Log.d("ShortcutUtil", "Icon resource: " + iconResource.packageName + "/" + iconResource.resourceName);
+            
+            // 尝试使用默认图标的 Bitmap
+            try {
+                android.graphics.drawable.Drawable drawable = androidx.core.content.ContextCompat.getDrawable(context, R.mipmap.ic_launcher);
+                if (drawable != null && drawable instanceof android.graphics.drawable.BitmapDrawable) {
+                    android.graphics.drawable.BitmapDrawable bitmapDrawable = (android.graphics.drawable.BitmapDrawable) drawable;
+                    android.graphics.Bitmap bitmap = bitmapDrawable.getBitmap();
+                    if (bitmap != null) {
+                        addIntent.putExtra(Intent.EXTRA_SHORTCUT_ICON, bitmap);
+                        android.util.Log.d("ShortcutUtil", "Default bitmap icon set, size: " + bitmap.getWidth() + "x" + bitmap.getHeight());
+                    }
+                }
+            } catch (Exception e) {
+                android.util.Log.w("ShortcutUtil", "Failed to set bitmap icon, using resource ID only", e);
+            }
+            
+            // 设置不允许重复创建
+            addIntent.putExtra("duplicate", false);
+            
+            // 发送广播
+            context.sendBroadcast(addIntent);
+            
+            android.util.Log.d("ShortcutUtil", "INSTALL_SHORTCUT broadcast sent successfully for subject");
+            android.util.Log.d("ShortcutUtil", "Note: Some ROMs (Xiaomi, Huawei) may block this broadcast");
+            
+            Toast.makeText(context, "已添加快捷方式\n如果未显示，某些设备需要手动添加或授权", Toast.LENGTH_LONG).show();
+            return true;
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutUtil", "Failed to create subject shortcut with INSTALL_SHORTCUT", e);
+            android.util.Log.e("ShortcutUtil", "Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            e.printStackTrace();
             Toast.makeText(context, "创建快捷方式失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
             return false;
         }

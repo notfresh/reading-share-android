@@ -64,6 +64,11 @@
             android:label="@string/read_statistics"
             android:theme="@style/Theme.MyApplication.NoActionBar" />
         <activity
+            android:name=".ui.subject.SubjectDetailActivity"
+            android:label="主题详情"
+            android:theme="@style/Theme.MyApplication.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+        <activity
             android:name=".ui.document.DocumentViewerActivity"
             android:label="文档阅读"
             android:theme="@style/Theme.MyApplication.NoActionBar"

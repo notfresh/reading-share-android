@@ -13,12 +13,15 @@
     <string name="menu_rss">RSS</string>
     <string name="menu_archive">归档</string>
     <string name="menu_documents">文档</string>
+    <string name="menu_subject">主题</string>
     
         <string name="menu_settings">设置</string>
 
     <string-array name="default_tabs_array">
         <item>首页</item>
         <item>标签</item>
+        <item>主题</item>
+        <item>RSS</item>
     </string-array>
 
     <string name="fragment_tags">标签</string>

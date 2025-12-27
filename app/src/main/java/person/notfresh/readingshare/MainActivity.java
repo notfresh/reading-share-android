@@ -100,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
             
             // 然后设置 AppBarConfiguration
             mAppBarConfiguration = new AppBarConfiguration.Builder(
-                    R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive, R.id.nav_documents)
+                    R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive, R.id.nav_documents, R.id.nav_subject)
                     .setOpenableLayout(drawer)
                     .build();
 
@@ -139,6 +139,8 @@ public class MainActivity extends AppCompatActivity {
                             navController.navigate(R.id.nav_archive);
                         } else if (id == R.id.nav_documents) {
                             navController.navigate(R.id.nav_documents);
+                        } else if (id == R.id.nav_subject) {
+                            navController.navigate(R.id.nav_subject);
                         }
                     } catch (Exception e) {
                         Log.e("MainActivity", "Navigation failed", e);
@@ -271,10 +273,19 @@ public class MainActivity extends AppCompatActivity {
             
             // 根据设置选择目标页面ID
             switch (defaultTab) {
+                case 0: // 首页
+                    destinationId = R.id.nav_home;
+                    break;
                 case 1: // 标签页
                     destinationId = R.id.nav_tags;
                     break;
-                default: // 首页
+                case 2: // 主题
+                    destinationId = R.id.nav_subject;
+                    break;
+                case 3: // RSS
+                    destinationId = R.id.nav_rss;
+                    break;
+                default: // 默认首页
                     destinationId = R.id.nav_home;
                     break;
             }
