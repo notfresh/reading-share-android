@@ -66,9 +66,7 @@ public class CreateSubjectDialog extends DialogFragment {
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
         boolean isEdit = getArguments() != null && getArguments().getBoolean(ARG_IS_EDIT, false);
-        if (isEdit) {
-            subject = (Subject) getArguments().getSerializable(ARG_SUBJECT);
-        }
+        // subject 已经通过静态变量在 newInstance 中设置了，不需要从 Bundle 获取
 
         View view = LayoutInflater.from(requireContext())
                 .inflate(R.layout.dialog_create_subject, null);
@@ -78,8 +76,8 @@ public class CreateSubjectDialog extends DialogFragment {
 
         // 如果是编辑模式，预填充数据
         if (isEdit && subject != null) {
-            editTitle.setText(subject.getTitle());
-            editDescribe.setText(subject.getDescribe());
+            editTitle.setText(subject.getTitle() != null ? subject.getTitle() : "");
+            editDescribe.setText(subject.getDescribe() != null ? subject.getDescribe() : "");
         }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext())

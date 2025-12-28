@@ -225,12 +225,14 @@ public class AddSubjectItemDialog extends DialogFragment {
     }
 
     private void pickImage() {
-        if (selectedImagePaths.size() >= SubjectItem.MAX_IMAGES) {
+        int remainingSlots = SubjectItem.MAX_IMAGES - selectedImagePaths.size();
+        if (remainingSlots <= 0) {
             Toast.makeText(requireContext(), "最多只能选择 " + SubjectItem.MAX_IMAGES + " 张图片", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        Intent intent = ImageUtil.createGalleryPickerIntent();
+        // 使用多选 Intent
+        Intent intent = ImageUtil.createGalleryPickerIntentMultiple();
         startActivityForResult(intent, REQUEST_CODE_PICK_IMAGE);
     }
 
@@ -239,9 +241,30 @@ public class AddSubjectItemDialog extends DialogFragment {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == REQUEST_CODE_PICK_IMAGE && resultCode == android.app.Activity.RESULT_OK) {
-            if (data != null && data.getData() != null) {
-                Uri imageUri = data.getData();
-                saveImageFromUri(imageUri);
+            if (data != null) {
+                // 处理多选图片
+                if (data.getClipData() != null) {
+                    // 多选模式：从 ClipData 获取多个 URI
+                    android.content.ClipData clipData = data.getClipData();
+                    int count = clipData.getItemCount();
+                    int remainingSlots = SubjectItem.MAX_IMAGES - selectedImagePaths.size();
+                    int toAdd = Math.min(count, remainingSlots);
+                    
+                    if (toAdd < count) {
+                        Toast.makeText(requireContext(), 
+                            "最多只能选择 " + SubjectItem.MAX_IMAGES + " 张图片，已选择前 " + toAdd + " 张", 
+                            Toast.LENGTH_LONG).show();
+                    }
+                    
+                    for (int i = 0; i < toAdd; i++) {
+                        Uri imageUri = clipData.getItemAt(i).getUri();
+                        saveImageFromUri(imageUri);
+                    }
+                } else if (data.getData() != null) {
+                    // 单选模式：从 getData() 获取单个 URI
+                    Uri imageUri = data.getData();
+                    saveImageFromUri(imageUri);
+                }
             }
         }
     }
@@ -384,10 +407,40 @@ public class AddSubjectItemDialog extends DialogFragment {
         @NonNull
         @Override
         public ImageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            // 创建容器布局（FrameLayout），包含图片和删除按钮
+            android.widget.FrameLayout container = new android.widget.FrameLayout(parent.getContext());
+            container.setLayoutParams(new ViewGroup.LayoutParams(200, 200));
+            container.setPadding(8, 8, 8, 8);
+            
+            // 创建图片视图
             android.widget.ImageView imageView = new android.widget.ImageView(parent.getContext());
-            imageView.setLayoutParams(new ViewGroup.LayoutParams(200, 200));
+            android.widget.FrameLayout.LayoutParams imageParams = new android.widget.FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT);
+            imageView.setLayoutParams(imageParams);
             imageView.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-            return new ImageViewHolder(imageView);
+            container.addView(imageView);
+            
+            // 创建删除按钮
+            android.widget.ImageButton deleteButton = new android.widget.ImageButton(parent.getContext());
+            android.widget.FrameLayout.LayoutParams deleteParams = new android.widget.FrameLayout.LayoutParams(
+                    36, 36);
+            deleteParams.gravity = android.view.Gravity.TOP | android.view.Gravity.END;
+            deleteParams.setMargins(0, 0, 4, 4);
+            deleteButton.setLayoutParams(deleteParams);
+            // 使用系统删除图标
+            deleteButton.setImageResource(android.R.drawable.ic_menu_delete);
+            deleteButton.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            deleteButton.setPadding(6, 6, 6, 6);
+            // 设置半透明黑色圆形背景
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            bg.setColor(0xCC000000); // 半透明黑色
+            deleteButton.setBackground(bg);
+            deleteButton.setColorFilter(android.graphics.Color.WHITE); // 图标设为白色
+            container.addView(deleteButton);
+            
+            return new ImageViewHolder(container, imageView, deleteButton);
         }
 
         @Override
@@ -403,11 +456,23 @@ public class AddSubjectItemDialog extends DialogFragment {
 
         class ImageViewHolder extends RecyclerView.ViewHolder {
             private android.widget.ImageView imageView;
+            private android.widget.ImageButton deleteButton;
 
-            ImageViewHolder(@NonNull View itemView) {
+            ImageViewHolder(@NonNull View itemView, android.widget.ImageView imageView, android.widget.ImageButton deleteButton) {
                 super(itemView);
-                imageView = (android.widget.ImageView) itemView;
-                imageView.setOnLongClickListener(v -> {
+                this.imageView = imageView;
+                this.deleteButton = deleteButton;
+                
+                // 删除按钮点击事件
+                deleteButton.setOnClickListener(v -> {
+                    int position = getAdapterPosition();
+                    if (position != RecyclerView.NO_POSITION && removeListener != null) {
+                        removeListener.onRemove(imagePaths.get(position));
+                    }
+                });
+                
+                // 保留长按删除功能（备用）
+                itemView.setOnLongClickListener(v -> {
                     int position = getAdapterPosition();
                     if (position != RecyclerView.NO_POSITION && removeListener != null) {
                         removeListener.onRemove(imagePaths.get(position));

@@ -327,10 +327,22 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             Toast.makeText(requireContext(), "请先选择要添加的链接", Toast.LENGTH_SHORT).show();
             return;
         }
+        // 复用辅助方法
+        addLinksToSubject(new ArrayList<>(selectedItems));
+    }
 
-        // 获取选中的链接ID列表
+    /**
+     * 添加链接到主题（辅助方法，可被单个或多个链接调用）
+     */
+    private void addLinksToSubject(List<LinkItem> items) {
+        if (items == null || items.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择要添加的链接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 获取链接ID列表
         List<Long> linkIds = new ArrayList<>();
-        for (LinkItem item : selectedItems) {
+        for (LinkItem item : items) {
             linkIds.add(item.getId());
         }
 
@@ -364,6 +376,14 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             }
         });
         dialog.show(getParentFragmentManager(), "SelectSubjectDialog");
+    }
+
+    @Override
+    public void onAddToSubject(LinkItem item) {
+        // 单个链接添加到主题，复用辅助方法
+        List<LinkItem> items = new ArrayList<>();
+        items.add(item);
+        addLinksToSubject(items);
     }
 
     @Override

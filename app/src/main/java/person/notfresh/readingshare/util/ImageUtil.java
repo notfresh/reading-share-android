@@ -17,12 +17,23 @@ import java.io.InputStream;
 public class ImageUtil {
 
     /**
-     * 创建相册选择 Intent
+     * 创建相册选择 Intent（单选）
      * @return 相册选择 Intent
      */
     public static Intent createGalleryPickerIntent() {
         return new Intent(Intent.ACTION_PICK, 
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+    }
+
+    /**
+     * 创建相册选择 Intent（多选）
+     * @return 支持多选的相册选择 Intent
+     */
+    public static Intent createGalleryPickerIntentMultiple() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        return intent;
     }
 
     /**

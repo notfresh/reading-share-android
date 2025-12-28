@@ -1,5 +1,8 @@
 package person.notfresh.readingshare.ui.subject;
 
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -18,14 +21,13 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
-import android.content.Intent;
-
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.SubjectAdapter;
 import person.notfresh.readingshare.core.model.Subject;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.ui.subject.CreateSubjectDialog;
 import person.notfresh.readingshare.ui.subject.SubjectDetailActivity;
+import person.notfresh.readingshare.util.ImageUtil;
 import person.notfresh.readingshare.util.ShortcutUtil;
 
 /**
@@ -33,10 +35,12 @@ import person.notfresh.readingshare.util.ShortcutUtil;
  */
 public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjectClickListener {
     private static final String TAG = "SubjectFragment";
+    private static final int REQUEST_CODE_PICK_ICON = 1001;
 
     private RecyclerView recyclerView;
     private SubjectAdapter adapter;
     private SubjectDao subjectDao;
+    private Subject pendingIconSubject; // 临时存储待处理图标的主题
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -102,8 +106,21 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
 
             @Override
             public void onAddToDesktop(Subject subject) {
-                // 创建主题快捷方式
+                // 这个方法现在不会被直接调用，因为 SubjectAdapter 会显示图标选择对话框
+                // 保留此方法以保持接口兼容性
                 createSubjectShortcut(subject);
+            }
+
+            @Override
+            public void onRequestCustomIcon(Subject subject) {
+                Log.d(TAG, "onRequestCustomIcon: " + subject.getTitle());
+                
+                // 保存临时数据
+                pendingIconSubject = subject;
+                
+                // 打开相册选择图片
+                Intent intent = ImageUtil.createGalleryPickerIntent();
+                startActivityForResult(intent, REQUEST_CODE_PICK_ICON);
             }
         });
         recyclerView.setAdapter(adapter);
@@ -153,6 +170,54 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
     private void createSubjectShortcut(Subject subject) {
         String title = subject.getTitle() != null ? subject.getTitle() : "主题";
         ShortcutUtil.createSubjectShortcut(requireContext(), title, subject.getId());
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        
+        if (requestCode == REQUEST_CODE_PICK_ICON && resultCode == android.app.Activity.RESULT_OK) {
+            if (data != null && data.getData() != null && pendingIconSubject != null) {
+                Uri selectedImageUri = data.getData();
+                Log.d(TAG, "图片选择成功: " + selectedImageUri);
+                
+                try {
+                    // 1. 将 URI 转换为 Bitmap
+                    Bitmap bitmap = ImageUtil.uriToBitmap(requireContext(), selectedImageUri);
+                    
+                    if (bitmap != null) {
+                        // 2. 缩放为正方形（快捷方式图标需要 256x256）
+                        Bitmap squareBitmap = ImageUtil.resizeToSquareForShortcut(bitmap);
+                        
+                        // 3. 释放原图内存
+                        if (squareBitmap != bitmap) {
+                            bitmap.recycle();
+                        }
+                        
+                        // 4. 创建快捷方式
+                        adapter.createShortcutWithCustomIcon(
+                            requireContext(), 
+                            pendingIconSubject, 
+                            squareBitmap
+                        );
+                        
+                        Log.d(TAG, "快捷方式创建成功（使用自定义图标）");
+                    } else {
+                        Toast.makeText(requireContext(), "无法读取图片", Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "无法从 URI 读取图片");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "处理图片时出错: " + e.getMessage(), e);
+                    Toast.makeText(requireContext(), "处理图片时出错: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                } finally {
+                    // 清理临时数据
+                    pendingIconSubject = null;
+                }
+            } else {
+                Log.w(TAG, "图片选择失败：data 或 pendingIconSubject 为 null");
+                pendingIconSubject = null;
+            }
+        }
     }
 }
 

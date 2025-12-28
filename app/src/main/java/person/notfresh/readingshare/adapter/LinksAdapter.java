@@ -93,6 +93,11 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
          * @param url 链接URL
          */
         void onRequestCustomIcon(LinkItem item, String url);
+        /**
+         * 添加单个链接到主题
+         * @param item 链接项
+         */
+        void onAddToSubject(LinkItem item);
 //        void updateLinkRemark(LinkItem item);
 //        void onLinkRemarkUpdated(LinkItem item);
     }
@@ -573,6 +578,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         popup.getMenu().add(0, 5, 0, "多选模式");
         popup.getMenu().add(0, 6, 0, "获取摘要");
         popup.getMenu().add(0, 7, 0, "添加到桌面");
+        popup.getMenu().add(0, 8, 0, "添加到主题");
         
         popup.setOnMenuItemClickListener(menuItem -> {
             switch (menuItem.getItemId()) {
@@ -663,6 +669,13 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     
                     // 显示图标选择对话框
                     showIconSelectionDialog(view, item, url);
+                    return true;
+                case 8:
+                    // 添加到主题
+                    Log.d("LinksAdapter", "添加到主题");
+                    if (listener != null) {
+                        listener.onAddToSubject(item);
+                    }
                     return true;
                 default:
                     return false;

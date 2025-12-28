@@ -199,21 +199,28 @@ public class SubjectDetailActivity extends AppCompatActivity implements
                                  @NonNull RecyclerView.ViewHolder viewHolder) {
                 super.clearView(recyclerView, viewHolder);
                 
-                // 拖拽结束，重新计算 orderIndex 并保存
+                // 拖拽结束，按照当前列表顺序重新分配 orderIndex 并保存
+                // 注意：不要先排序，因为 onMove 已经改变了列表顺序，直接按当前顺序分配即可
                 List<SubjectItem> items = adapter.getItems();
-                SubjectUtil.sortByOrderIndex(items); // 先按当前 orderIndex 排序
                 
-                // 重新分配 orderIndex
+                // 按照当前列表顺序（已经是拖拽后的顺序）重新分配 orderIndex
                 for (int i = 0; i < items.size(); i++) {
                     items.get(i).setOrderIndex(i * SubjectUtil.ORDER_INTERVAL);
                 }
                 
                 // 保存到数据库
+                // 注意：updateSubjectItem 内部已经有事务处理，但为了批量更新的原子性，可以优化
+                int successCount = 0;
                 for (SubjectItem item : items) {
-                    subjectDao.updateSubjectItem(item);
+                    if (subjectDao.updateSubjectItem(item)) {
+                        successCount++;
+                    }
                 }
                 
-                Log.d(TAG, "拖拽排序完成，已更新 orderIndex");
+                Log.d(TAG, "拖拽排序完成，已更新 " + successCount + "/" + items.size() + " 个主题项的 orderIndex");
+                
+                // 验证：重新加载一次，确保顺序正确
+                // loadSubjectItems(); // 可选：如果需要立即验证，可以取消注释
             }
         };
 

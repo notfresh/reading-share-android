@@ -18,6 +18,7 @@ import java.util.List;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.core.model.Subject;
+import person.notfresh.readingshare.util.ShortcutUtil;
 
 /**
  * 主题列表适配器
@@ -36,6 +37,11 @@ public class SubjectAdapter extends RecyclerView.Adapter<SubjectAdapter.SubjectV
         void onEditSubject(Subject subject);
         void onDeleteSubject(Subject subject);
         void onAddToDesktop(Subject subject);
+        /**
+         * 请求选择自定义图标（从相册选择图片）
+         * @param subject 主题
+         */
+        void onRequestCustomIcon(Subject subject);
     }
 
     public SubjectAdapter(Context context) {
@@ -134,7 +140,7 @@ public class SubjectAdapter extends RecyclerView.Adapter<SubjectAdapter.SubjectV
                                 .show();
                         return true;
                     case 3: // 添加到桌面
-                        actionListener.onAddToDesktop(subject);
+                        showIconSelectionDialog(view, subject);
                         return true;
                     default:
                         return false;
@@ -142,6 +148,70 @@ public class SubjectAdapter extends RecyclerView.Adapter<SubjectAdapter.SubjectV
             });
 
             popup.show();
+        }
+
+        /**
+         * 显示图标选择对话框
+         */
+        private void showIconSelectionDialog(View view, Subject subject) {
+            String[] options = {"从相册选择", "使用默认图标"};
+            
+            new AlertDialog.Builder(context)
+                    .setTitle("选择快捷方式图标")
+                    .setItems(options, (dialog, which) -> {
+                        switch (which) {
+                            case 0:
+                                // 从相册选择
+                                if (actionListener != null) {
+                                    actionListener.onRequestCustomIcon(subject);
+                                } else {
+                                    Toast.makeText(context, "无法打开相册", Toast.LENGTH_SHORT).show();
+                                }
+                                break;
+                            case 1:
+                                // 使用默认图标
+                                createShortcutWithDefaultIcon(view, subject);
+                                break;
+                        }
+                    })
+                    .setNegativeButton("取消", null)
+                    .show();
+        }
+
+        /**
+         * 使用默认图标创建快捷方式
+         */
+        private void createShortcutWithDefaultIcon(View view, Subject subject) {
+            String title = subject.getTitle() != null ? subject.getTitle() : "主题";
+            boolean success = ShortcutUtil.createSubjectShortcut(
+                context, 
+                title, 
+                subject.getId(),
+                null  // 使用默认图标
+            );
+            if (success) {
+                Toast.makeText(context, "已添加快捷方式", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(context, "创建快捷方式失败", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    /**
+     * 使用自定义图标创建快捷方式（由 Fragment 调用）
+     */
+    public void createShortcutWithCustomIcon(Context context, Subject subject, android.graphics.Bitmap customIcon) {
+        String title = subject.getTitle() != null ? subject.getTitle() : "主题";
+        boolean success = ShortcutUtil.createSubjectShortcut(
+            context, 
+            title, 
+            subject.getId(),
+            customIcon
+        );
+        if (success) {
+            Toast.makeText(context, "已添加快捷方式", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(context, "创建快捷方式失败", Toast.LENGTH_SHORT).show();
         }
     }
 }

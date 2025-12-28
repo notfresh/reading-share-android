@@ -367,6 +367,11 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         // 空实现，暂不支持自定义图标
     }
 
+    @Override
+    public void onAddToSubject(LinkItem item) {
+
+    }
+
     private void scrollToDate(RecyclerView recyclerView, String date) {
         // 找到日期对应的位置
         int position = adapter.getPositionForDate(date);

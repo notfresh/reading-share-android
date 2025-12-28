@@ -22,6 +22,13 @@
             android:orientation="horizontal"
             android:visibility="gone"/>
 
+        <!-- 空白区域（用于只有图片时的长按触发） -->
+        <TextView
+            android:id="@+id/text_empty_area"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:visibility="gone"/>
+
         <!-- 链接区域 -->
         <LinearLayout
             android:id="@+id/layout_link"
