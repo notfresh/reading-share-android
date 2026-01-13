@@ -124,23 +124,23 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate: 开始");
+        Log.d(TAG, "onCreate: start");
         try {
             setHasOptionsMenu(true);
-            Log.d(TAG, "onCreate: setHasOptionsMenu(true) 成功");
+            Log.d(TAG, "onCreate: setHasOptionsMenu(true) success");
         } catch (Exception e) {
-            Log.e(TAG, "onCreate: 异常", e);
+            Log.e(TAG, "onCreate: exception", e);
             throw e;
         }
     }
 
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
-        Log.d(TAG, "onCreateOptionsMenu: 开始");
+        Log.d(TAG, "onCreateOptionsMenu: start");
         try {
             menu.clear();
             inflater.inflate(R.menu.home_menu, menu);
-            Log.d(TAG, "onCreateOptionsMenu: 菜单加载成功");
+            Log.d(TAG, "onCreateOptionsMenu: menu loaded successfully");
             
             shareMenuItem = menu.findItem(R.id.action_share);
             closeSelectionMenuItem = menu.findItem(R.id.action_close_selection);
@@ -151,7 +151,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             exitSortMenuItem = menu.findItem(R.id.action_exit_sort);  // 退出排序菜单项
             MenuItem statisticsMenuItem = menu.findItem(R.id.action_statistics);  // 新增的统计
             
-            Log.d(TAG, "onCreateOptionsMenu: 菜单项查找完成 - share=" + (shareMenuItem != null) + 
+            Log.d(TAG, "onCreateOptionsMenu: menu items found - share=" + (shareMenuItem != null) + 
                     ", close=" + (closeSelectionMenuItem != null) + 
                     ", enter=" + (enterSelectionMenuItem != null) +
                     ", selectAll=" + (selectAllMenuItem != null) +
@@ -179,9 +179,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             updateMenuVisibility();
 
             super.onCreateOptionsMenu(menu, inflater);
-            Log.d(TAG, "onCreateOptionsMenu: 完成");
+            Log.d(TAG, "onCreateOptionsMenu: completed");
         } catch (Exception e) {
-            Log.e(TAG, "onCreateOptionsMenu: 异常", e);
+            Log.e(TAG, "onCreateOptionsMenu: exception", e);
             // 不抛出异常，允许继续执行
             super.onCreateOptionsMenu(menu, inflater);
         }
@@ -241,11 +241,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                             ViewGroup container, Bundle savedInstanceState) {
-        Log.d(TAG, "onCreateView: 开始");
+        Log.d(TAG, "onCreateView: start");
         try {
             binding = FragmentHomeBinding.inflate(inflater, container, false);
             View root = binding.getRoot();
-            Log.d(TAG, "onCreateView: 布局加载成功");
+            Log.d(TAG, "onCreateView: layout loaded successfully");
 
             // 检查是否有选定的日期
             String selectedDate = null;
@@ -253,15 +253,15 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 selectedDate = getArguments().getString("selected_date");
             }
 
-            Log.d(TAG, "onCreateView: 初始化LinkDao");
+            Log.d(TAG, "onCreateView: initializing LinkDao");
             linkDao = new LinkDao(requireContext());
             linkDao.open();
-            Log.d(TAG, "onCreateView: LinkDao打开成功");
+            Log.d(TAG, "onCreateView: LinkDao opened successfully");
 
-            Log.d(TAG, "onCreateView: 初始化RecyclerView和Adapter");
+            Log.d(TAG, "onCreateView: initializing RecyclerView and Adapter");
             RecyclerView recyclerView = binding.recyclerView;
             if (recyclerView == null) {
-                Log.e(TAG, "onCreateView: recyclerView为null！");
+                Log.e(TAG, "onCreateView: recyclerView is null!");
                 throw new IllegalStateException("recyclerView为null");
             }
             
@@ -269,7 +269,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             adapter.setOnLinkActionListener(this);
             recyclerView.setAdapter(adapter);
             recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
-            Log.d(TAG, "onCreateView: RecyclerView设置完成");
+            Log.d(TAG, "onCreateView: RecyclerView setup completed");
 
             // 启用滑动操作功能
             adapter.enableSwipeActions(recyclerView);
@@ -283,7 +283,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             });
 
             // 设置搜索框
-            Log.d(TAG, "onCreateView: 初始化搜索框");
+            Log.d(TAG, "onCreateView: initializing search box");
             searchEditText = binding.searchEditText;
             if (searchEditText != null) {
                 searchEditText.addTextChangedListener(new TextWatcher() {
@@ -301,39 +301,32 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     }
                 });
             } else {
-                Log.w(TAG, "onCreateView: searchEditText为null");
+                Log.w(TAG, "onCreateView: searchEditText is null");
             }
 
             // ========== 初始化标签管理UI（阶段2启用）==========
-            Log.d(TAG, "onCreateView: 初始化标签管理UI");
+            Log.d(TAG, "onCreateView: initializing tag management UI");
             try {
                 initTagRecyclerView(root);
-                Log.d(TAG, "onCreateView: 标签管理UI初始化成功");
+                Log.d(TAG, "onCreateView: tag management UI initialized successfully");
             } catch (Exception e) {
-                Log.e(TAG, "onCreateView: 标签管理UI初始化失败", e);
+                Log.e(TAG, "onCreateView: tag management UI initialization failed", e);
                 // 不抛出异常，允许继续执行
             }
             
             // ========== 统一数据加载（阶段2）==========
-            Log.d(TAG, "onCreateView: 开始加载数据，selectedTagNames.size=" + selectedTagNames.size());
-            // 初始加载：如果没有选中标签，使用原有逻辑；如果有选中标签，使用筛选逻辑
-            if (selectedTagNames.isEmpty()) {
-                // 原有逻辑：加载所有链接
-                Log.d(TAG, "onCreateView: 使用原有逻辑加载所有链接");
-                refreshLinksList();
-            } else {
-                // 新逻辑：根据选中的标签筛选
-                Log.d(TAG, "onCreateView: 使用标签筛选逻辑");
-                updateContentBySelectedTags();
-            }
+            Log.d(TAG, "onCreateView: start loading data, selectedTagNames.size=" + selectedTagNames.size());
             
-            // 加载标签列表
-            Log.d(TAG, "onCreateView: 开始加载标签列表");
+            // 注意：数据加载延迟到onViewCreated，确保RecyclerView已经完成布局
+            
+            // 异步加载标签列表，并在完成后恢复选择状态
+            // 如果恢复了标签选择，会触发过滤，覆盖之前的所有链接显示
+            Log.d(TAG, "onCreateView: start async loading tag list");
             try {
                 loadTags();
             } catch (Exception e) {
-                Log.e(TAG, "onCreateView: 加载标签列表失败", e);
-                // 不抛出异常，允许继续执行
+                Log.e(TAG, "onCreateView: failed to load tag list", e);
+                // 如果加载标签失败，至少已经显示了所有链接，不影响用户体验
             }
 
             // 如果有选定日期，滚动到对应位置
@@ -341,12 +334,92 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 scrollToDate(recyclerView, selectedDate);
             }
 
-            Log.d(TAG, "onCreateView: 完成");
+            Log.d(TAG, "onCreateView: completed");
             return root;
         } catch (Exception e) {
-            Log.e(TAG, "onCreateView: 发生异常", e);
+            Log.e(TAG, "onCreateView: exception occurred", e);
             throw e;
         }
+    }
+    
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        Log.d(TAG, "onViewCreated: start");
+        
+        // 在onViewCreated中直接加载所有链接，此时RecyclerView已经完成布局测量
+        // 初始化时直接加载所有链接，确保用户能立即看到内容
+        if (linkDao != null && adapter != null) {
+            Log.d(TAG, "onViewCreated: loading all links directly");
+            List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
+            Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
+            
+            // 计算总链接数
+            int totalLinks = pinnedLinks.size();
+            for (List<LinkItem> links : groupedLinks.values()) {
+                totalLinks += links.size();
+            }
+            
+            Log.d(TAG, "onViewCreated: loaded links - pinned=" + pinnedLinks.size() 
+                    + ", groups=" + groupedLinks.size() + ", total links=" + totalLinks);
+            
+            // 直接设置数据到adapter
+            adapter.setPinnedLinks(pinnedLinks);
+            adapter.setGroupedLinks(groupedLinks);
+            Log.d(TAG, "onViewCreated: data set to adapter, itemCount=" + adapter.getItemCount());
+            
+            // 检查RecyclerView状态
+            RecyclerView recyclerView = binding.recyclerView;
+            if (recyclerView != null) {
+                Log.d(TAG, "onViewCreated: RecyclerView state - visibility=" + recyclerView.getVisibility() 
+                        + " (0=VISIBLE), width=" + recyclerView.getWidth() 
+                        + ", height=" + recyclerView.getHeight()
+                        + ", isShown=" + recyclerView.isShown()
+                        + ", hasFixedSize=" + recyclerView.hasFixedSize());
+                
+                // 确保RecyclerView可见
+                if (recyclerView.getVisibility() != View.VISIBLE) {
+                    Log.w(TAG, "onViewCreated: RecyclerView is not visible, setting to VISIBLE");
+                    recyclerView.setVisibility(View.VISIBLE);
+                }
+                
+                // 检查LayoutManager
+                RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
+                if (layoutManager != null) {
+                    Log.d(TAG, "onViewCreated: LayoutManager exists, itemCount=" + layoutManager.getItemCount());
+                } else {
+                    Log.e(TAG, "onViewCreated: LayoutManager is null!");
+                }
+                
+                // 强制刷新
+                recyclerView.post(() -> {
+                    Log.d(TAG, "onViewCreated: post - RecyclerView width=" + recyclerView.getWidth() 
+                            + ", height=" + recyclerView.getHeight()
+                            + ", adapter itemCount=" + (adapter != null ? adapter.getItemCount() : 0));
+                    if (adapter != null) {
+                        adapter.notifyDataSetChanged();
+                        Log.d(TAG, "onViewCreated: post - notifyDataSetChanged called");
+                    }
+                });
+            } else {
+                Log.e(TAG, "onViewCreated: RecyclerView is null!");
+            }
+        } else {
+            Log.e(TAG, "onViewCreated: linkDao or adapter is null!");
+        }
+        
+        // 检查是否有选定的日期，滚动到对应位置
+        if (getArguments() != null) {
+            String selectedDate = getArguments().getString("selected_date");
+            if (selectedDate != null && binding != null) {
+                RecyclerView recyclerView = binding.recyclerView;
+                if (recyclerView != null) {
+                    scrollToDate(recyclerView, selectedDate);
+                }
+            }
+        }
+        
+        Log.d(TAG, "onViewCreated: completed");
     }
     
     // ========== 标签管理：加载与初始化 ==========
@@ -356,10 +429,10 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * 从TagsFragment合并，阶段2启用标签区域显示
      */
     private void initTagRecyclerView(View root) {
-        Log.d(TAG, "initTagRecyclerView: 开始");
+        Log.d(TAG, "initTagRecyclerView: start");
         try {
             if (root == null) {
-                Log.e(TAG, "initTagRecyclerView: root为null！");
+                Log.e(TAG, "initTagRecyclerView: root is null!");
                 return;
             }
             
@@ -367,13 +440,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             tagsContainer = root.findViewById(R.id.tags_container);
             if (tagsContainer != null) {
                 tagsContainer.setVisibility(View.VISIBLE);  // 阶段2：启用标签区域显示
-                Log.d(TAG, "initTagRecyclerView: 标签容器已显示");
+                Log.d(TAG, "initTagRecyclerView: tags container displayed");
             } else {
-                Log.w(TAG, "initTagRecyclerView: tagsContainer为null，可能布局中没有此ID");
+                Log.w(TAG, "initTagRecyclerView: tagsContainer is null, may not exist in layout");
             }
         
             // 初始化固定标签 RecyclerView
-            Log.d(TAG, "initTagRecyclerView: 初始化固定标签RecyclerView");
+            Log.d(TAG, "initTagRecyclerView: initializing fixed tags RecyclerView");
             tagsRecyclerView = root.findViewById(R.id.recycler_tags_fixed);
             if (tagsRecyclerView != null) {
                 try {
@@ -394,16 +467,16 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         }
                     });
                     tagsRecyclerView.setAdapter(tagsAdapter);
-                    Log.d(TAG, "initTagRecyclerView: 固定标签RecyclerView初始化成功");
+                    Log.d(TAG, "initTagRecyclerView: fixed tags RecyclerView initialized successfully");
                 } catch (Exception e) {
-                    Log.e(TAG, "initTagRecyclerView: 固定标签RecyclerView初始化失败", e);
+                    Log.e(TAG, "initTagRecyclerView: fixed tags RecyclerView initialization failed", e);
                 }
             } else {
-                Log.w(TAG, "initTagRecyclerView: recycler_tags_fixed为null");
+                Log.w(TAG, "initTagRecyclerView: recycler_tags_fixed is null");
             }
         
             // 初始化折叠标签 RecyclerView
-            Log.d(TAG, "initTagRecyclerView: 初始化折叠标签RecyclerView");
+            Log.d(TAG, "initTagRecyclerView: initializing collapsed tags RecyclerView");
             tagsRecyclerViewCollapsed = root.findViewById(R.id.recycler_tags_collapsed);
             if (tagsRecyclerViewCollapsed != null) {
                 try {
@@ -424,12 +497,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         }
                     });
                     tagsRecyclerViewCollapsed.setAdapter(tagsAdapterCollapsed);
-                    Log.d(TAG, "initTagRecyclerView: 折叠标签RecyclerView初始化成功");
+                    Log.d(TAG, "initTagRecyclerView: collapsed tags RecyclerView initialized successfully");
                 } catch (Exception e) {
-                    Log.e(TAG, "initTagRecyclerView: 折叠标签RecyclerView初始化失败", e);
+                    Log.e(TAG, "initTagRecyclerView: collapsed tags RecyclerView initialization failed", e);
                 }
             } else {
-                Log.w(TAG, "initTagRecyclerView: recycler_tags_collapsed为null");
+                Log.w(TAG, "initTagRecyclerView: recycler_tags_collapsed is null");
             }
         
         // 初始化展开更多标签按钮
@@ -499,26 +572,26 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             try {
                 loadHighlightedTags();
             } catch (Exception e) {
-                Log.e(TAG, "initTagRecyclerView: 加载高亮标签设置失败", e);
+                Log.e(TAG, "initTagRecyclerView: failed to load highlighted tags settings", e);
             }
             
-            Log.d(TAG, "initTagRecyclerView: 完成");
+            Log.d(TAG, "initTagRecyclerView: completed");
         } catch (Exception e) {
-            Log.e(TAG, "initTagRecyclerView: 发生异常", e);
+            Log.e(TAG, "initTagRecyclerView: exception occurred", e);
             throw e;
         }
     }
 
     @Override
     public void onDestroyView() {
-        Log.d(TAG, "onDestroyView: 开始");
+        Log.d(TAG, "onDestroyView: start");
         super.onDestroyView();
         binding = null;
         if (linkDao != null) {
             linkDao.close();
-            Log.d(TAG, "onDestroyView: LinkDao已关闭");
+            Log.d(TAG, "onDestroyView: LinkDao closed");
         }
-        Log.d(TAG, "onDestroyView: 完成");
+        Log.d(TAG, "onDestroyView: completed");
     }
 
     // ========== 实现接口方法：链接操作 ==========
@@ -546,7 +619,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             loadTags();
         }
         
-        Log.d("HomeFragment", "链接删除完成，UI已更新");
+        Log.d("HomeFragment", "Link deletion completed, UI updated");
     }
 
     @Override
@@ -852,7 +925,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     @Override
     public void onPinStatusChanged() {
-        Log.d("HomeFragment", "onPinStatusChanged 被调用");
+        Log.d("HomeFragment", "onPinStatusChanged called");
         // 统一刷新：根据是否有标签筛选来决定刷新方式
         refreshLinksList();
     }
@@ -866,14 +939,14 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * - 如果选中了标签：使用筛选逻辑（显示筛选后的链接）
      */
     private void refreshLinksList() {
-        Log.d(TAG, "refreshLinksList: 开始，selectedTagNames.size=" + selectedTagNames.size());
+        Log.d(TAG, "refreshLinksList: start, selectedTagNames.size=" + selectedTagNames.size());
         try {
             if (linkDao == null) {
-                Log.e(TAG, "refreshLinksList: linkDao为null！");
+                Log.e(TAG, "refreshLinksList: linkDao is null!");
                 return;
             }
             if (adapter == null) {
-                Log.e(TAG, "refreshLinksList: adapter为null！");
+                Log.e(TAG, "refreshLinksList: adapter is null!");
                 return;
             }
             
@@ -881,18 +954,42 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 // 原有逻辑：加载所有链接（HomeFragment原有行为）
                 List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
                 Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
-                Log.d(TAG, "refreshLinksList: 刷新链接列表（全部）：置顶=" + pinnedLinks.size() + ", 分组=" + groupedLinks.size());
+                
+                // 计算总链接数
+                int totalLinks = pinnedLinks.size();
+                for (List<LinkItem> links : groupedLinks.values()) {
+                    totalLinks += links.size();
+                }
+                
+                Log.d(TAG, "refreshLinksList: refresh link list (all): pinned=" + pinnedLinks.size() 
+                    + ", groups=" + groupedLinks.size() + ", total links=" + totalLinks);
+                
+                if (totalLinks == 0) {
+                    Log.w(TAG, "refreshLinksList: WARNING! No link data found");
+                }
+                
+                // 直接设置数据到adapter（onCreateView时RecyclerView已经准备好）
+                Log.d(TAG, "refreshLinksList: setting data to adapter directly");
                 adapter.setPinnedLinks(pinnedLinks);
                 adapter.setGroupedLinks(groupedLinks);
-                adapter.notifyDataSetChanged();
+                // setGroupedLinks内部已经调用了notifyDataSetChanged，不需要再次调用
+                Log.d(TAG, "refreshLinksList: data set to adapter, notifyDataSetChanged called");
+                
+                // 验证数据是否设置成功
+                RecyclerView recyclerView = binding.recyclerView;
+                if (recyclerView != null && adapter != null) {
+                    Log.d(TAG, "refreshLinksList: RecyclerView visibility=" + recyclerView.getVisibility() 
+                            + ", width=" + recyclerView.getWidth() + ", height=" + recyclerView.getHeight()
+                            + ", adapter itemCount=" + adapter.getItemCount());
+                }
             } else {
                 // 新逻辑：根据选中的标签筛选
-                Log.d(TAG, "refreshLinksList: 使用标签筛选逻辑");
+                Log.d(TAG, "refreshLinksList: use tag filter logic");
                 updateContentBySelectedTags();
             }
-            Log.d(TAG, "refreshLinksList: 完成");
+            Log.d(TAG, "refreshLinksList: completed");
         } catch (Exception e) {
-            Log.e(TAG, "refreshLinksList: 刷新链接列表失败", e);
+            Log.e(TAG, "refreshLinksList: failed to refresh link list", e);
         }
     }
     
@@ -997,7 +1094,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (requestCode == REQUEST_CODE_PICK_ICON && resultCode == android.app.Activity.RESULT_OK) {
             if (data != null && data.getData() != null && pendingIconItem != null) {
                 Uri selectedImageUri = data.getData();
-                Log.d("HomeFragment", "图片选择成功: " + selectedImageUri);
+                Log.d("HomeFragment", "Image selection successful: " + selectedImageUri);
                 
                 try {
                     // 1. 将 URI 转换为 Bitmap
@@ -1020,13 +1117,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                             squareBitmap
                         );
                         
-                        Log.d("HomeFragment", "快捷方式创建成功（使用自定义图标）");
+                        Log.d("HomeFragment", "Shortcut created successfully (using custom icon)");
                     } else {
                         Toast.makeText(requireContext(), "无法读取图片", Toast.LENGTH_SHORT).show();
-                        Log.e("HomeFragment", "无法从 URI 读取图片");
+                        Log.e("HomeFragment", "Failed to read image from URI");
                     }
                 } catch (Exception e) {
-                    Log.e("HomeFragment", "处理图片时出错: " + e.getMessage(), e);
+                    Log.e("HomeFragment", "Error processing image: " + e.getMessage(), e);
                     Toast.makeText(requireContext(), "处理图片时出错: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 } finally {
                     // 清理临时数据
@@ -1034,7 +1131,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     pendingIconUrl = null;
                 }
             } else {
-                Log.w("HomeFragment", "图片选择失败：data 或 pendingIconItem 为 null");
+                Log.w("HomeFragment", "Image selection failed: data or pendingIconItem is null");
                 pendingIconItem = null;
                 pendingIconUrl = null;
             }
@@ -1065,7 +1162,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (selectedTagNames.contains(tagName)) {
             // 取消选择
             selectedTagNames.remove(tagName);
-            
+            Log.d(TAG, "updateTagSelectionByName: unselect tag, tagName=" + tagName);
+            Log.d(TAG, "updateTagSelectionByName: selectedTagNames.size=" + selectedTagNames.size());
+            for (String tag : selectedTagNames) {
+                Log.d(TAG, "updateTagSelectionByName: tag=" + tag);
+            }
             if (selectedTagNames.isEmpty()) {
                 // 如果没有选中任何标签，显示所有链接（HomeFragment原有行为）
                 requireActivity().setTitle("全部内容");
@@ -1076,6 +1177,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 updateContentBySelectedTags();
             }
         } else {
+            Log.d(TAG, "updateTagSelectionByName: select tag, tagName=" + tagName);
+            Log.d(TAG, "updateTagSelectionByName: selectedTagNames.size=" + selectedTagNames.size());
+
             // 选中新标签
             selectedTagNames.add(tagName);
             updateContentBySelectedTags();
@@ -1105,53 +1209,120 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * 从数据库加载标签数据并更新UI
      */
     private void loadTags() {
-        Log.d(TAG, "loadTags: 开始");
+        Log.d(TAG, "loadTags: start");
         if (tagsAdapter == null || tagsAdapterCollapsed == null) {
-            Log.e(TAG, "loadTags: tagsAdapter为null，tagsAdapter=" + (tagsAdapter != null) + 
+            Log.e(TAG, "loadTags: tagsAdapter is null, tagsAdapter=" + (tagsAdapter != null) + 
                     ", tagsAdapterCollapsed=" + (tagsAdapterCollapsed != null));
             return;
         }
         
         if (linkDao == null) {
-            Log.e(TAG, "loadTags: linkDao为null！");
+            Log.e(TAG, "loadTags: linkDao is null!");
             return;
         }
         
         // 使用后台线程加载标签数据
         new Thread(() -> {
             try {
-                Log.d(TAG, "loadTags: 后台线程开始");
-                // 后台获取标签数据
-                Map<String, Integer> tagsWithCount = linkDao.getTagsWithCount();
-                Log.d(TAG, "loadTags: 标签数量=" + tagsWithCount.size());
-            
-                // 获取无标签的链接数量
-                int noTagCount = linkDao.getLinksWithoutTags().size();
+                Log.d(TAG, "loadTags: background thread start");
+                
+                // 检查linkDao是否还打开（可能在后台线程执行时Fragment已被销毁）
+                if (linkDao == null) {
+                    Log.w(TAG, "loadTags: linkDao is null, Fragment may have been destroyed, cancel loading");
+                    return;
+                }
+                
+                // 后台获取标签数据（添加异常处理）
+                // 先检查Fragment状态和数据库状态，避免访问已关闭的数据库
+                if (!isAdded() || linkDao == null) {
+                    Log.w(TAG, "loadTags: Fragment not attached or linkDao is null, cancel loading");
+                    return;
+                }
+                
+                Map<String, Integer> tagsWithCount;
+                int noTagCount = 0;
+                List<TagsAdapter.TagItem> allTagItems = new ArrayList<>();
+                
+                try {
+                    // 检查Fragment状态
+                    if (!isAdded() || linkDao == null) {
+                        Log.w(TAG, "loadTags: Fragment detached or linkDao closed before getTagsWithCount");
+                        return;
+                    }
+                    
+                    tagsWithCount = linkDao.getTagsWithCount();
+                    Log.d(TAG, "loadTags: tag count=" + tagsWithCount.size());
+                    
+                    // 获取无标签的链接数量（需要访问数据库，可能抛出异常）
+                    try {
+                        if (isAdded() && linkDao != null) {
+                            noTagCount = linkDao.getLinksWithoutTags().size();
+                        } else {
+                            Log.w(TAG, "loadTags: Fragment detached or linkDao closed before getLinksWithoutTags");
+                            return;
+                        }
+                    } catch (IllegalStateException e) {
+                        // 数据库已关闭，停止加载
+                        Log.w(TAG, "loadTags: database closed during getLinksWithoutTags, cancel loading", e);
+                        return;
+                    }
+                    
+                    // 在后台线程中预先获取所有tagId，避免在UI线程中访问数据库
+                    // 添加"无标签"选项（如果数量大于0）
+                    if (noTagCount > 0) {
+                        allTagItems.add(new TagsAdapter.TagItem(-1, NO_TAG, noTagCount));
+                    }
+                    
+                    // 添加其他标签（在后台线程中获取tagId）
+                    for (Map.Entry<String, Integer> entry : tagsWithCount.entrySet()) {
+                        // 每次循环都检查状态
+                        if (!isAdded() || linkDao == null) {
+                            Log.w(TAG, "loadTags: Fragment detached or linkDao closed during tag processing");
+                            break;
+                        }
+                        
+                        try {
+                            long tagId = linkDao.getTagIdByName(entry.getKey());
+                            if (tagId != -1) {
+                                allTagItems.add(new TagsAdapter.TagItem(tagId, entry.getKey(), entry.getValue()));
+                            }
+                        } catch (IllegalStateException e) {
+                            // 如果数据库已关闭，停止处理
+                            Log.w(TAG, "loadTags: database closed during getTagIdByName, stop processing", e);
+                            break;
+                        }
+                    }
+                } catch (IllegalStateException e) {
+                    Log.w(TAG, "loadTags: database closed, cancel loading", e);
+                    return;
+                } catch (Exception e) {
+                    Log.e(TAG, "loadTags: unexpected exception in background thread", e);
+                    return;
+                }
             
                 // 回到主线程更新UI
                 try {
-                    Activity activity = requireActivity();
-                    if (activity != null && !activity.isFinishing()) {
-                        activity.runOnUiThread(() -> {
-                            List<TagsAdapter.TagItem> allTagItems = new ArrayList<>();
-                
-                // 添加"无标签"选项（如果数量大于0）
-                if (noTagCount > 0) {
-                    allTagItems.add(new TagsAdapter.TagItem(-1, NO_TAG, noTagCount));
-                }
-                
-                // 添加其他标签
-                for (Map.Entry<String, Integer> entry : tagsWithCount.entrySet()) {
-                    long tagId = linkDao.getTagIdByName(entry.getKey());
-                    if (tagId != -1) {
-                        allTagItems.add(new TagsAdapter.TagItem(tagId, entry.getKey(), entry.getValue()));
+                    // 检查Fragment是否还attached
+                    if (!isAdded() || getActivity() == null) {
+                        Log.w(TAG, "loadTags: Fragment not attached or Activity is null, skip UI update");
+                        return;
                     }
-                }
+                    
+                    Activity activity = getActivity();
+                    if (activity != null && !activity.isFinishing()) {
+                        // 使用final变量保存数据，避免在lambda中访问可能已关闭的linkDao
+                        final List<TagsAdapter.TagItem> finalAllTagItems = allTagItems;
+                        activity.runOnUiThread(() -> {
+                            // 再次检查Fragment状态和adapter
+                            if (!isAdded() || tagsAdapter == null) {
+                                Log.w(TAG, "loadTags: Fragment state changed during UI update, skip update");
+                                return;
+                            }
                 
                 // 在排序模式下，显示所有标签在一个区域
                 if (isSortMode) {
                     if (tagsAdapter != null) {
-                        tagsAdapter.setTags(allTagItems);
+                        tagsAdapter.setTags(finalAllTagItems);
                         tagsAdapter.setHighlightedTags(highlightedTags);
                         tagsAdapter.setSelectedTagNames(selectedTagNames);
                     }
@@ -1169,11 +1340,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     List<TagsAdapter.TagItem> fixedTags = new ArrayList<>();
                     List<TagsAdapter.TagItem> collapsedTags = new ArrayList<>();
                     
-                    for (int i = 0; i < allTagItems.size(); i++) {
+                    for (int i = 0; i < finalAllTagItems.size(); i++) {
                         if (i < FIXED_TAGS_COUNT) {
-                            fixedTags.add(allTagItems.get(i));
+                            fixedTags.add(finalAllTagItems.get(i));
                         } else {
-                            collapsedTags.add(allTagItems.get(i));
+                            collapsedTags.add(finalAllTagItems.get(i));
                         }
                     }
                     
@@ -1225,18 +1396,36 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         }
                     });
                 }
-                            // 恢复选择状态
-                            restoreSelections();
-                            Log.d(TAG, "loadTags: UI更新完成");
+                
+                // 恢复标签选择状态到内存变量（仅更新标签UI，不影响链接数据）
+                SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+                Set<String> savedTags = prefs.getStringSet(KEY_SELECTED_TAGS, new HashSet<>());
+                boolean noTagSelected = prefs.getBoolean(KEY_NO_TAG_SELECTED, false);
+                
+                selectedTagNames.clear();
+                if (noTagSelected) {
+                    //selectedTagNames.add(NO_TAG);
+                }
+                selectedTagNames.addAll(savedTags);
+                
+                // 更新标签适配器的选中状态
+                if (tagsAdapter != null) {
+                    tagsAdapter.setSelectedTagNames(selectedTagNames);
+                }
+                if (tagsAdapterCollapsed != null) {
+                    tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
+                }
+                
+                Log.d(TAG, "loadTags: UI update completed, selectedTagNames.size=" + selectedTagNames.size());
                         });  // 关闭runOnUiThread的lambda
                     } else {
-                        Log.w(TAG, "loadTags: Activity为null或已finish，跳过UI更新");
+                        Log.w(TAG, "loadTags: Activity is null or finished, skip UI update");
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "loadTags: runOnUiThread异常", e);
+                    Log.e(TAG, "loadTags: runOnUiThread exception", e);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "loadTags: 后台线程异常", e);
+                Log.e(TAG, "loadTags: background thread exception", e);
             }
         }).start();
     }
@@ -1249,20 +1438,20 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * 阶段2：统一数据加载逻辑
      */
     private void updateContentBySelectedTags() {
-        Log.d(TAG, "updateContentBySelectedTags: 开始，selectedTagNames.size=" + selectedTagNames.size());
+        Log.d(TAG, "updateContentBySelectedTags: start, selectedTagNames.size=" + selectedTagNames.size());
         try {
             if (linkDao == null) {
-                Log.e(TAG, "updateContentBySelectedTags: linkDao为null！");
+                Log.e(TAG, "updateContentBySelectedTags: linkDao is null!");
                 return;
             }
             if (adapter == null) {
-                Log.e(TAG, "updateContentBySelectedTags: adapter为null！");
+                Log.e(TAG, "updateContentBySelectedTags: adapter is null!");
                 return;
             }
             
             // 如果没有选中任何标签，使用HomeFragment原有行为
             if (selectedTagNames.isEmpty()) {
-                Log.d(TAG, "updateContentBySelectedTags: 没有选中标签，使用原有逻辑");
+                Log.d(TAG, "updateContentBySelectedTags: no tags selected, use original logic");
                 // 使用原有逻辑加载所有链接
                 List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
                 Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
@@ -1272,7 +1461,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 try {
                     requireActivity().setTitle("全部内容");
                 } catch (Exception e) {
-                    Log.e(TAG, "updateContentBySelectedTags: 设置标题失败", e);
+                    Log.e(TAG, "updateContentBySelectedTags: failed to set title", e);
                 }
                 return;
             }
@@ -1298,18 +1487,18 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 links.addAll(linkDao.getLinksByTags(tagNames));
             }
             
-            Log.d(TAG, "updateContentBySelectedTags: 筛选完成，links.size=" + links.size());
+            Log.d(TAG, "updateContentBySelectedTags: filtering completed, links.size=" + links.size());
 
             // 更新标题
             updateTitle(tagNames, hasNoTagFilter);
 
             // 按日期分组显示
             Map<String, List<LinkItem>> groupedLinks = groupLinksByDate(links);
-            Log.d(TAG, "updateContentBySelectedTags: 分组完成，groupedLinks.size=" + groupedLinks.size());
+            Log.d(TAG, "updateContentBySelectedTags: grouping completed, groupedLinks.size=" + groupedLinks.size());
             
             // 计算置顶与筛选结果的交集
             List<LinkItem> pinnedOverlap = calculatePinnedOverlap(links);
-            Log.d(TAG, "updateContentBySelectedTags: 置顶交集=" + pinnedOverlap.size());
+            Log.d(TAG, "updateContentBySelectedTags: pinned overlap=" + pinnedOverlap.size());
             
             adapter.setPinnedLinks(pinnedOverlap);
             adapter.setGroupedLinks(groupedLinks);
@@ -1317,9 +1506,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
             // 保存选择状态
             saveSelections(tagNames, hasNoTagFilter);
-            Log.d(TAG, "updateContentBySelectedTags: 完成");
+            Log.d(TAG, "updateContentBySelectedTags: completed");
         } catch (Exception e) {
-            Log.e(TAG, "updateContentBySelectedTags: 发生异常", e);
+            Log.e(TAG, "updateContentBySelectedTags: exception occurred", e);
         }
     }
     
@@ -1346,7 +1535,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             requireActivity().setTitle(title.toString());
             Log.d(TAG, "updateTitle: " + title.toString());
         } catch (Exception e) {
-            Log.e(TAG, "updateTitle: 更新标题失败", e);
+            Log.e(TAG, "updateTitle: failed to update title", e);
         }
     }
     
@@ -1372,16 +1561,44 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .clear()
-                .apply();
+                .commit();
+    }
+    
+    /**
+     * 同步恢复选择状态（仅恢复状态，不加载数据）
+     * 从SharedPreferences恢复标签选择状态，但不触发数据加载
+     * 用于onCreateView中先恢复状态，再根据状态加载数据
+     */
+    private void restoreSelectionsSync() {
+        try {
+            Log.d(TAG, "restoreSelectionsSync: start");
+            SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+            Set<String> savedTags = prefs.getStringSet(KEY_SELECTED_TAGS, new HashSet<>());
+            boolean noTagSelected = prefs.getBoolean(KEY_NO_TAG_SELECTED, false);
+            
+            Log.d(TAG, "restoreSelectionsSync: savedTags.size=" + savedTags.size() + ", noTagSelected=" + noTagSelected);
+
+            // 恢复选择状态
+            selectedTagNames.clear();
+            if (noTagSelected) {
+                selectedTagNames.add(NO_TAG);
+            }
+            selectedTagNames.addAll(savedTags);
+            
+            Log.d(TAG, "restoreSelectionsSync: after restore selectedTagNames.size=" + selectedTagNames.size());
+        } catch (Exception e) {
+            Log.e(TAG, "restoreSelectionsSync: failed to restore selection state", e);
+        }
     }
     
     /**
      * 恢复选择状态
-     * 从SharedPreferences恢复标签选择状态
+     * 从SharedPreferences恢复标签选择状态，并更新UI和数据
+     * @param shouldLoadData 是否加载数据（true：加载数据；false：仅更新UI状态）
      */
-    private void restoreSelections() {
+    private void restoreSelections(boolean shouldLoadData) {
         try {
-            Log.d(TAG, "restoreSelections: 开始");
+            Log.d(TAG, "restoreSelections: start, shouldLoadData=" + shouldLoadData);
             SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
             Set<String> savedTags = prefs.getStringSet(KEY_SELECTED_TAGS, new HashSet<>());
             boolean noTagSelected = prefs.getBoolean(KEY_NO_TAG_SELECTED, false);
@@ -1395,30 +1612,53 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             }
             selectedTagNames.addAll(savedTags);
             
-            Log.d(TAG, "restoreSelections: 恢复后selectedTagNames.size=" + selectedTagNames.size());
+            Log.d(TAG, "restoreSelections: after restore selectedTagNames.size=" + selectedTagNames.size());
             
-            // 更新内容显示
-            if (selectedTagNames.isEmpty()) {
-                // 如果没有选中任何标签，显示所有链接（HomeFragment原有行为）
-                Log.d(TAG, "restoreSelections: 没有选中标签，显示所有链接");
-                refreshLinksList();
-            } else {
-                // 根据选中的标签筛选内容
-                Log.d(TAG, "restoreSelections: 根据选中标签筛选内容");
-                updateContentBySelectedTags();
-            }
-            
-            // 刷新适配器（两个适配器都需要更新）
+            // 更新适配器显示（两个适配器都需要更新）
             if (tagsAdapter != null) {
                 tagsAdapter.setSelectedTagNames(selectedTagNames);
             }
             if (tagsAdapterCollapsed != null) {
                 tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
             }
-            Log.d(TAG, "restoreSelections: 完成");
+            
+            // 如果需要加载数据，根据选择状态加载
+            if (shouldLoadData) {
+                // 确保adapter和linkDao都已初始化
+                if (adapter == null || linkDao == null) {
+                    Log.w(TAG, "restoreSelections: adapter or linkDao not initialized, skip data loading");
+                    return;
+                }
+                
+                if (selectedTagNames.isEmpty()) {
+                    // 如果没有选中任何标签，不需要重新加载数据
+                    // 因为onViewCreated中已经加载了所有链接，这里只需要更新标签UI状态即可
+                    Log.d(TAG, "restoreSelections: no tags selected, keep existing data (already loaded in onViewCreated)");
+                    ///不调用refreshLinksList()，避免清空已加载的数据
+                } else {
+                    // 根据选中的标签筛选内容（覆盖之前的所有链接显示）
+                    Log.d(TAG, "restoreSelections: filter content by selected tags, override previous all links display");
+                    updateContentBySelectedTags();
+                }
+            }
+            
+            Log.d(TAG, "restoreSelections: completed");
         } catch (Exception e) {
-            Log.e(TAG, "restoreSelections: 恢复选择状态失败", e);
+            Log.e(TAG, "restoreSelections: failed to restore selection state", e);
+            // 如果恢复失败且需要加载数据，确保至少显示所有链接
+            if (shouldLoadData && selectedTagNames.isEmpty() && adapter != null && linkDao != null) {
+                Log.d(TAG, "restoreSelections: restore failed, try to show all links");
+                refreshLinksList();
+            }
         }
+    }
+    
+    /**
+     * 恢复选择状态（默认加载数据）
+     * 从SharedPreferences恢复标签选择状态
+     */
+    private void restoreSelections() {
+        restoreSelections(true);
     }
     
     // ========== 标签管理：UI状态切换（从TagsFragment合并）==========
@@ -1509,7 +1749,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     : maxHeightPx;
                 
                 String mode = isSortMode ? "排序模式" : "展开更多标签模式";
-                Log.d(TAG, "updateTagsScrollViewHeight: " + mode + "，screenHeight=" + screenHeight 
+                Log.d(TAG, "updateTagsScrollViewHeight: " + mode + ", screenHeight=" + screenHeight 
                     + ", searchBoxHeight=" + searchBoxHeight + ", availableHeight=" + availableHeight
                     + ", measuredHeight=" + measuredHeight + ", maxHeightPx=" + maxHeightPx 
                     + ", 设置高度=" + params.height);
@@ -1691,7 +1931,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 .setMessage("确定要删除标签 \"" + tag + "\" 吗？")
                 .setPositiveButton("删除", (dialog, which) -> {
                     try {
-                        Log.d("HomeFragment", "开始删除标签: " + tag);
+                        Log.d("HomeFragment", "Start deleting tag: " + tag);
                         
                         // 从数据库中删除标签
                         if (!isCascading) {
@@ -1699,15 +1939,15 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         } else { // 级联删除
                             linkDao.deleteTagWithLinks(tag);
                         }
-                        Log.d("HomeFragment", "标签已从数据库删除");
+                        Log.d("HomeFragment", "Tag deleted from database");
                         
                         // 从当前选中的标签集合中移除
                         selectedTagNames.remove(tag);
-                        Log.d("HomeFragment", "标签已从选中集合移除");
+                        Log.d("HomeFragment", "Tag removed from selected set");
                         
                         // 重新加载标签
                         loadTags();
-                        Log.d("HomeFragment", "标签列表已重新加载");
+                        Log.d("HomeFragment", "Tag list reloaded");
                         
                         // 更新链接列表
                         if (selectedTagNames.isEmpty()) {
@@ -1722,7 +1962,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                             Toast.LENGTH_SHORT).show();
                         
                     } catch (Exception e) {
-                        Log.e("HomeFragment", "删除标签时出错", e);
+                        Log.e("HomeFragment", "Error deleting tag", e);
                         Toast.makeText(requireContext(), 
                             "删除标签失败: " + e.getMessage(), 
                             Toast.LENGTH_SHORT).show();
@@ -1731,7 +1971,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 .setNegativeButton("取消", null)
                 .show();
         } catch (Exception e) {
-            Log.e("HomeFragment", "显示确认对话框时出错", e);
+            Log.e("HomeFragment", "Error showing confirmation dialog", e);
             Toast.makeText(requireContext(), 
                 "操作失败: " + e.getMessage(), 
                 Toast.LENGTH_SHORT).show();
@@ -1748,7 +1988,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * 注意：此功能在阶段0中已标记为待迁移到Sync模块，这里保留基本实现
      */
     private void publishTagToWebsite(String tag) {
-        Log.d("HomeFragment", "开始发布标签到网站: " + tag);
+        Log.d("HomeFragment", "Start publishing tag to website: " + tag);
         // TODO: 此功能将在后续阶段迁移到Sync模块
         Snackbar.make(requireView(), "发布功能待迁移到Sync模块", Snackbar.LENGTH_SHORT).show();
     }
