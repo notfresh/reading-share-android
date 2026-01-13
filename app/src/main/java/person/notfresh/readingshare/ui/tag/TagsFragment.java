@@ -75,6 +75,20 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+/**
+ * 标签管理Fragment
+ * 
+ * @deprecated 此Fragment正在与HomeFragment合并，功能将迁移到HomeFragment。
+ *             请使用HomeFragment替代。此Fragment将在合并完成后删除。
+ *             迁移计划：阶段0（重构）-> 阶段1（合并）-> 阶段2（整合）-> 阶段3（测试）-> 阶段4（删除）
+ * 
+ * @see person.notfresh.readingshare.ui.home.HomeFragment
+ * 
+ * @author 开发团队
+ * @version 1.0
+ * @since 2024
+ */
+@Deprecated
 public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
     private static final String PREF_NAME = "TagsPreferences";
     private static final String KEY_LAST_TAG = "lastSelectedTag";

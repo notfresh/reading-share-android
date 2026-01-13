@@ -1,10 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+    
+    <!-- 标签管理菜单项（从tags_menu.xml合并，默认隐藏） -->
+    <item
+        android:id="@+id/action_add_tag"
+        android:icon="@drawable/ic_add"
+        android:title="添加标签"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_sort_tags"
+        android:icon="@android:drawable/ic_menu_sort_by_size"
+        android:title="排序"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_exit_sort"
+        android:icon="@drawable/ic_close"
+        android:title="完成排序"
+        android:visible="false"
+        app:showAsAction="always" />
+    
+    <!-- 选择模式菜单项（原有） -->
     <item
         android:id="@+id/action_close_selection"
         android:icon="@drawable/ic_close"
         android:title="退出选择"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_select_all"
+        android:icon="@drawable/ic_select_all"
+        android:title="全选"
         android:visible="false"
         app:showAsAction="always" />
     <item
@@ -33,6 +61,8 @@
         android:title="多选"
         android:visible="true"
         app:showAsAction="always|withText"/>
+    
+    <!-- 统计菜单项（原有） -->
     <item
         android:id="@+id/action_statistics"
         android:icon="@drawable/ic_statistics"

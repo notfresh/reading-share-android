@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -18,6 +19,116 @@
         android:imeOptions="actionSearch"
         android:textColor="@android:color/darker_gray"/>
 
+    <!-- 标签区域（从TagsFragment合并，阶段2启用显示） -->
+    <FrameLayout
+        android:id="@+id/tags_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="0dp"
+        android:visibility="visible">
+
+        <ScrollView
+            android:id="@+id/tags_scrollview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:fadingEdge="vertical"
+            android:fadingEdgeLength="24dp"
+            android:requiresFadingEdge="vertical"
+            android:paddingBottom="8dp"
+            android:clipToPadding="false">
+
+            <!-- 仅包含标签容器，不包含按钮 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="0dp">
+
+                <!-- 固定显示的标签区（前10个） -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_tags_fixed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="8dp"
+                    android:paddingBottom="4dp"
+                    android:minHeight="0dp" />
+
+                <!-- 展开/折叠按钮 -->
+                <LinearLayout
+                    android:id="@+id/btn_expand_more_tags"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone"
+                    android:background="?android:attr/selectableItemBackground">
+
+                    <TextView
+                        android:id="@+id/text_expand_more"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="展开更多标签"
+                        android:textColor="#666666"
+                        android:textSize="14sp"
+                        android:maxLines="1"
+                        android:ellipsize="none" />
+
+                    <ImageView
+                        android:id="@+id/icon_expand_more"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="6dp"
+                        android:src="@drawable/ic_expand_more"
+                        android:contentDescription="展开"
+                        android:scaleType="fitCenter" />
+                </LinearLayout>
+
+                <!-- 折叠的标签区（后续标签） -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_tags_collapsed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="8dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="8dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- 折叠/展开按钮悬浮在标签区域底部 -->
+        <LinearLayout
+            android:id="@+id/btn_toggle_tags"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@android:color/transparent">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#E0E0E0"/>
+
+            <ImageView
+                android:id="@+id/arrow_indicator"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_expand_more"
+                android:contentDescription="展开收起标签"
+                android:background="@drawable/circle_background"
+                android:padding="2dp"/>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- 链接列表 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
