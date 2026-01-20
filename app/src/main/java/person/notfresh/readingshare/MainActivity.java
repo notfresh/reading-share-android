@@ -99,8 +99,9 @@ public class MainActivity extends AppCompatActivity {
             handleNavigation(getIntent());
             
             // 然后设置 AppBarConfiguration
+            // 注意：nav_tags已废弃，功能已合并到nav_home
             mAppBarConfiguration = new AppBarConfiguration.Builder(
-                    R.id.nav_home, R.id.nav_tags, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive, R.id.nav_documents, R.id.nav_subject)
+                    R.id.nav_home, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive, R.id.nav_documents, R.id.nav_subject)
                     .setOpenableLayout(drawer)
                     .build();
 
@@ -129,8 +130,6 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         if (id == R.id.nav_home) {
                             navController.navigate(R.id.nav_home);
-                        } else if (id == R.id.nav_tags) {
-                            navController.navigate(R.id.nav_tags);
                         } else if (id == R.id.nav_rss) {
                             navController.navigate(R.id.nav_rss);
                         } else if (id == R.id.nav_slideshow) {
@@ -276,16 +275,20 @@ public class MainActivity extends AppCompatActivity {
                 case 0: // 首页
                     destinationId = R.id.nav_home;
                     break;
-                case 1: // 标签页
-                    destinationId = R.id.nav_tags;
-                    break;
                 case 2: // 主题
                     destinationId = R.id.nav_subject;
                     break;
                 case 3: // RSS
                     destinationId = R.id.nav_rss;
                     break;
-                default: // 默认首页
+                case 4: { // 随机：首页/主题/RSS
+                    int r = (int) (Math.random() * 3);
+                    destinationId = (r == 0)
+                        ? R.id.nav_home
+                        : (r == 1 ? R.id.nav_subject : R.id.nav_rss);
+                    break;
+                }
+                default: // 默认首页（包括已废弃的case 1标签页）
                     destinationId = R.id.nav_home;
                     break;
             }

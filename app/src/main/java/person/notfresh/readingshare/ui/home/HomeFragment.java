@@ -71,6 +71,22 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.text.SimpleDateFormat;
 
+/**
+ * 首页Fragment
+ * 
+ * 功能说明：
+ * - 显示所有链接，支持按日期分组和置顶显示
+ * - 支持标签管理和筛选功能（从TagsFragment合并）
+ * - 支持链接选择、分享、添加到主题等功能
+ * - 支持搜索功能
+ * 
+ * 合并历史：
+ * - 阶段0-2：将TagsFragment的功能合并到HomeFragment
+ * - 阶段3：测试和优化
+ * - 阶段4：清理废弃代码和更新文档
+ * 
+ * @see TagsFragment（已废弃，功能已合并到此Fragment）
+ */
 public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
 
     private static final String TAG = "HomeFragment";  // Logcat过滤关键字

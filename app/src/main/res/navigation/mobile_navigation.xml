@@ -11,15 +11,6 @@
         android:label="@string/menu_home"
         tools:layout="@layout/fragment_home" />
 
-    <!-- 
-        @deprecated 此导航目标已废弃，功能已合并到nav_home。
-        保留此配置仅用于向后兼容，将在阶段4删除。
-    -->
-    <fragment
-        android:id="@+id/nav_tags"
-        android:name="person.notfresh.readingshare.ui.tag.TagsFragment"
-        android:label="@string/menu_gallery"
-        tools:layout="@layout/fragment_tags" />
 
     <fragment
         android:id="@+id/nav_slideshow"

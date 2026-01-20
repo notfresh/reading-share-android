@@ -659,18 +659,17 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 3. **Bug修复**（1小时）
    - 修复发现的问题
 
-#### 阶段四：清理与文档（2-3小时）
+#### 阶段四：清理与文档（2-3小时）✅ 已完成
 
-1. **删除废弃代码**（1-2小时）
-   - 删除 `TagsFragment` 类
-   - 删除 `fragment_tags.xml`
-   - 删除 `tags_menu.xml`
-   - 清理导航配置
+1. **删除废弃代码**（1-2小时）✅
+   - ✅ 删除 `fragment_tags.xml`
+   - ✅ 删除 `tags_menu.xml`
+   - ✅ 清理导航配置（MainActivity、mobile_navigation.xml、activity_main_drawer.xml）
+   - ⚠️ `TagsFragment` 类保留但标记为 `@Deprecated`（按用户要求，等完全迁移后再删除）
 
-2. **更新文档**（1小时）
-   - 更新代码注释
-   - 更新README
-   - 更新架构文档
+2. **更新文档**（1小时）✅
+   - ✅ 更新代码注释（已在代码中添加详细注释）
+   - ⚠️ README和架构文档待后续更新
 
 **总工作量：20-30小时（约2.5-4个工作日）**
 

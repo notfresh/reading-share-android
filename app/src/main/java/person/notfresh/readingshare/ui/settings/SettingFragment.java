@@ -72,14 +72,53 @@ public class SettingFragment extends Fragment {
         // 加载保存的默认 Tab
         SharedPreferences prefs = requireActivity().getPreferences(Context.MODE_PRIVATE);
         int defaultTab = prefs.getInt("default_tab", 0);
-        defaultTabSpinner.setSelection(defaultTab);
+        
+        // 处理已废弃的标签页选项（原索引1）的迁移
+        // 原索引：0=首页, 1=标签(已废弃), 2=主题, 3=RSS, 4=随机
+        // 新索引：0=首页, 1=主题, 2=RSS, 3=随机
+        int adjustedTab = defaultTab;
+        if (defaultTab == 1) {
+            // 原标签页选项，迁移到首页
+            adjustedTab = 0;
+            // 更新保存的值
+            prefs.edit().putInt("default_tab", 0).apply();
+        } else if (defaultTab == 2) {
+            // 原主题选项，索引减1
+            adjustedTab = 1;
+        } else if (defaultTab == 3) {
+            // 原RSS选项，索引减1
+            adjustedTab = 2;
+        } else if (defaultTab == 4) {
+            // 随机
+            adjustedTab = 3;
+        }
+
+        // 兜底：避免越界导致崩溃
+        if (adjustedTab < 0 || adjustedTab >= adapter.getCount()) {
+            adjustedTab = 0;
+        }
+        
+        defaultTabSpinner.setSelection(adjustedTab);
 
         // 保存用户选择
         defaultTabSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 SharedPreferences.Editor editor = prefs.edit();
-                editor.putInt("default_tab", position);
+                // 将新索引映射回原索引格式（用于MainActivity的兼容性）
+                // 新索引：0=首页, 1=主题, 2=RSS, 3=随机
+                // 原索引：0=首页, 2=主题, 3=RSS（跳过已废弃的1=标签）, 4=随机
+                int savedTab;
+                if (position == 0) {
+                    savedTab = 0;
+                } else if (position == 1) {
+                    savedTab = 2;
+                } else if (position == 2) {
+                    savedTab = 3;
+                } else {
+                    savedTab = 4; // 随机
+                }
+                editor.putInt("default_tab", savedTab);
                 editor.apply();
             }
 
