@@ -317,7 +317,7 @@ public class SettingFragment extends Fragment {
     }
 
     /**
-     * 导出并分享文件（包含保存到公共目录的逻辑）
+     * 导出并分享文件
      */
     private void exportAndShare(boolean isJson) {
         // 显示进度对话框
@@ -330,31 +330,21 @@ public class SettingFragment extends Fragment {
         new Thread(() -> {
             boolean success = false;
             Uri fileUri = null;
-            String fileName = null;
             String errorMessage = null;
             
-//            try {
-//                // 生成文件名（已包含扩展名）
-//                String timeStamp = ExportUtil.getCurrentTime();
-//                fileName = isJson
-//                    ? "links_" + timeStamp + "_readshare.json"
-//                    : "links_" + timeStamp + "_readshare.csv";
-//
-//                // 先保存到公共 Documents 目录
-//                fileUri = ExportUtil.exportToPublicDirectory(
-//                    requireContext(),
-//                    linkDao.getAllLinks(),
-//                    isJson,
-//                    fileName
-//                );
-//                success = true;
-//            } catch (Exception e) {
-//                Log.e("SettingFragment", "导出失败", e);
-//                errorMessage = e.getMessage();
-//            }
+            try {
+                fileUri = ExportUtil.exportToPublicDirectory(
+                    requireContext(), 
+                    linkDao.getAllLinks(), 
+                    isJson
+                );
+                success = true;
+            } catch (Exception e) {
+                Log.e("SettingFragment", "导出失败", e);
+                errorMessage = e.getMessage();
+            }
             
             final Uri finalFileUri = fileUri;
-            final String finalFileName = fileName;
             final boolean finalSuccess = success;
             final String finalErrorMessage = errorMessage;
             
@@ -362,28 +352,14 @@ public class SettingFragment extends Fragment {
             requireActivity().runOnUiThread(() -> {
                 progressDialog.dismiss();
                 
-                if (finalSuccess && finalFileUri != null && finalFileName != null) {
+                if (finalSuccess && finalFileUri != null) {
                     // 保存成功后，分享文件
                     try {
                         Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                        shareIntent.setType(isJson ? "application/json" : "text/csv");
+                        shareIntent.setType(isJson ? "text/plain" : "text/csv");
                         shareIntent.putExtra(Intent.EXTRA_STREAM, finalFileUri);
-                        shareIntent.putExtra(Intent.EXTRA_SUBJECT, finalFileName); // 方式1：EXTRA_SUBJECT
-                        
-                        // 方式2：使用 ClipData 传递文件信息（更好的兼容性）
-                        android.content.ClipData clipData = android.content.ClipData.newUri(
-                            requireContext().getContentResolver(), finalFileName, finalFileUri);
-                        shareIntent.setClipData(clipData);
-                        
                         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        
                         startActivity(Intent.createChooser(shareIntent, "分享导出文件"));
-                        
-                        // 显示提示信息
-                        String format = isJson ? "JSON" : "CSV";
-                        Snackbar.make(requireView(), 
-                            format + " 文件已保存到 Documents 目录，正在分享...", 
-                            Snackbar.LENGTH_SHORT).show();
                     } catch (Exception e) {
                         Snackbar.make(requireView(), 
                             "分享失败：" + e.getMessage(), 
@@ -456,7 +432,7 @@ public class SettingFragment extends Fragment {
             .setPositiveButton("打开文件", (dialog, which) -> {
                 try {
                     Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setDataAndType(fileUri, isJson ? "application/json" : "text/csv");
+                    intent.setDataAndType(fileUri, isJson ? "text/plain" : "text/csv");
                     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     startActivity(intent);
                 } catch (Exception e) {

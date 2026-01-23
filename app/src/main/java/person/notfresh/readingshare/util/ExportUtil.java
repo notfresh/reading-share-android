@@ -155,7 +155,7 @@ public class ExportUtil {
                                              boolean isJson) throws IOException, JSONException {
         // 使用默认文件名（已包含扩展名）
         String defaultFileName = isJson 
-            ? "links_" + getCurrentTime() + "_readshare.json"
+            ? "links_" + getCurrentTime() + "_readshare.json.txt"
             : "links_" + getCurrentTime() + "_readshare.csv";
         return exportToPublicDirectory(context, links, isJson, defaultFileName);
     }
@@ -173,7 +173,7 @@ public class ExportUtil {
      */
     public static Uri exportToPublicDirectory(Context context, List<LinkItem> links, 
                                              boolean isJson, String fileName) throws IOException, JSONException {
-        String mimeType = isJson ? "application/json" : "text/csv";
+        String mimeType = isJson ? "text/plain" : "text/csv";
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Android 10+ 使用 MediaStore API
