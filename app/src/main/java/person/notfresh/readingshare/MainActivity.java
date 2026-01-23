@@ -65,7 +65,12 @@ import java.io.IOException;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
 import java.io.File;
+import person.notfresh.readingshare.util.SubjectUtil;
+import person.notfresh.readingshare.db.SubjectDao;
+import person.notfresh.readingshare.core.model.Subject;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -353,13 +358,11 @@ public class MainActivity extends AppCompatActivity {
                         sourceApp = intent.getComponent().getPackageName();
                     }
 
-                    // 保存完整的分享信息
-                    if (title == null || title.isEmpty()) {
-                        // 如果没有标题，尝试从分享文本中提取
-                        title = StringUtil.extractTitle(sharedText);
-                    }
+                    // 准备标题
+                    String initialTitle = (title == null || title.isEmpty())
+                            ? StringUtil.extractTitle(sharedText) : title;
 
-                    // 收集目标Activity信息
+                    // 收集目标 Activity 信息，供保存时使用
                     StringBuilder targetActivityInfo = new StringBuilder();
                     for (ResolveInfo info : activities) {
                         targetActivityInfo.append(info.activityInfo.packageName)
@@ -368,22 +371,15 @@ public class MainActivity extends AppCompatActivity {
                                          .append(";");
                     }
 
-                    // 保存更详细的信息
-                    LinkItem newLink = new LinkItem(
-                        title,
-                        sharedText,
-                        sourceApp,
-                        intent.toString(),  // 保存完整的Intent信息
-                        targetActivityInfo.toString()  // 保存可以处理的Activity信息
+                    // 弹窗自定义保存（与剪切板流程一致，但不清除剪切板）
+                    showSaveLinkDialog(
+                            sharedText,
+                            initialTitle,
+                            sourceApp,
+                            intent.toString(),
+                            targetActivityInfo.toString(),
+                            false
                     );
-                    linkDao.insertLink(newLink);
-
-                    NavController navController = Navigation.findNavController(this, 
-                            R.id.nav_host_fragment_content_main);
-                    navController.navigate(R.id.nav_home);
-                    
-                    Snackbar.make(binding.getRoot(), "已保存：" + title, 
-                            Snackbar.LENGTH_LONG).show();
                 }
             }
         }
@@ -496,12 +492,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /** 剪切板检测到链接时调用：弹窗自定义保存，保存后清除剪切板 */
     private void showSaveLinkDialog(String url, String initialTitle) {
+        showSaveLinkDialog(url, initialTitle, "clipboard", "clipboard", "", true);
+    }
+
+    /**
+     * 弹窗保存链接，支持自定义标题、链接、标签、主题。
+     * @param clearClipboardOnSave 仅剪切板流程为 true，保存后清除剪切板；分享流程为 false
+     */
+    private void showSaveLinkDialog(String url, String initialTitle,
+            String sourceApp, String originalIntent, String targetActivity,
+            boolean clearClipboardOnSave) {
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_save_link, null);
         EditText titleInput = dialogView.findViewById(R.id.edit_title);
         EditText urlInput = dialogView.findViewById(R.id.edit_url);
         EditText tagsInput = dialogView.findViewById(R.id.edit_tags);
         FlexboxLayout recentTagsContainer = dialogView.findViewById(R.id.recent_tags_container);
+        Spinner subjectSpinner = dialogView.findViewById(R.id.spinner_save_to_subject);
 
         // 设置初始值和提示
         titleInput.setHint(initialTitle);  // 使用 hint 显示灰色提示文字
@@ -509,6 +517,26 @@ public class MainActivity extends AppCompatActivity {
 
         // 让标题输入框获得焦点
         titleInput.requestFocus();
+
+        // 填充「保存到主题」下拉框：首项为「不添加到主题」，其余为现有主题
+        final List<Subject> subjectList = new ArrayList<>();
+        List<String> subjectLabels = new ArrayList<>();
+        subjectLabels.add("不添加到主题");
+        SubjectDao subjectDao = new SubjectDao(this);
+        subjectDao.open();
+        try {
+            List<Subject> all = subjectDao.getAllSubjects();
+            for (Subject s : all) {
+                subjectList.add(s);
+                subjectLabels.add(s.getTitle());
+            }
+        } finally {
+            subjectDao.close();
+        }
+        ArrayAdapter<String> subjectAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, subjectLabels);
+        subjectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        subjectSpinner.setAdapter(subjectAdapter);
 
         // 获取并显示最近标签
         Context context = this;
@@ -552,9 +580,9 @@ public class MainActivity extends AppCompatActivity {
                         LinkItem newLink = new LinkItem(
                             title,
                             finalUrl,
-                            "clipboard",
-                            "clipboard",
-                            ""
+                            sourceApp,
+                            originalIntent,
+                            targetActivity
                         );
                         String[] tags = tagsInput.getText().toString().split("[,，]");
                         List<String> tagList = new ArrayList<>();
@@ -567,9 +595,18 @@ public class MainActivity extends AppCompatActivity {
                         newLink.setTags(tagList);
                         linkDao.insertLink(newLink);
 
-                        // 清除剪贴板
-                        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                        clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+                        // 若在下拉框中选了某个主题，则添加到该主题
+                        int subjectPos = subjectSpinner.getSelectedItemPosition();
+                        if (subjectPos > 0 && subjectPos <= subjectList.size()) {
+                            Subject chosen = subjectList.get(subjectPos - 1);
+                            SubjectUtil.addLinkToSubjectById(this, chosen.getId(), newLink.getId());
+                        }
+
+                        // 仅剪切板流程保存后清除剪贴板，分享流程不清除
+                        if (clearClipboardOnSave) {
+                            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+                        }
 
                         Snackbar.make(binding.getRoot(), "已保存：" + title, 
                                 Snackbar.LENGTH_LONG).show();
