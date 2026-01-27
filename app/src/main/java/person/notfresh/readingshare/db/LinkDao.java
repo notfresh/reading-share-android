@@ -747,9 +747,8 @@ public class LinkDao {
                 long tagId = cursor.getLong(0);
                 String tagName = cursor.getString(1);
                 int count = cursor.getInt(2);
-                if (count > 0) {  // 只保存有链接的标签
-                    allTags.put(tagId, new TagCountInfo(tagName, count));
-                }
+                // 显示所有标签，包括count为0的标签
+                allTags.put(tagId, new TagCountInfo(tagName, count));
             } while (cursor.moveToNext());
         }
         cursor.close();

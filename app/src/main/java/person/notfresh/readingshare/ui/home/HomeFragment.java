@@ -1,7 +1,6 @@
 package person.notfresh.readingshare.ui.home;
 
 import android.app.Activity;
-import android.content.ComponentName;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -16,18 +15,16 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.appcompat.widget.Toolbar;
+
 import com.google.android.flexbox.FlexboxLayoutManager;
 import com.google.android.flexbox.FlexDirection;
 import com.google.android.flexbox.FlexWrap;
@@ -44,7 +41,6 @@ import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.core.model.SubjectItem;
 import person.notfresh.readingshare.core.model.SubjectUtil;
 import person.notfresh.readingshare.ui.subject.SelectSubjectDialog;
-import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.ClickStatisticsActivity;
 import person.notfresh.readingshare.util.ShareUtil;
 import person.notfresh.readingshare.util.ImageUtil;
@@ -52,14 +48,11 @@ import person.notfresh.readingshare.util.ImageUtil;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
-import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
-import com.google.android.material.snackbar.Snackbar;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -70,6 +63,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.text.SimpleDateFormat;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 首页Fragment
@@ -1175,6 +1169,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * 阶段2：统一状态管理，整合标签选择状态和内容更新
      */
     private void updateTagSelectionByName(String tagName) {
+        // 先清理 selectedTagNames 中的无效标签（tagID为-1的标签）
+        cleanInvalidTagsFromSelection();
+        
         if (selectedTagNames.contains(tagName)) {
             // 取消选择
             selectedTagNames.remove(tagName);
@@ -1194,11 +1191,32 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             }
         } else {
             Log.d(TAG, "updateTagSelectionByName: select tag, tagName=" + tagName);
-            Log.d(TAG, "updateTagSelectionByName: selectedTagNames.size=" + selectedTagNames.size());
-
-            // 选中新标签
-            selectedTagNames.add(tagName);
-            updateContentBySelectedTags();
+            
+            // 验证要添加的标签是否存在
+            if (NO_TAG.equals(tagName)) {
+                // NO_TAG 特殊处理，总是允许选择（即使数量为0）
+                selectedTagNames.add(tagName);
+                Log.d(TAG, "updateTagSelectionByName: selectedTagNames.size=" + selectedTagNames.size());
+                updateContentBySelectedTags();
+            } else {
+                // 验证普通标签是否存在
+                try {
+                    long tagId = linkDao.getTagIdByName(tagName);
+                    if (tagId != -1) {
+                        // 标签存在，可以添加
+                        selectedTagNames.add(tagName);
+                        Log.d(TAG, "updateTagSelectionByName: selectedTagNames.size=" + selectedTagNames.size());
+                        updateContentBySelectedTags();
+                    } else {
+                        // 标签不存在（tagID为-1），不能添加
+                        Log.w(TAG, "updateTagSelectionByName: tag not found (tagID=-1), tagName=" + tagName);
+                        Toast.makeText(requireContext(), "标签不存在: " + tagName, Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "updateTagSelectionByName: failed to get tagID for tag: " + tagName, e);
+                    Toast.makeText(requireContext(), "验证标签失败: " + tagName, Toast.LENGTH_SHORT).show();
+                }
+            }
         }
         
         // 如果处于选择模式，退出选择模式（标签选择会改变内容，需要重新选择）
@@ -1216,6 +1234,59 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         
         // 统一更新菜单可见性（标签选择可能影响菜单显示）
         updateMenuVisibility();
+    }
+    
+    /**
+     * 清理 selectedTagNames 中的无效标签（tagID为-1的标签）
+     * 在每次更新标签选择状态时调用，确保内存中只保留有效的标签
+     */
+    private void cleanInvalidTagsFromSelection() {
+        if (linkDao == null || selectedTagNames.isEmpty()) {
+            return;
+        }
+        
+        Set<String> invalidTags = new HashSet<>();
+        boolean needUpdateNoTag = false;
+        
+        // 检查每个标签是否存在
+        for (String tagName : new HashSet<>(selectedTagNames)) {
+            if (NO_TAG.equals(tagName)) {
+                // NO_TAG 总是有效的，不需要检查数量（允许count为0）
+                // 不做任何处理，保留 NO_TAG
+            } else {
+                // 检查普通标签是否存在
+                try {
+                    long tagId = linkDao.getTagIdByName(tagName);
+                    if (tagId == -1) {
+                        invalidTags.add(tagName);
+                        Log.w(TAG, "cleanInvalidTagsFromSelection: found invalid tag (tagID=-1), will remove: " + tagName);
+                    }
+                } catch (Exception e) {
+                    invalidTags.add(tagName);
+                    Log.e(TAG, "cleanInvalidTagsFromSelection: failed to get tagID for tag: " + tagName, e);
+                }
+            }
+        }
+        
+        // 移除无效标签
+        if (!invalidTags.isEmpty()) {
+            selectedTagNames.removeAll(invalidTags);
+            Log.d(TAG, "cleanInvalidTagsFromSelection: removed " + invalidTags.size() + " invalid tags: " + invalidTags);
+            
+            // 更新 SharedPreferences
+            SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            
+            // 重新计算有效的标签集合
+            Set<String> validTags = new HashSet<>(selectedTagNames);
+            validTags.remove(NO_TAG);  // NO_TAG 单独处理
+            
+            editor.putStringSet(KEY_SELECTED_TAGS, validTags);
+            if (needUpdateNoTag) {
+                editor.putBoolean(KEY_NO_TAG_SELECTED, false);
+            }
+            editor.apply();
+        }
     }
     
     // ========== 标签管理：数据加载（从TagsFragment合并）==========
@@ -1242,25 +1313,19 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             try {
                 Log.d(TAG, "loadTags: background thread start");
                 
-                // 检查linkDao是否还打开（可能在后台线程执行时Fragment已被销毁）
-                if (linkDao == null) {
-                    Log.w(TAG, "loadTags: linkDao is null, Fragment may have been destroyed, cancel loading");
-                    return;
-                }
-                
-                // 后台获取标签数据（添加异常处理）
-                // 先检查Fragment状态和数据库状态，避免访问已关闭的数据库
+                // 统一检查Fragment状态和数据库状态（在后台线程开始时检查一次）
+                // 注意：由于没有锁机制，后续操作前仍需要检查，但可以减少重复检查
                 if (!isAdded() || linkDao == null) {
                     Log.w(TAG, "loadTags: Fragment not attached or linkDao is null, cancel loading");
                     return;
                 }
                 
                 Map<String, Integer> tagsWithCount;
-                int noTagCount = 0;
+                AtomicInteger noTagCount = new AtomicInteger();
                 List<TagsAdapter.TagItem> allTagItems = new ArrayList<>();
                 
                 try {
-                    // 检查Fragment状态
+                    // 在数据库操作前再次检查（避免检查和使用之间的竞态条件）
                     if (!isAdded() || linkDao == null) {
                         Log.w(TAG, "loadTags: Fragment detached or linkDao closed before getTagsWithCount");
                         return;
@@ -1270,24 +1335,16 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     Log.d(TAG, "loadTags: tag count=" + tagsWithCount.size());
                     
                     // 获取无标签的链接数量（需要访问数据库，可能抛出异常）
-                    try {
-                        if (isAdded() && linkDao != null) {
-                            noTagCount = linkDao.getLinksWithoutTags().size();
-                        } else {
-                            Log.w(TAG, "loadTags: Fragment detached or linkDao closed before getLinksWithoutTags");
-                            return;
-                        }
-                    } catch (IllegalStateException e) {
-                        // 数据库已关闭，停止加载
-                        Log.w(TAG, "loadTags: database closed during getLinksWithoutTags, cancel loading", e);
+                    // 在数据库操作前再次检查
+                    if (!isAdded() || linkDao == null) {
+                        Log.w(TAG, "loadTags: Fragment detached or linkDao closed before getLinksWithoutTags");
                         return;
                     }
+                    noTagCount.set(linkDao.getLinksWithoutTags().size());
                     
                     // 在后台线程中预先获取所有tagId，避免在UI线程中访问数据库
-                    // 添加"无标签"选项（如果数量大于0）
-                    if (noTagCount > 0) {
-                        allTagItems.add(new TagsAdapter.TagItem(-1, NO_TAG, noTagCount));
-                    }
+                    // 添加"无标签"选项（总是显示，即使数量为0）
+                    allTagItems.add(new TagsAdapter.TagItem(-1, NO_TAG, noTagCount.get()));
                     
                     // 添加其他标签（在后台线程中获取tagId）
                     for (Map.Entry<String, Integer> entry : tagsWithCount.entrySet()) {
@@ -1296,16 +1353,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                             Log.w(TAG, "loadTags: Fragment detached or linkDao closed during tag processing");
                             break;
                         }
-                        
-                        try {
-                            long tagId = linkDao.getTagIdByName(entry.getKey());
-                            if (tagId != -1) {
-                                allTagItems.add(new TagsAdapter.TagItem(tagId, entry.getKey(), entry.getValue()));
-                            }
-                        } catch (IllegalStateException e) {
-                            // 如果数据库已关闭，停止处理
-                            Log.w(TAG, "loadTags: database closed during getTagIdByName, stop processing", e);
-                            break;
+                        long tagId = linkDao.getTagIdByName(entry.getKey());
+                        if (tagId != -1) {
+                            allTagItems.add(new TagsAdapter.TagItem(tagId, entry.getKey(), entry.getValue()));
                         }
                     }
                 } catch (IllegalStateException e) {
@@ -1334,105 +1384,176 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                                 Log.w(TAG, "loadTags: Fragment state changed during UI update, skip update");
                                 return;
                             }
-                
-                // 在排序模式下，显示所有标签在一个区域
-                if (isSortMode) {
-                    if (tagsAdapter != null) {
-                        tagsAdapter.setTags(finalAllTagItems);
-                        tagsAdapter.setHighlightedTags(highlightedTags);
-                        tagsAdapter.setSelectedTagNames(selectedTagNames);
-                    }
-                    if (tagsAdapterCollapsed != null) {
-                        tagsAdapterCollapsed.setTags(new ArrayList<>());
-                    }
-                    if (tagsRecyclerViewCollapsed != null) {
-                        tagsRecyclerViewCollapsed.setVisibility(View.GONE);
-                    }
-                    if (expandMoreTagsButton != null) {
-                        expandMoreTagsButton.setVisibility(View.GONE);
-                    }
-                } else {
-                    // 非排序模式：分成固定区和折叠区
-                    List<TagsAdapter.TagItem> fixedTags = new ArrayList<>();
-                    List<TagsAdapter.TagItem> collapsedTags = new ArrayList<>();
-                    
-                    for (int i = 0; i < finalAllTagItems.size(); i++) {
-                        if (i < FIXED_TAGS_COUNT) {
-                            fixedTags.add(finalAllTagItems.get(i));
-                        } else {
-                            collapsedTags.add(finalAllTagItems.get(i));
-                        }
-                    }
-                    
-                    if (tagsAdapter != null) {
-                        tagsAdapter.setTags(fixedTags);
-                        tagsAdapter.setHighlightedTags(highlightedTags);
-                        tagsAdapter.setSelectedTagNames(selectedTagNames);
-                    }
-                    
-                    if (tagsAdapterCollapsed != null) {
-                        tagsAdapterCollapsed.setTags(collapsedTags);
-                        tagsAdapterCollapsed.setHighlightedTags(highlightedTags);
-                        tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
-                    }
-                    
-                    // 如果有折叠标签，显示展开按钮；否则隐藏以减少空白
-                    if (expandMoreTagsButton != null) {
-                        if (collapsedTags.size() > 0) {
-                            expandMoreTagsButton.setVisibility(View.VISIBLE);
-                            updateExpandMoreButtonState();
-                        } else {
-                            expandMoreTagsButton.setVisibility(View.GONE);
-                        }
-                    }
-                    
-                    // 根据展开状态显示/隐藏折叠标签区
-                    if (tagsRecyclerViewCollapsed != null) {
-                        tagsRecyclerViewCollapsed.setVisibility(
-                            isMoreTagsExpanded && collapsedTags.size() > 0 ? View.VISIBLE : View.GONE);
-                    }
-                }
-                
-                // 标签加载完成后，检查是否需要显示展开按钮（排序模式下不显示）
-                if (tagsRecyclerView != null) {
-                    tagsRecyclerView.post(() -> {
-                        // 排序模式下，按钮应该隐藏
-                        if (isSortMode) {
-                            if (toggleTagsButton != null) {
-                                toggleTagsButton.setVisibility(View.GONE);
+                            
+                            // 在排序模式下，显示所有标签在一个区域
+                            if (isSortMode) {
+                                if (tagsAdapter != null) {
+                                    tagsAdapter.setTags(finalAllTagItems);
+                                    tagsAdapter.setHighlightedTags(highlightedTags);
+                                    tagsAdapter.setSelectedTagNames(selectedTagNames);
+                                }
+                                if (tagsAdapterCollapsed != null) {
+                                    tagsAdapterCollapsed.setTags(new ArrayList<>());
+                                }
+                                if (tagsRecyclerViewCollapsed != null) {
+                                    tagsRecyclerViewCollapsed.setVisibility(View.GONE);
+                                }
+                                if (expandMoreTagsButton != null) {
+                                    expandMoreTagsButton.setVisibility(View.GONE);
+                                }
+                            } else {
+                                // 非排序模式：分成固定区和折叠区
+                                List<TagsAdapter.TagItem> fixedTags = new ArrayList<>();
+                                List<TagsAdapter.TagItem> collapsedTags = new ArrayList<>();
+                                
+                                for (int i = 0; i < finalAllTagItems.size(); i++) {
+                                    if (i < FIXED_TAGS_COUNT) {
+                                        fixedTags.add(finalAllTagItems.get(i));
+                                    } else {
+                                        collapsedTags.add(finalAllTagItems.get(i));
+                                    }
+                                }
+                                
+                                if (tagsAdapter != null) {
+                                    tagsAdapter.setTags(fixedTags);
+                                    tagsAdapter.setHighlightedTags(highlightedTags);
+                                    tagsAdapter.setSelectedTagNames(selectedTagNames);
+                                }
+                                
+                                if (tagsAdapterCollapsed != null) {
+                                    tagsAdapterCollapsed.setTags(collapsedTags);
+                                    tagsAdapterCollapsed.setHighlightedTags(highlightedTags);
+                                    tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
+                                }
+                                
+                                // 如果有折叠标签，显示展开按钮；否则隐藏以减少空白
+                                if (expandMoreTagsButton != null) {
+                                    if (collapsedTags.size() > 0) {
+                                        expandMoreTagsButton.setVisibility(View.VISIBLE);
+                                        updateExpandMoreButtonState();
+                                    } else {
+                                        expandMoreTagsButton.setVisibility(View.GONE);
+                                    }
+                                }
+                                
+                                // 根据展开状态显示/隐藏折叠标签区
+                                if (tagsRecyclerViewCollapsed != null) {
+                                    tagsRecyclerViewCollapsed.setVisibility(
+                                        isMoreTagsExpanded && collapsedTags.size() > 0 ? View.VISIBLE : View.GONE);
+                                }
                             }
-                            return;
-                        }
-                        // 非排序模式下，根据内容高度决定是否显示
-                        int height = tagsRecyclerView.getHeight();
-                        float density = getResources().getDisplayMetrics().density;
-                        int collapsedHeightPx = (int) (COLLAPSED_HEIGHT_DP * density);
-                        if (toggleTagsButton != null) {
-                            toggleTagsButton.setVisibility(height > collapsedHeightPx ? View.VISIBLE : View.GONE);
-                        }
-                    });
-                }
-                
-                // 恢复标签选择状态到内存变量（仅更新标签UI，不影响链接数据）
-                SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-                Set<String> savedTags = prefs.getStringSet(KEY_SELECTED_TAGS, new HashSet<>());
-                boolean noTagSelected = prefs.getBoolean(KEY_NO_TAG_SELECTED, false);
-                
-                selectedTagNames.clear();
-                if (noTagSelected) {
-                    //selectedTagNames.add(NO_TAG);
-                }
-                selectedTagNames.addAll(savedTags);
-                
-                // 更新标签适配器的选中状态
-                if (tagsAdapter != null) {
-                    tagsAdapter.setSelectedTagNames(selectedTagNames);
-                }
-                if (tagsAdapterCollapsed != null) {
-                    tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
-                }
-                
-                Log.d(TAG, "loadTags: UI update completed, selectedTagNames.size=" + selectedTagNames.size());
+                            
+                            // 标签加载完成后，检查是否需要显示展开按钮（排序模式下不显示）
+                            if (tagsRecyclerView != null) {
+                                tagsRecyclerView.post(() -> {
+                                    // 排序模式下，按钮应该隐藏
+                                    if (isSortMode) {
+                                        if (toggleTagsButton != null) {
+                                            toggleTagsButton.setVisibility(View.GONE);
+                                        }
+                                        return;
+                                    }
+                                    // 非排序模式下，根据内容高度决定是否显示
+                                    int height = tagsRecyclerView.getHeight();
+                                    float density = getResources().getDisplayMetrics().density;
+                                    int collapsedHeightPx = (int) (COLLAPSED_HEIGHT_DP * density);
+                                    if (toggleTagsButton != null) {
+                                        toggleTagsButton.setVisibility(height > collapsedHeightPx ? View.VISIBLE : View.GONE);
+                                    }
+                                });
+                            }
+                            
+                            // 恢复标签选择状态到内存变量（仅更新标签UI，不影响链接数据）
+                            SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+                            Set<String> savedTags = prefs.getStringSet(KEY_SELECTED_TAGS, new HashSet<>());
+                            boolean noTagSelected = prefs.getBoolean(KEY_NO_TAG_SELECTED, false);
+                            
+                            selectedTagNames.clear();
+                            
+                            // 验证标签是否存在，清理不存在的标签（tagID为-1的标签）
+                            Set<String> validTags = new HashSet<>();
+                            Set<String> invalidTags = new HashSet<>();
+                            boolean shouldKeepNoTag = false;
+                            
+                            // 检查 NO_TAG 是否需要保留（总是保留，即使数量为0）
+                            if (noTagSelected) {
+                                shouldKeepNoTag = true;
+                                validTags.add(NO_TAG);
+                            }
+                            
+                            // 验证普通标签是否存在
+                            for (String tagName : savedTags) {
+                                if (NO_TAG.equals(tagName)) {
+                                    // NO_TAG 已经在上面处理过了，跳过
+                                    continue;
+                                } else {
+                                    try {
+                                        long tagId = linkDao.getTagIdByName(tagName);
+                                        if (tagId != -1) {
+                                            // 标签存在
+                                            validTags.add(tagName);
+                                        } else {
+                                            // 标签不存在（tagID为-1），需要清理
+                                            invalidTags.add(tagName);
+                                            Log.w(TAG, "loadTags: found invalid tag (tagID=-1), will remove: " + tagName);
+                                        }
+                                    } catch (Exception e) {
+                                        // 获取tagID失败，视为无效标签
+                                        invalidTags.add(tagName);
+                                        Log.e(TAG, "loadTags: failed to get tagID for tag: " + tagName, e);
+                                    }
+                                }
+                            }
+                            
+                            // 只添加有效的标签
+                            selectedTagNames.addAll(validTags);
+                            
+                            // 如果有无效标签或需要清理 NO_TAG，更新 SharedPreferences
+                            boolean needUpdatePrefs = !invalidTags.isEmpty() || (noTagSelected && !shouldKeepNoTag);
+                            if (needUpdatePrefs) {
+                                Log.d(TAG, "loadTags: cleaning invalid tags from SharedPreferences, invalidTags=" + invalidTags.size() 
+                                        + ", shouldKeepNoTag=" + shouldKeepNoTag);
+                                SharedPreferences.Editor editor = prefs.edit();
+                                editor.putStringSet(KEY_SELECTED_TAGS, validTags);
+                                editor.putBoolean(KEY_NO_TAG_SELECTED, shouldKeepNoTag);
+                                editor.apply();
+                            }
+                            
+                            // 更新标签适配器的选中状态
+                            if (tagsAdapter != null) {
+                                tagsAdapter.setSelectedTagNames(selectedTagNames);
+                            }
+                            if (tagsAdapterCollapsed != null) {
+                                tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
+                            }
+                            
+                            Log.d(TAG, "loadTags: UI update completed, selectedTagNames.size=" + selectedTagNames.size());
+                            
+                            // 恢复状态后，需要同步链接列表，确保状态一致
+                            // 避免标签显示选中但链接列表为空的问题
+                            if (adapter != null && linkDao != null) {
+                                if (selectedTagNames.isEmpty()) {
+                                    // 如果没有选中任何标签，显示所有链接
+                                    refreshLinksList();
+                                } else {
+                                    Log.d(TAG, "loadTags: selectedTagNames.size=" + selectedTagNames.size());
+                                    // 打印选中的标签名称和对应的tagID
+                                    for (String tagName : selectedTagNames) {
+                                        if (NO_TAG.equals(tagName)) {
+                                            Log.d(TAG, "loadTags: selected tag - name=" + tagName + ", tagID=-1 (NO_TAG)");
+                                        } else {
+                                            try {
+                                                long tagId = linkDao.getTagIdByName(tagName);
+                                                Log.d(TAG, "loadTags: selected tag - name=" + tagName + ", tagID=" + tagId);
+                                            } catch (Exception e) {
+                                                Log.e(TAG, "loadTags: failed to get tagID for tag: " + tagName, e);
+                                            }
+                                        }
+                                    }
+                                    // 如果有选中的标签，根据标签筛选内容
+                                    updateContentBySelectedTags();
+                                }
+                            }
                         });  // 关闭runOnUiThread的lambda
                     } else {
                         Log.w(TAG, "loadTags: Activity is null or finished, skip UI update");
