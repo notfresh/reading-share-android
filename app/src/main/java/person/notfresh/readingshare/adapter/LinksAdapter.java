@@ -1181,8 +1181,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
                         if (url.contains("b23.tv")) {
                             handleBilibiliLink(url); //@Def Line408
-                        } else if (url.contains("weread.qq.com")) {
-                            handleWereadLink(url);
+                        // } else if (url.contains("weread.qq.com")) {
+                        //     handleWereadLink(url);
                         } else {
                             // 使用内置 WebView 打开普通链接
                             adapter.openLink(v.getContext(), url, getAdapterPosition());
