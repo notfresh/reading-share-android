@@ -6,5 +6,10 @@
         android:icon="@android:drawable/ic_input_add"
         android:title="添加主题项"
         app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_subject_settings"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="设置"
+        app:showAsAction="ifRoom" />
 </menu>
 

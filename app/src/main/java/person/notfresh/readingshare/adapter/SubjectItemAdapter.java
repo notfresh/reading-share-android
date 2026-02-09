@@ -19,8 +19,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.WebViewActivity;
@@ -39,6 +42,7 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
     private Context context;
     private LinkDao linkDao;
     private SubjectDao subjectDao;
+    private boolean archiveMode = false;
 
     public interface OnSubjectItemClickListener {
         void onSubjectItemClick(SubjectItem item);
@@ -47,6 +51,8 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
     public interface OnSubjectItemActionListener {
         void onCollectLink(SubjectItem item, LinkItem linkItem);
         void onDeleteSubjectItem(SubjectItem item);
+        void onArchiveSubjectItem(SubjectItem item);
+        void onRestoreSubjectItem(SubjectItem item);
         void onRefreshItems();
     }
 
@@ -71,11 +77,41 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
         notifyDataSetChanged();
     }
 
+    public void setArchiveMode(boolean archiveMode) {
+        this.archiveMode = archiveMode;
+    }
+
+    public boolean isArchiveMode() {
+        return archiveMode;
+    }
+
     /**
      * 获取当前的主题项列表（用于拖拽排序）
      */
     public List<SubjectItem> getItems() {
         return items;
+    }
+
+    /**
+     * 从适配器中直接移除主题项
+     */
+    public boolean removeItem(SubjectItem item) {
+        if (item == null) {
+            return false;
+        }
+        int position = -1;
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).getId() == item.getId()) {
+                position = i;
+                break;
+            }
+        }
+        if (position == -1) {
+            return false;
+        }
+        items.remove(position);
+        notifyItemRemoved(position);
+        return true;
     }
 
     public void close() {
@@ -139,8 +175,16 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
                 popup.getMenu().add(0, 1, 0, "收录链接");
             }
         }
+
+        if (archiveMode) {
+            popup.getMenu().add(0, 4, 0, "还原");
+        } else {
+            popup.getMenu().add(0, 4, 0, "归档");
+        }
         
-        popup.getMenu().add(0, 2, 0, "编辑");
+        if (listener != null && !archiveMode) {
+            popup.getMenu().add(0, 2, 0, "编辑");
+        }
         popup.getMenu().add(0, 3, 0, "删除");
         
         popup.setOnMenuItemClickListener(menuItem -> {
@@ -169,6 +213,15 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
                             })
                             .setNegativeButton("取消", null)
                             .show();
+                    return true;
+                case 4: // 归档/还原
+                    if (actionListener != null) {
+                        if (archiveMode) {
+                            actionListener.onRestoreSubjectItem(item);
+                        } else {
+                            actionListener.onArchiveSubjectItem(item);
+                        }
+                    }
                     return true;
                 default:
                     return false;
@@ -205,6 +258,7 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
         private TextView textLinkUrl;
         private TextView textLinkDeleted;
         private TextView textRemark;
+        private TextView textAddTime;
         private ImageAdapter imageAdapter;
 
         SubjectItemViewHolder(@NonNull View itemView) {
@@ -216,6 +270,7 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
             textLinkUrl = itemView.findViewById(R.id.text_link_url);
             textLinkDeleted = itemView.findViewById(R.id.text_link_deleted);
             textRemark = itemView.findViewById(R.id.text_remark);
+            textAddTime = itemView.findViewById(R.id.text_add_time);
 
             // 设置图片横向滚动
             recyclerImages.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
@@ -316,7 +371,22 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
             } else {
                 textRemark.setVisibility(View.GONE);
             }
+
+            // 显示时间（主列表=添加时间，归档列表=归档时间）
+            long timeToShow = archiveMode ? item.getArchivedAt() : item.getAddTime();
+            if (timeToShow > 0) {
+                textAddTime.setVisibility(View.VISIBLE);
+                textAddTime.setText(formatTimeLabel(timeToShow));
+            } else {
+                textAddTime.setVisibility(View.GONE);
+            }
         }
+    }
+
+    private String formatTimeLabel(long timestamp) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+        String prefix = archiveMode ? "归档于：" : "添加于：";
+        return prefix + dateFormat.format(new Date(timestamp));
     }
 
     /**

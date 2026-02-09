@@ -11,8 +11,9 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     //private static final int DATABASE_VERSION = 4;
     // private static final int DATABASE_VERSION = 5; // 添加summary字段
     //private static final int DATABASE_VERSION = 10; // 添加文档表
-    private static final int DATABASE_VERSION = 11; // 添加主题表
+    //private static final int DATABASE_VERSION = 11; // 添加主题表
 
+    private static final int DATABASE_VERSION = 12; // 主题项增加归档字段
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_TITLE = "title";
@@ -67,6 +68,8 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String COLUMN_SUBJECT_ITEM_REMARK = "remark";
     public static final String COLUMN_SUBJECT_ITEM_ADD_TIME = "add_time";
     public static final String COLUMN_SUBJECT_ITEM_ORDER_INDEX = "order_index";
+    public static final String COLUMN_SUBJECT_ITEM_IS_ARCHIVED = "is_archived";
+    public static final String COLUMN_SUBJECT_ITEM_ARCHIVED_AT = "archived_at";
 
     // 主题项图片表
     public static final String TABLE_SUBJECT_ITEM_IMAGES = "subject_item_images";
@@ -151,7 +154,9 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     COLUMN_SUBJECT_ITEM_IS_LINK_DELETED + " INTEGER DEFAULT 0, " +
                     COLUMN_SUBJECT_ITEM_REMARK + " TEXT, " +
                     COLUMN_SUBJECT_ITEM_ADD_TIME + " INTEGER NOT NULL, " +
-                    COLUMN_SUBJECT_ITEM_ORDER_INDEX + " INTEGER DEFAULT 0, " +
+                COLUMN_SUBJECT_ITEM_ORDER_INDEX + " INTEGER DEFAULT 0, " +
+                COLUMN_SUBJECT_ITEM_IS_ARCHIVED + " INTEGER DEFAULT 0, " +
+                COLUMN_SUBJECT_ITEM_ARCHIVED_AT + " INTEGER DEFAULT 0, " +
                     "FOREIGN KEY (" + COLUMN_SUBJECT_ITEM_SUBJECT_ID + ") REFERENCES " + TABLE_SUBJECTS + "(" + COLUMN_SUBJECT_ID + "))";
 
     private static final String SQL_CREATE_SUBJECT_ITEM_IMAGES =
@@ -227,6 +232,13 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                 db.execSQL(SQL_CREATE_SUBJECT_ITEMS);
                 db.execSQL(SQL_CREATE_SUBJECT_ITEM_IMAGES);
                 Log.d("LinkDbHelper", "Created subject tables");
+            }
+
+            if (oldVersion >= 11 && oldVersion < 12) {
+                // 版本12：主题项表增加归档字段
+                db.execSQL("ALTER TABLE " + TABLE_SUBJECT_ITEMS + " ADD COLUMN " + COLUMN_SUBJECT_ITEM_IS_ARCHIVED + " INTEGER DEFAULT 0");
+                db.execSQL("ALTER TABLE " + TABLE_SUBJECT_ITEMS + " ADD COLUMN " + COLUMN_SUBJECT_ITEM_ARCHIVED_AT + " INTEGER DEFAULT 0");
+                Log.d("LinkDbHelper", "Added subject item archive columns");
             }
 
             if (oldVersion < 10) {

@@ -18,6 +18,8 @@ public class SubjectItem {
     private long addTime;                // 添加时间
     private int orderIndex;              // 排序索引（间隔值：0, 10, 20, 30...）
     private List<String> images;         // 图片文件路径列表（最多10张）
+    private boolean isArchived;          // 归档状态
+    private long archivedAt;             // 归档时间
 
     // 常量
     public static final int MAX_IMAGES = 10;        // 最大图片数量
@@ -28,6 +30,8 @@ public class SubjectItem {
         this.images = new ArrayList<>();
         this.isLinkDeleted = false;
         this.orderIndex = 0;
+        this.isArchived = false;
+        this.archivedAt = 0;
     }
 
     public SubjectItem(long subjectId) {
@@ -171,6 +175,22 @@ public class SubjectItem {
         this.orderIndex = orderIndex;
     }
 
+    public boolean isArchived() {
+        return isArchived;
+    }
+
+    public void setArchived(boolean archived) {
+        isArchived = archived;
+    }
+
+    public long getArchivedAt() {
+        return archivedAt;
+    }
+
+    public void setArchivedAt(long archivedAt) {
+        this.archivedAt = archivedAt;
+    }
+
     public List<String> getImages() {
         return images;
     }
@@ -206,6 +226,8 @@ public class SubjectItem {
                 ", remark='" + remark + '\'' +
                 ", addTime=" + addTime +
                 ", orderIndex=" + orderIndex +
+                ", isArchived=" + isArchived +
+                ", archivedAt=" + archivedAt +
                 ", imageCount=" + getImageCount() +
                 '}';
     }

@@ -201,6 +201,8 @@ public class SubjectDao {
             values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_REMARK, item.getRemark());
             values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_ADD_TIME, item.getAddTime());
             values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_ORDER_INDEX, item.getOrderIndex());
+            values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_IS_ARCHIVED, item.isArchived() ? 1 : 0);
+            values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_ARCHIVED_AT, item.getArchivedAt());
 
             long itemId = database.insert(LinkDbHelper.TABLE_SUBJECT_ITEMS, null, values);
             item.setId(itemId);
@@ -242,6 +244,8 @@ public class SubjectDao {
             values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_IS_LINK_DELETED, item.isLinkDeleted() ? 1 : 0);
             values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_REMARK, item.getRemark());
             values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_ORDER_INDEX, item.getOrderIndex());
+            values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_IS_ARCHIVED, item.isArchived() ? 1 : 0);
+            values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_ARCHIVED_AT, item.getArchivedAt());
 
             int rowsAffected = database.update(
                     LinkDbHelper.TABLE_SUBJECT_ITEMS,
@@ -335,7 +339,8 @@ public class SubjectDao {
         Cursor cursor = database.query(
                 LinkDbHelper.TABLE_SUBJECT_ITEMS,
                 null,
-                LinkDbHelper.COLUMN_SUBJECT_ITEM_SUBJECT_ID + " = ?",
+            LinkDbHelper.COLUMN_SUBJECT_ITEM_SUBJECT_ID + " = ? AND " +
+                LinkDbHelper.COLUMN_SUBJECT_ITEM_IS_ARCHIVED + " = 0",
                 new String[]{String.valueOf(subjectId)},
                 null,
                 null,
@@ -353,6 +358,71 @@ public class SubjectDao {
         cursor.close();
 
         return items;
+    }
+
+    /**
+     * 根据主题ID获取归档的主题项（按 archivedAt 排序）
+     */
+    public List<SubjectItem> getArchivedSubjectItemsBySubjectId(long subjectId, boolean ascending) {
+        List<SubjectItem> items = new ArrayList<>();
+
+        String orderBy = LinkDbHelper.COLUMN_SUBJECT_ITEM_ARCHIVED_AT + (ascending ? " ASC" : " DESC");
+
+        Cursor cursor = database.query(
+                LinkDbHelper.TABLE_SUBJECT_ITEMS,
+                null,
+                LinkDbHelper.COLUMN_SUBJECT_ITEM_SUBJECT_ID + " = ? AND " +
+                        LinkDbHelper.COLUMN_SUBJECT_ITEM_IS_ARCHIVED + " = 1",
+                new String[]{String.valueOf(subjectId)},
+                null,
+                null,
+                orderBy
+        );
+
+        if (cursor.moveToFirst()) {
+            do {
+                SubjectItem item = cursorToSubjectItem(cursor);
+                item.setImages(getSubjectItemImages(item.getId()));
+                items.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+
+        return items;
+    }
+
+    /**
+     * 归档主题项
+     */
+    public boolean archiveSubjectItem(long itemId, long archivedAt) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_IS_ARCHIVED, 1);
+        values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_ARCHIVED_AT, archivedAt);
+
+        int rowsAffected = database.update(
+                LinkDbHelper.TABLE_SUBJECT_ITEMS,
+                values,
+                LinkDbHelper.COLUMN_SUBJECT_ITEM_ID + " = ?",
+                new String[]{String.valueOf(itemId)}
+        );
+        return rowsAffected > 0;
+    }
+
+    /**
+     * 还原主题项
+     */
+    public boolean restoreSubjectItem(long itemId) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_IS_ARCHIVED, 0);
+        values.put(LinkDbHelper.COLUMN_SUBJECT_ITEM_ARCHIVED_AT, 0);
+
+        int rowsAffected = database.update(
+                LinkDbHelper.TABLE_SUBJECT_ITEMS,
+                values,
+                LinkDbHelper.COLUMN_SUBJECT_ITEM_ID + " = ?",
+                new String[]{String.valueOf(itemId)}
+        );
+        return rowsAffected > 0;
     }
 
     /**
@@ -572,6 +642,8 @@ public class SubjectDao {
 
         item.setAddTime(cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUBJECT_ITEM_ADD_TIME)));
         item.setOrderIndex(cursor.getInt(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUBJECT_ITEM_ORDER_INDEX)));
+        item.setArchived(cursor.getInt(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUBJECT_ITEM_IS_ARCHIVED)) == 1);
+        item.setArchivedAt(cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUBJECT_ITEM_ARCHIVED_AT)));
         return item;
     }
 }

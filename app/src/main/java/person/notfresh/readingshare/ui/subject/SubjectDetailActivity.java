@@ -25,6 +25,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.ui.subject.AddSubjectItemDialog;
+import person.notfresh.readingshare.ui.subject.SubjectArchivedItemsDialog;
 
 /**
  * 主题详情页Activity
@@ -36,6 +37,7 @@ public class SubjectDetailActivity extends AppCompatActivity implements
     public static final String EXTRA_SUBJECT_ID = "subject_id";
 
     private RecyclerView recyclerView;
+    private android.widget.TextView textEmpty;
     private SubjectItemAdapter adapter;
     private SubjectDao subjectDao;
     private LinkDao linkDao;
@@ -82,6 +84,7 @@ public class SubjectDetailActivity extends AppCompatActivity implements
         }
 
         recyclerView = findViewById(R.id.recycler_view);
+        textEmpty = findViewById(R.id.text_empty);
         adapter = new SubjectItemAdapter(this);
         adapter.setOnSubjectItemClickListener(this);
         adapter.setOnSubjectItemActionListener(this);
@@ -122,6 +125,9 @@ public class SubjectDetailActivity extends AppCompatActivity implements
         } else if (item.getItemId() == R.id.action_add_item) {
             showAddSubjectItemDialog();
             return true;
+        } else if (item.getItemId() == R.id.action_subject_settings) {
+            showSubjectSettingsDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -142,8 +148,20 @@ public class SubjectDetailActivity extends AppCompatActivity implements
         if (subject != null) {
             List<SubjectItem> items = subject.getSubItems();
             adapter.setItems(items);
+            updateEmptyState(items);
             Log.d(TAG, "加载了 " + items.size() + " 个主题项");
+        } else {
+            updateEmptyState(null);
         }
+    }
+
+    private void updateEmptyState(List<SubjectItem> items) {
+        if (textEmpty == null) {
+            return;
+        }
+        boolean isEmpty = items == null || items.isEmpty();
+        textEmpty.setVisibility(isEmpty ? android.view.View.VISIBLE : android.view.View.GONE);
+        recyclerView.setVisibility(isEmpty ? android.view.View.GONE : android.view.View.VISIBLE);
     }
 
     @Override
@@ -262,8 +280,61 @@ public class SubjectDetailActivity extends AppCompatActivity implements
     }
 
     @Override
+    public void onArchiveSubjectItem(SubjectItem item) {
+        long archivedAt = System.currentTimeMillis();
+        boolean archived = subjectDao.archiveSubjectItem(item.getId(), archivedAt);
+        if (archived) {
+            item.setArchived(true);
+            item.setArchivedAt(archivedAt);
+            if (adapter != null) {
+                adapter.removeItem(item);
+            }
+            Toast.makeText(this, "已归档，可在设置-已归档中查看", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "归档失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onRestoreSubjectItem(SubjectItem item) {
+        boolean restored = subjectDao.restoreSubjectItem(item.getId());
+        if (restored) {
+            item.setArchived(false);
+            item.setArchivedAt(0);
+            loadSubjectItems();
+            Toast.makeText(this, "已还原", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "还原失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
     public void onRefreshItems() {
         loadSubjectItems();
+    }
+
+    private void showSubjectSettingsDialog() {
+        android.view.View view = getLayoutInflater().inflate(R.layout.dialog_subject_settings, null);
+        android.widget.Button btnArchived = view.findViewById(R.id.btn_archived);
+
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("设置")
+                .setView(view)
+                .setNegativeButton("关闭", null)
+                .create();
+
+        btnArchived.setOnClickListener(v -> {
+            dialog.dismiss();
+            showArchivedItemsDialog();
+        });
+
+        dialog.show();
+    }
+
+    private void showArchivedItemsDialog() {
+        SubjectArchivedItemsDialog dialog = SubjectArchivedItemsDialog.newInstance(subjectId);
+        dialog.setOnItemsRestoredListener(() -> loadSubjectItems());
+        dialog.show(getSupportFragmentManager(), "SubjectArchivedItemsDialog");
     }
 }
 
