@@ -4,7 +4,7 @@
 
 ## 下载安装
 
-APK 文件位置：`[Release页面](https://github.com/notfresh/reading-share-android/releases)`
+APK 文件位置：[Release页面](https://github.com/notfresh/reading-share-android/releases)
 
 手动编译需要的是 IDE 的 Andriod Studio  , java 1.8 （当时电脑上装了这个版本，就一直没怎么改了），minSdk = 29，targetSdk = 34 。
 
