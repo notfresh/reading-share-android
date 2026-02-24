@@ -4,7 +4,9 @@
 
 ## 下载安装
 
-APK 文件位置：`app/release/app-release-版本号.apk`
+APK 文件位置：`[Release页面](https://github.com/notfresh/reading-share-android/releases)`
+
+手动编译需要的是 IDE 的 Andriod Studio  , java 1.8 （当时电脑上装了这个版本，就一直没怎么改了），minSdk = 29，targetSdk = 34 。
 
 ## 主要功能
 
@@ -75,6 +77,8 @@ APK 文件位置：`app/release/app-release-版本号.apk`
    - tag_id: 标签ID
 
 ## 使用说明
+
+项目的一些设计文档放在根目录的dev-docs里。
 
 1. 添加链接
 
