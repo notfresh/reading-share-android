@@ -53,6 +53,9 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -85,6 +88,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
     private static final String TAG = "HomeFragment";  // Logcat过滤关键字
     private static final int REQUEST_CODE_PICK_ICON = 1001;
+    private static final Logger log = LoggerFactory.getLogger(HomeFragment.class);
 
     private FragmentHomeBinding binding;
     private LinksAdapter adapter;
@@ -1405,15 +1409,45 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                                 // 非排序模式：分成固定区和折叠区
                                 List<TagsAdapter.TagItem> fixedTags = new ArrayList<>();
                                 List<TagsAdapter.TagItem> collapsedTags = new ArrayList<>();
-                                
-                                for (int i = 0; i < finalAllTagItems.size(); i++) {
-                                    if (i < FIXED_TAGS_COUNT) {
-                                        fixedTags.add(finalAllTagItems.get(i));
-                                    } else {
-                                        collapsedTags.add(finalAllTagItems.get(i));
+
+                                // 恢复并验证已保存的选择到 selectedTagNames（不触发数据加载），
+                                // 使后续按选中优先的逻辑能够直接使用权威的 selectedTagNames。
+                                try {
+                                    restoreSelections(false);
+                                } catch (Exception e) {
+                                    Log.e(TAG, "loadTags: restoreSelections failed", e);
+                                }
+
+                                // 1) 先把所有被选中的标签按 finalAllTagItems 顺序加入 fixedTags（避免重复）
+                                for (TagsAdapter.TagItem item : finalAllTagItems) {
+                                    String name = item.getName() != null ? item.getName().trim() : "";
+                                    for (String sel : selectedTagNames) {
+                                        if (sel != null && sel.trim().equals(name)) {
+                                            if (!fixedTags.contains(item)) fixedTags.add(item);
+                                            break;
+                                        }
                                     }
                                 }
-                                
+
+                                // 2) 再按位置填充固定区，直到达到固定数（避免重复加入）
+                                int fixedLimit = FIXED_TAGS_COUNT;
+                                int addedCount = fixedTags.size();
+                                for (int i = 0; i < finalAllTagItems.size() && addedCount < fixedLimit; i++) {
+                                    TagsAdapter.TagItem item = finalAllTagItems.get(i);
+                                    if (!fixedTags.contains(item)) {
+                                        fixedTags.add(item);
+                                        addedCount++;
+                                        Log.i("FIXED_TAGS NAME", item.getName());
+                                    }
+                                }
+
+                                // 3) 剩余的放入折叠区
+                                for (TagsAdapter.TagItem item : finalAllTagItems) {
+                                    if (!fixedTags.contains(item)) {
+                                        collapsedTags.add(item);
+                                    }
+                                }
+
                                 if (tagsAdapter != null) {
                                     tagsAdapter.setTags(fixedTags);
                                     tagsAdapter.setHighlightedTags(highlightedTags);
@@ -1462,73 +1496,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                                     }
                                 });
                             }
-                            
-                            // 恢复标签选择状态到内存变量（仅更新标签UI，不影响链接数据）
-                            SharedPreferences prefs = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-                            Set<String> savedTags = prefs.getStringSet(KEY_SELECTED_TAGS, new HashSet<>());
-                            boolean noTagSelected = prefs.getBoolean(KEY_NO_TAG_SELECTED, false);
-                            
-                            selectedTagNames.clear();
-                            
-                            // 验证标签是否存在，清理不存在的标签（tagID为-1的标签）
-                            Set<String> validTags = new HashSet<>();
-                            Set<String> invalidTags = new HashSet<>();
-                            boolean shouldKeepNoTag = false;
-                            
-                            // 检查 NO_TAG 是否需要保留（总是保留，即使数量为0）
-                            if (noTagSelected) {
-                                shouldKeepNoTag = true;
-                                validTags.add(NO_TAG);
-                            }
-                            
-                            // 验证普通标签是否存在
-                            for (String tagName : savedTags) {
-                                if (NO_TAG.equals(tagName)) {
-                                    // NO_TAG 已经在上面处理过了，跳过
-                                    continue;
-                                } else {
-                                    try {
-                                        long tagId = linkDao.getTagIdByName(tagName);
-                                        if (tagId != -1) {
-                                            // 标签存在
-                                            validTags.add(tagName);
-                                        } else {
-                                            // 标签不存在（tagID为-1），需要清理
-                                            invalidTags.add(tagName);
-                                            Log.w(TAG, "loadTags: found invalid tag (tagID=-1), will remove: " + tagName);
-                                        }
-                                    } catch (Exception e) {
-                                        // 获取tagID失败，视为无效标签
-                                        invalidTags.add(tagName);
-                                        Log.e(TAG, "loadTags: failed to get tagID for tag: " + tagName, e);
-                                    }
-                                }
-                            }
-                            
-                            // 只添加有效的标签
-                            selectedTagNames.addAll(validTags);
-                            
-                            // 如果有无效标签或需要清理 NO_TAG，更新 SharedPreferences
-                            boolean needUpdatePrefs = !invalidTags.isEmpty() || (noTagSelected && !shouldKeepNoTag);
-                            if (needUpdatePrefs) {
-                                Log.d(TAG, "loadTags: cleaning invalid tags from SharedPreferences, invalidTags=" + invalidTags.size() 
-                                        + ", shouldKeepNoTag=" + shouldKeepNoTag);
-                                SharedPreferences.Editor editor = prefs.edit();
-                                editor.putStringSet(KEY_SELECTED_TAGS, validTags);
-                                editor.putBoolean(KEY_NO_TAG_SELECTED, shouldKeepNoTag);
-                                editor.apply();
-                            }
-                            
-                            // 更新标签适配器的选中状态
-                            if (tagsAdapter != null) {
-                                tagsAdapter.setSelectedTagNames(selectedTagNames);
-                            }
-                            if (tagsAdapterCollapsed != null) {
-                                tagsAdapterCollapsed.setSelectedTagNames(selectedTagNames);
-                            }
-                            
-                            Log.d(TAG, "loadTags: UI update completed, selectedTagNames.size=" + selectedTagNames.size());
-                            
+
                             // 恢复状态后，需要同步链接列表，确保状态一致
                             // 避免标签显示选中但链接列表为空的问题
                             if (adapter != null && linkDao != null) {

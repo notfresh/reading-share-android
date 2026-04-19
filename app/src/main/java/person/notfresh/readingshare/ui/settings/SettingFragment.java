@@ -40,6 +40,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import com.google.android.material.snackbar.Snackbar;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.ImportUtil;
+import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -49,6 +50,7 @@ public class SettingFragment extends Fragment {
     private static final String DEFAULT_SERVER_URL = "https://duxiang.ai";
 
     private Spinner defaultTabSpinner;
+    private Spinner recentTagsWindowSpinner;
     private LinkDao linkDao; // 声明 LinkDao
     private TextInputEditText serverUrlInput;
 
@@ -120,6 +122,31 @@ public class SettingFragment extends Fragment {
                 }
                 editor.putInt("default_tab", savedTab);
                 editor.apply();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        // 初始化最近标签窗口大小 Spinner
+        recentTagsWindowSpinner = root.findViewById(R.id.recent_tags_window_spinner);
+        ArrayAdapter<CharSequence> windowAdapter = ArrayAdapter.createFromResource(getContext(),
+                R.array.recent_tags_window_array, android.R.layout.simple_spinner_item);
+        windowAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        recentTagsWindowSpinner.setAdapter(windowAdapter);
+
+        // 加载保存的窗口大小
+        int savedWindow = RecentTagsManager.getRecentTagsWindow(requireContext());
+        // 将保存的值转换为 Spinner 索引 (保存值-3 = 索引)
+        int windowIndex = Math.max(0, Math.min(7, savedWindow - 3));
+        recentTagsWindowSpinner.setSelection(windowIndex);
+
+        // 保存用户选择
+        recentTagsWindowSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                int window = position + 3;  // 索引+3 = 实际窗口值
+                RecentTagsManager.setRecentTagsWindow(requireContext(), window);
             }
 
             @Override

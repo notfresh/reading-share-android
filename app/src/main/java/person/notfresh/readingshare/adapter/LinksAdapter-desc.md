@@ -38,6 +38,7 @@ itemView.setOnClickListener(v -> {
         } else if (url.contains("weread.qq.com")) {
             handleWereadLink(url);
         } else {
+          
             adapter.openLink(v.getContext(), url, getAdapterPosition());
         }
     } catch (Exception e) {

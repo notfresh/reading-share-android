@@ -39,15 +39,25 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.content.pm.PackageManager;
 import android.webkit.PermissionRequest;
+import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import android.widget.EditText;
+import android.widget.TextView;
+import android.widget.LinearLayout;
+import com.google.android.flexbox.FlexboxLayout;
+
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.CrawlUtil;
+import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
 
 public class WebViewActivity extends AppCompatActivity {
@@ -406,6 +416,9 @@ public class WebViewActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.action_toggle_external_block) {
             toggleExternalBlockMode();
             return true;
+        } else if (item.getItemId() == R.id.action_add_tag) {
+            showAddTagDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -612,6 +625,161 @@ public class WebViewActivity extends AppCompatActivity {
         }
         prefs.edit().putInt("external_link_mode", newMode).apply();
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    private void showAddTagDialog() {
+        if (webView == null) {
+            Toast.makeText(this, "页面未加载", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String url = webView.getUrl();
+        if (url == null || url.isEmpty()) {
+            Toast.makeText(this, "无法获取页面URL", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_tag, null);
+        EditText input = dialogView.findViewById(R.id.edit_tag_input);
+        FlexboxLayout recentTagsContainer = dialogView.findViewById(R.id.recent_tags_container);
+        FlexboxLayout currentTagsContainer = dialogView.findViewById(R.id.current_tags_container);
+        TextView currentTagsLabel = dialogView.findViewById(R.id.text_current_tags_label);
+
+        // 加载现有标签（异步）
+        final List<String> existingTags = new ArrayList<>();
+        final boolean[] linkExists = {false};
+        final long[] linkId = {-1};
+
+        new Thread(() -> {
+            LinkDao dao = new LinkDao(WebViewActivity.this);
+            try {
+                dao.open();
+                if (dao.urlExists(url)) {
+                    linkExists[0] = true;
+                    List<LinkItem> allLinks = dao.getAllLinks();
+                    for (LinkItem link : allLinks) {
+                        if (url.equals(link.getUrl())) {
+                            existingTags.addAll(link.getTags());
+                            linkId[0] = link.getId();
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                try { dao.close(); } catch (Exception ignored) {}
+            }
+
+            runOnUiThread(() -> {
+                // 显示当前标签
+                if (!existingTags.isEmpty()) {
+                    currentTagsLabel.setVisibility(View.VISIBLE);
+                    for (String tag : existingTags) {
+                        TextView tagView = (TextView) LayoutInflater.from(WebViewActivity.this)
+                                .inflate(R.layout.item_tag, currentTagsContainer, false);
+                        tagView.setText(tag);
+                        tagView.setOnClickListener(v -> {
+                            // 点击删除：从容器中移除，并从列表中移除
+                            currentTagsContainer.removeView(tagView);
+                            existingTags.remove(tag);
+                        });
+                        currentTagsContainer.addView(tagView);
+                    }
+                }
+
+                // 显示最近标签
+                List<String> recentTags = RecentTagsManager.getRecentTags(WebViewActivity.this);
+                if (!recentTags.isEmpty()) {
+                    TextView recentTagsLabel = dialogView.findViewById(R.id.text_recent_tags_label);
+                    recentTagsLabel.setVisibility(View.VISIBLE);
+                    for (String tag : recentTags) {
+                        TextView tagView = (TextView) LayoutInflater.from(WebViewActivity.this)
+                                .inflate(R.layout.item_recent_tag, recentTagsContainer, false);
+                        tagView.setText(tag);
+                        tagView.setOnClickListener(v -> {
+                            String currentText = input.getText().toString().trim();
+                            if (!currentText.isEmpty() && !currentText.endsWith(",") && !currentText.endsWith("，")) {
+                                input.setText(currentText + "，" + tag);
+                            } else {
+                                input.setText(currentText + tag);
+                            }
+                            input.setSelection(input.getText().length());
+                        });
+                        recentTagsContainer.addView(tagView);
+                    }
+                }
+            });
+        }).start();
+
+        new AlertDialog.Builder(this)
+                .setTitle("添加标签")
+                .setView(dialogView)
+                .setPositiveButton("确定", (dialogInterface, which) -> {
+                    String tagName = input.getText().toString().trim();
+                    String[] tags = tagName.split("[,，]");
+                    List<String> newTags = new ArrayList<>();
+                    for (String tag : tags) {
+                        String trimmedTag = tag.trim();
+                        if (!trimmedTag.isEmpty()) {
+                            newTags.add(trimmedTag);
+                        }
+                    }
+
+                    List<String> allTags = new ArrayList<>(existingTags);
+                    allTags.addAll(newTags);
+
+                    if (!allTags.isEmpty()) {
+                        if (!newTags.isEmpty()) {
+                            RecentTagsManager.addRecentTags(this, newTags);
+                        }
+                        saveTagsToLink(url, allTags);
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void saveTagsToLink(String url, List<String> tags) {
+        new Thread(() -> {
+            LinkDao dao = new LinkDao(WebViewActivity.this);
+            try {
+                dao.open();
+                LinkItem item;
+
+                if (dao.urlExists(url)) {
+                    List<LinkItem> allLinks = dao.getAllLinks();
+                    item = null;
+                    for (LinkItem link : allLinks) {
+                        if (url.equals(link.getUrl())) {
+                            item = link;
+                            break;
+                        }
+                    }
+                } else {
+                    String title = pageTitleCache != null && !pageTitleCache.isEmpty()
+                            ? pageTitleCache : "未命名";
+                    item = new LinkItem(title, url, "", "", "");
+                    item.setClickCount(0);
+                    item.setSummary("");
+                    long id = dao.insertLink(item);
+                    item.setId(id);
+                }
+
+                if (item != null) {
+                    for (String tag : tags) {
+                        item.addTag(tag);
+                    }
+                    dao.updateLinkTags(item);
+                    runOnUiThread(() -> Toast.makeText(WebViewActivity.this,
+                            "已保存标签: " + String.join(", ", tags), Toast.LENGTH_SHORT).show());
+                }
+            } catch (Exception e) {
+                Log.e("WebViewActivity", "保存标签失败: " + e.getMessage());
+                runOnUiThread(() -> Toast.makeText(WebViewActivity.this,
+                        "保存标签失败", Toast.LENGTH_SHORT).show());
+            } finally {
+                try { dao.close(); } catch (Exception ignored) {}
+            }
+        }).start();
     }
 
     private void showExternalOpenConfirmDialog(String url) {

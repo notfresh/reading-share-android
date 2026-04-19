@@ -11,7 +11,21 @@ public class RecentTagsManager {
     private static final String PREF_NAME = "recent_tags_pref";
     private static final String KEY_RECENT_TAGS = "recent_tags";
     private static final String TAG_SEPARATOR = ",";
-    private static final int MAX_RECENT_TAGS = 3;
+    private static final String KEY_RECENT_TAGS_WINDOW = "recent_tags_window";
+    private static final int DEFAULT_RECENT_TAGS_WINDOW = 5;
+    private static final int MIN_RECENT_TAGS_WINDOW = 1;
+    private static final int MAX_RECENT_TAGS_WINDOW = 10;
+
+    public static int getRecentTagsWindow(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE);
+        return prefs.getInt(KEY_RECENT_TAGS_WINDOW, DEFAULT_RECENT_TAGS_WINDOW);
+    }
+
+    public static void setRecentTagsWindow(Context context, int window) {
+        int validWindow = Math.max(MIN_RECENT_TAGS_WINDOW, Math.min(MAX_RECENT_TAGS_WINDOW, window));
+        SharedPreferences prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE);
+        prefs.edit().putInt(KEY_RECENT_TAGS_WINDOW, validWindow).apply();
+    }
 
     public static void addRecentTag(Context context, String tag) {
         if (tag == null || tag.trim().isEmpty()) {
@@ -35,8 +49,9 @@ public class RecentTagsManager {
         
         // 转换回列表并限制数量
         List<String> tagsList = new ArrayList<>(tagsSet);
-        if (tagsList.size() > MAX_RECENT_TAGS) {
-            tagsList = tagsList.subList(0, MAX_RECENT_TAGS);
+        int window = getRecentTagsWindow(context);
+        if (tagsList.size() > window) {
+            tagsList = tagsList.subList(0, window);
         }
         
         // 保存回SharedPreferences

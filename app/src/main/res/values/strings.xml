@@ -24,6 +24,17 @@
         <item>随机</item>
     </string-array>
 
+    <string-array name="recent_tags_window_array">
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+    </string-array>
+
     <string name="fragment_tags">标签</string>
 
     <string name="delete_tag">删除标签</string>
@@ -55,4 +66,5 @@
     <string name="extract_web_content">提取Web内容</string>
     <string name="toggle_navigation">显示/隐藏导航控件</string>
     <string name="toggle_external_block">切换外部链接拦截模式</string>
+    <string name="add_tag">添加标签</string>
 </resources>

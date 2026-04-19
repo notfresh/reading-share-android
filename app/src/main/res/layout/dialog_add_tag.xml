@@ -15,6 +15,24 @@
         android:maxLines="1" />
 
     <TextView
+        android:id="@+id/text_current_tags_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="当前标签（点击可删除）:"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <com.google.android.flexbox.FlexboxLayout
+        android:id="@+id/current_tags_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        app:flexWrap="wrap"
+        app:alignItems="flex_start"
+        app:flexDirection="row" />
+
+    <TextView
         android:id="@+id/text_recent_tags_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
