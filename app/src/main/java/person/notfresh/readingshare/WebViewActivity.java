@@ -26,8 +26,6 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.content.SharedPreferences;
-import android.content.BroadcastReceiver;
-import android.content.IntentFilter;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.media.AudioAttributes;
@@ -78,8 +76,6 @@ public class WebViewActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "settings";
     private static final String KEY_NAV_CONTROLS_HIDDEN = "nav_controls_hidden";
-    // 底部播放状态条已移除，使用系统通知栏控制
-    private BroadcastReceiver audioControlReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -228,11 +224,8 @@ public class WebViewActivity extends AppCompatActivity {
         }
 
         // 无论是否保留缓存，都在onDestroy中释放这些资源
-        if (audioControlReceiver != null) {
-            unregisterReceiver(audioControlReceiver);
-            audioControlReceiver = null;
-        }
         stopService(new Intent(this, WebViewBackgroundService.class));
+        WebViewBackgroundService.setMediaCallback(null);
         if (audioManager != null && audioFocusRequest != null) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest);
         }
@@ -518,23 +511,30 @@ public class WebViewActivity extends AppCompatActivity {
                     "(function(){" +
                     "if(window.__mediaListenerAttached)return;" +
                     "window.__mediaListenerAttached=true;" +
-                    "function checkAnyPlaying(){" +
-                    "var els=[].slice.call(document.getElementsByTagName('audio'))" +
-                    ".concat([].slice.call(document.getElementsByTagName('video')));" +
-                    "for(var i=0;i<els.length;i++){if(!els[i].paused&&!els[i].ended)return true;}" +
-                    "return false;}" +
+                    // 用 Set 保存正在播放的元素引用
+                    "window.__activeMedia=new Set();" +
                     "function notify(p){if(window.AndroidMediaInterface)window.AndroidMediaInterface.setMediaPlaying(p);}" +
                     "function attach(el){" +
                     "if(el.__listenersAttached)return;el.__listenersAttached=true;" +
-                    "el.addEventListener('play',function(){notify(true);});" +
-                    "el.addEventListener('pause',function(){if(!checkAnyPlaying())notify(false);});" +
-                    "el.addEventListener('ended',function(){if(!checkAnyPlaying())notify(false);})" +
+                    "el.addEventListener('play',function(){console.log('__media play event');window.__activeMedia.add(el);notify(true);});" +
+                    "el.addEventListener('pause',function(){console.log('__media pause event');window.__activeMedia.delete(el);if(window.__activeMedia.size===0)notify(false);});" +
+                    "el.addEventListener('ended',function(){console.log('__media ended event');window.__activeMedia.delete(el);if(window.__activeMedia.size===0)notify(false);})" +
                     "}" +
+                    // 全局控制函数：直接操作保存的元素引用
+                    "window.__pauseMedia=function(){console.log('__pauseMedia called, active='+window.__activeMedia.size);" +
+                    "window.__activeMedia.forEach(function(e){try{e.pause();}catch(x){}});};" +
+                    "window.__playMedia=function(){console.log('__playMedia called, active='+window.__activeMedia.size);" +
+                    "window.__activeMedia.forEach(function(e){try{e.play().catch(function(){});}catch(x){}});};" +
+                    "window.__stopMedia=function(){console.log('__stopMedia called');" +
+                    "window.__activeMedia.forEach(function(e){try{e.pause();e.currentTime=0;}catch(x){}});window.__activeMedia.clear();};" +
+                    // 附加到已有元素
                     "var existing=[].slice.call(document.getElementsByTagName('audio'))" +
                     ".concat([].slice.call(document.getElementsByTagName('video')));" +
                     "existing.forEach(attach);" +
                     // 立即检测当前是否已有音频在播放（监听前已开始的情况）
-                    "if(checkAnyPlaying())notify(true);" +
+                    "existing.forEach(function(el){if(!el.paused&&!el.ended){window.__activeMedia.add(el);}});" +
+                    "if(window.__activeMedia.size>0)notify(true);" +
+                    // MutationObserver 监听动态添加的元素
                     "var obs=new MutationObserver(function(ms){ms.forEach(function(m){" +
                     "m.addedNodes.forEach(function(n){" +
                     "if(n.tagName==='AUDIO'||n.tagName==='VIDEO'){attach(n);}" +
@@ -597,8 +597,7 @@ public class WebViewActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         isAppInForeground = false;
-        // 无条件启动前台服务，确保通知栏一定出现
-        // （即使 audioPlaying 标志因 JS 异步没有及时更新，服务也会启动）
+        // 无条件启动前台服务保活进程，不请求 AudioFocus（WebView 自己管理焦点）
         Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
         serviceIntent.putExtra("current_url", currentUrl);
         startForegroundService(serviceIntent);
@@ -648,64 +647,57 @@ public class WebViewActivity extends AppCompatActivity {
             @Override
             public void onPlay() {
                 if (webView != null) {
-                    webView.evaluateJavascript(
-                        "(function(){[].slice.call(document.getElementsByTagName('audio'))"
-                        + ".concat([].slice.call(document.getElementsByTagName('video')))"
-                        + ".forEach(function(e){e.play().catch(function(){});});})()", null);
+                    webView.evaluateJavascript("if(window.__playMedia)window.__playMedia()", null);
                 }
             }
             @Override
             public void onPause() {
                 if (webView != null) {
-                    webView.evaluateJavascript(
-                        "(function(){[].slice.call(document.getElementsByTagName('audio'))"
-                        + ".concat([].slice.call(document.getElementsByTagName('video')))"
-                        + ".forEach(function(e){e.pause();});})()", null);
+                    webView.evaluateJavascript("if(window.__pauseMedia)window.__pauseMedia()", null);
                 }
+            }
+            @Override
+            public void onStop() {
+                stopAudioPlayback();
             }
         });
         mediaSession.setActive(true);
         mediaSession.setPlaybackState(new PlaybackStateCompat.Builder()
                 .setActions(PlaybackStateCompat.ACTION_PLAY
                         | PlaybackStateCompat.ACTION_PAUSE
-                        | PlaybackStateCompat.ACTION_PLAY_PAUSE)
+                        | PlaybackStateCompat.ACTION_PLAY_PAUSE
+                        | PlaybackStateCompat.ACTION_STOP)
                 .setState(PlaybackStateCompat.STATE_NONE,
                         PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
                 .build());
 
-        // 注册广播接收器，监听通知栏的播放/暂停/停止按钮
-        audioControlReceiver = new BroadcastReceiver() {
+        // 注册静态回调，让 Service 能直接调用我们的方法（同进程，无需广播或 IPC）
+        WebViewBackgroundService.setMediaCallback(new WebViewBackgroundService.MediaCallback() {
             @Override
-            public void onReceive(Context context, Intent intent) {
-                String action = intent.getAction();
-                if (WebViewBackgroundService.ACTION_PLAY_PAUSE.equals(action)) {
-                    boolean isPaused = intent.getBooleanExtra("is_paused", false);
-                    if (isPaused) {
-                        // 暂停
-                        if (webView != null) {
-                            webView.evaluateJavascript(
-                                "(function(){[].slice.call(document.getElementsByTagName('audio'))"
-                                + ".concat([].slice.call(document.getElementsByTagName('video')))"
-                                + ".forEach(function(e){e.pause();});})()", null);
-                        }
-                    } else {
-                        // 恢复播放
-                        if (webView != null) {
-                            webView.evaluateJavascript(
-                                "(function(){[].slice.call(document.getElementsByTagName('audio'))"
-                                + ".concat([].slice.call(document.getElementsByTagName('video')))"
-                                + ".forEach(function(e){e.play().catch(function(){});});})()", null);
-                        }
+            public void onPlayRequested() {
+                runOnUiThread(() -> {
+                    if (webView != null) {
+                        webView.evaluateJavascript("if(window.__playMedia)window.__playMedia()", null);
                     }
-                } else if (WebViewBackgroundService.ACTION_STOP.equals(action)) {
-                    stopAudioPlayback();
-                }
+                });
             }
-        };
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(WebViewBackgroundService.ACTION_PLAY_PAUSE);
-        filter.addAction(WebViewBackgroundService.ACTION_STOP);
-        registerReceiver(audioControlReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            @Override
+            public void onPauseRequested() {
+                runOnUiThread(() -> {
+                    if (webView != null) {
+                        webView.evaluateJavascript("if(window.__pauseMedia)window.__pauseMedia()", null);
+                    }
+                });
+            }
+            @Override
+            public void onStopRequested() {
+                runOnUiThread(() -> {
+                    if (webView != null) {
+                        webView.evaluateJavascript("if(window.__stopMedia)window.__stopMedia()", null);
+                    }
+                });
+            }
+        });
     }
 
     private void onMediaPlayingChanged(boolean isPlaying) {
@@ -720,22 +712,11 @@ public class WebViewActivity extends AppCompatActivity {
                             PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
                     .build());
         }
-        if (isPlaying) {
-            if (audioManager != null && audioFocusRequest != null) {
-                audioManager.requestAudioFocus(audioFocusRequest);
-            }
-            if (!isAppInForeground) {
-                Intent serviceIntent = new Intent(WebViewActivity.this, WebViewBackgroundService.class);
-                serviceIntent.putExtra("current_url", currentUrl);
-                startForegroundService(serviceIntent);
-                if (wakeLock != null && !wakeLock.isHeld()) {
-                    wakeLock.acquire(30 * 60 * 1000L);
-                }
-            }
-        } else {
-            if (audioManager != null && audioFocusRequest != null) {
-                audioManager.abandonAudioFocusRequest(audioFocusRequest);
-            }
+        // 不在这里请求/放弃 AudioFocus，WebView 自己管理音频焦点。
+        // 不在后台时因为播放状态变化停止服务，防止瞬时波动导致服务被杀。
+        // 服务的停止统一由 onResume 和 onDestroy 管理。
+        if (!isPlaying && isAppInForeground) {
+            // 前台音频停止播放时，可以停止服务
             stopService(new Intent(WebViewActivity.this, WebViewBackgroundService.class));
             if (wakeLock != null && wakeLock.isHeld()) {
                 wakeLock.release();
@@ -916,10 +897,7 @@ public class WebViewActivity extends AppCompatActivity {
     // --- 通知栏停止音频辅助 ---
     private void stopAudioPlayback() {
         if (webView != null) {
-            webView.evaluateJavascript(
-                "(function(){[].slice.call(document.getElementsByTagName('audio'))"
-                + ".concat([].slice.call(document.getElementsByTagName('video')))"
-                + ".forEach(function(e){e.pause();e.currentTime=0;});})()", null);
+            webView.evaluateJavascript("if(window.__stopMedia)window.__stopMedia()", null);
         }
     }
     // --- end 通知栏停止音频辅助 ---

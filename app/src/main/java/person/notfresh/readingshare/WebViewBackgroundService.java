@@ -25,6 +25,17 @@ public class WebViewBackgroundService extends Service {
     private String currentUrl;
     private boolean isPaused = false;
 
+    // 同进程静态回调，直接调用 Activity 的方法，不经过广播或 IPC
+    public interface MediaCallback {
+        void onPlayRequested();
+        void onPauseRequested();
+        void onStopRequested();
+    }
+    private static MediaCallback sMediaCallback;
+    public static void setMediaCallback(MediaCallback callback) {
+        sMediaCallback = callback;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -47,19 +58,22 @@ public class WebViewBackgroundService extends Service {
             String action = intent.getAction();
             if (ACTION_PLAY_PAUSE.equals(action)) {
                 isPaused = !isPaused;
-                // 发送广播给 WebViewActivity 执行 play/pause
-                Intent broadcast = new Intent(ACTION_PLAY_PAUSE);
-                broadcast.putExtra("is_paused", isPaused);
-                broadcast.setPackage(getPackageName());
-                sendBroadcast(broadcast);
+                Log.d(TAG, "Play/Pause 按钮点击, isPaused=" + isPaused + ", callback=" + (sMediaCallback != null));
+                if (sMediaCallback != null) {
+                    if (isPaused) {
+                        sMediaCallback.onPauseRequested();
+                    } else {
+                        sMediaCallback.onPlayRequested();
+                    }
+                }
                 // 刷新通知
                 startForeground(NOTIFICATION_ID, buildNotification());
                 return START_STICKY;
             } else if (ACTION_STOP.equals(action)) {
-                // 发送广播给 WebViewActivity 执行停止
-                Intent broadcast = new Intent(ACTION_STOP);
-                broadcast.setPackage(getPackageName());
-                sendBroadcast(broadcast);
+                Log.d(TAG, "Stop 按钮点击, callback=" + (sMediaCallback != null));
+                if (sMediaCallback != null) {
+                    sMediaCallback.onStopRequested();
+                }
                 stopForeground(true);
                 stopSelf();
                 return START_NOT_STICKY;
