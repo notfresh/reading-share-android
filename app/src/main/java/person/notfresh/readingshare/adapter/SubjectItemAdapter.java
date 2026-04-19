@@ -146,14 +146,19 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
             return;
         }
 
-        // 获取链接信息
+        // 优先通过 listener 交给宿主 Activity 处理（例如 SubjectDetailActivity 会传递 context_ids）
+        if (listener != null) {
+            listener.onSubjectItemClick(item);
+            return;
+        }
+
+        // 没有 listener 的回退：直接打开 WebView（保持原有行为）
         LinkItem linkItem = getLinkById(item.getLinkId());
         if (linkItem == null) {
             Toast.makeText(context, "无法获取链接信息", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // 打开链接
         String url = linkItem.getUrl();
         if (url != null && !url.isEmpty()) {
             Intent intent = new Intent(context, WebViewActivity.class);
