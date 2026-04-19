@@ -1056,12 +1056,42 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             Log.d("LinksAdapter", "Starting WebViewActivity with url: " + url);
             Intent intent = new Intent(context, WebViewActivity.class);
             intent.putExtra("url", url);
+            // Build context_ids and context_index (so WebViewActivity can do continuous reading)
+            try {
+                List<LinkItem> currentLinks = getLinks();
+                long[] contextIds = new long[currentLinks.size()];
+                for (int i = 0; i < currentLinks.size(); i++) {
+                    contextIds[i] = currentLinks.get(i).getId();
+                }
+                int contextIndex = currentLinks.indexOf(linkItem);
+                intent.putExtra("context_ids", contextIds);
+                intent.putExtra("context_index", contextIndex >= 0 ? contextIndex : 0);
+            } catch (Exception e) {
+                Log.w("LinksAdapter", "Failed to build context_ids: " + e.getMessage());
+            }
             context.startActivity(intent);
 
         } catch (Exception e) {
             Log.e("LinksAdapter", "Error in openLink: " + e.getMessage(), e);
             Toast.makeText(context, "无法打开链接: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    public void openLinkWithContext(View view, LinkItem item, int position) {
+        Intent intent = new Intent(view.getContext(), WebViewActivity.class);
+        intent.putExtra("url", item.getUrl());
+
+        // Build context_ids and context_index
+        List<LinkItem> currentLinks = getLinks();
+        long[] contextIds = new long[currentLinks.size()];
+        for (int i = 0; i < currentLinks.size(); i++) {
+            contextIds[i] = currentLinks.get(i).getId();
+        }
+        int contextIndex = currentLinks.indexOf(item);
+        intent.putExtra("context_ids", contextIds);
+        intent.putExtra("context_index", contextIndex >= 0 ? contextIndex : 0);
+
+        view.getContext().startActivity(intent);
     }
 
     public int getPositionForDate(String date) {
@@ -1478,8 +1508,4 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
     }
 
-
-
-
-
-} 
+}

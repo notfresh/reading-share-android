@@ -1,0 +1,29 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build and verify app",
+			"type": "shell",
+			"command": "gradlew.bat",
+			"args": [
+				":app:assembleDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$javac"
+			]
+		},
+		{
+			"label": "Run tests for navigation verification",
+			"type": "shell",
+			"command": "gradlew.bat",
+			"args": [
+				"testDebugUnitTest"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$javac"
+			]
+		}
+	]
+}

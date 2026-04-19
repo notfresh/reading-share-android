@@ -12,14 +12,20 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import android.view.View;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.content.SharedPreferences;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.os.PowerManager;
@@ -29,9 +35,11 @@ import android.webkit.PermissionRequest;
 import android.view.ViewGroup;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.ShareUtil;
 
@@ -45,11 +53,24 @@ public class WebViewActivity extends AppCompatActivity {
     private boolean preserveCache = false;
     private String pageTitleCache = "";
     private boolean isExternalOpen = false; // 是否从外部打开
+    private long[] contextIds;
+    private int currentIndex;
+    private boolean isNavigating = false;
+    private FrameLayout navigationControls;
+    private Button buttonPrevious;
+    private Button buttonNext;
+    private Handler controlsHandler = new Handler(Looper.getMainLooper());
+    private Runnable hideControlsRunnable;
+    private static final int CONTROLS_AUTO_HIDE_MS = 3000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_webview);
+
+        parseNavigationContext();
+        setupNavigationControls();
+        initControlsIfNeeded();
 
         // 初始化 Toolbar
         toolbar = findViewById(R.id.toolbar);
@@ -103,7 +124,8 @@ public class WebViewActivity extends AppCompatActivity {
             if (webView.getParent() != null) {
                 ((ViewGroup) webView.getParent()).removeView(webView);
             }
-            webViewContainer.addView(webView);
+            webViewContainer.addView(webView, 0);
+            attachControlRevealTouchListener();
             Toast.makeText(this, "已恢复存档页面", Toast.LENGTH_SHORT).show();
             
             // 初始化MediaSession（确保缓存的WebView有可用的mediaSession）
@@ -220,56 +242,31 @@ public class WebViewActivity extends AppCompatActivity {
         super.onStop();
     }
 
+    private void handleNavigationIntent(Intent intent) {
+        String newUrl = intent.getStringExtra("url");
+        if (newUrl != null && !newUrl.equals(currentUrl)) {
+            currentUrl = newUrl;
+            webView.loadUrl(currentUrl);
+        } else if (contextIds != null && currentIndex >= 0 && currentIndex < contextIds.length) {
+            loadByContextIndex(currentIndex);
+        } else {
+            Log.w("WebViewActivity", "Invalid navigation intent or context.");
+        }
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        setIntent(intent); // 重要：更新 Intent，这样 getIntent() 会返回最新的 Intent
-        
-        // 更新外部打开标志
-        String action = intent != null ? intent.getAction() : null;
-        boolean fromShortcut = intent != null && intent.getBooleanExtra("from_shortcut", false);
-        isExternalOpen = Intent.ACTION_SEND.equals(action) || Intent.ACTION_VIEW.equals(action) || fromShortcut;
-        
-        // 从新的 Intent 中获取 URL
-        String newUrl = intent.getStringExtra("url");
-        if (newUrl != null && !newUrl.isEmpty() && !newUrl.equals(currentUrl)) {
-            Log.d("WebViewActivity", "onNewIntent: Loading new URL from shortcut: " + newUrl);
-            currentUrl = newUrl;
-            
-            // 强制加载新的 URL
-            if (webView != null) {
-                // 检查是否有缓存的 WebView
-                WebView cachedWebView = getInstance().getWebView(newUrl);
-                ViewGroup webViewContainer = findViewById(R.id.webview_container);
-                
-                if (cachedWebView != null) {
-                    // 移除当前的 WebView
-                    if (webView.getParent() != null) {
-                        ((ViewGroup) webView.getParent()).removeView(webView);
-                    }
-                    // 使用缓存的 WebView
-                    webView = cachedWebView;
-                    if (webView.getParent() != null) {
-                        ((ViewGroup) webView.getParent()).removeView(webView);
-                    }
-                    webViewContainer.addView(webView);
-                    Toast.makeText(this, "已恢复存档页面", Toast.LENGTH_SHORT).show();
-                    initMediaSession();
-                } else {
-                    // 没有缓存，直接加载新 URL
-                    webView.loadUrl(newUrl);
-                }
-            }
-        } else if (newUrl == null || newUrl.isEmpty()) {
-            Log.w("WebViewActivity", "onNewIntent: No URL provided in intent");
-        } else {
-            Log.d("WebViewActivity", "onNewIntent: URL unchanged: " + newUrl);
-        }
+        setIntent(intent);
+        parseNavigationContext();
+        initControlsIfNeeded();
+        handleNavigationIntent(intent);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        initControlsIfNeeded();
         if (webView != null) {
             webView.onResume();
             webView.resumeTimers();
@@ -384,6 +381,8 @@ public class WebViewActivity extends AppCompatActivity {
 
 
     private void setupWebView() {
+        attachControlRevealTouchListener();
+
         // 启用 JavaScript
         webView.getSettings().setJavaScriptEnabled(true);
         
@@ -447,23 +446,16 @@ public class WebViewActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                // 处理自定义 URI Scheme
-                if (url != null && !url.startsWith("http://") && !url.startsWith("https://")) {
-                    try {
-                        // 尝试用系统浏览器打开自定义 URI Scheme
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(intent);
-                        return true; // 表示已经处理了这个URL
-                    } catch (Exception e) {
-                        // 如果无法打开，显示错误信息
-                        Log.e("WebViewActivity", "无法打开自定义URI: " + url, e);
-                        Toast.makeText(WebViewActivity.this, "无法打开此链接: " + url, Toast.LENGTH_SHORT).show();
-                        return true;
-                    }
-                }
-                // 对于普通的 http/https URL，让 WebView 正常处理
-                return false;
+                return handleUrlOverride(view, url, true);
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request != null && request.getUrl() != null
+                        ? request.getUrl().toString()
+                        : null;
+                boolean isMainFrame = request == null || request.isForMainFrame();
+                return handleUrlOverride(view, url, isMainFrame);
             }
             
             @Override
@@ -547,6 +539,52 @@ public class WebViewActivity extends AppCompatActivity {
         });
     }
 
+    private boolean handleUrlOverride(WebView view, String url, boolean isMainFrame) {
+        if (url == null || !isMainFrame) {
+            return false;
+        }
+
+        // http(s) 链接直接在 WebView 内加载
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            return false;
+        }
+
+        // 所有非 http(s) 链接（自定义 scheme 如 snssdk://, intent://, weixin:// 等）
+        // 一律拦截并弹窗确认，防止网页强制跳转到外部应用
+        Log.d("WebViewActivity", "拦截非HTTP链接: " + url + " (来自页面: " + (view != null ? view.getUrl() : currentUrl) + ")");
+        showExternalOpenConfirmDialog(url);
+        return true;
+    }
+
+    private void showExternalOpenConfirmDialog(String url) {
+        runOnUiThread(() -> new AlertDialog.Builder(this)
+                .setTitle("打开外部应用")
+                .setMessage("网页正在尝试打开外部应用，是否继续？\n\n" + url)
+                .setNegativeButton("留在网页", null)
+                .setPositiveButton("继续打开", (dialog, which) -> openExternalUri(url))
+                .show());
+    }
+
+    private void openExternalUri(String url) {
+        try {
+            Intent intent;
+            if (url.startsWith("intent://")) {
+                // 解析 intent:// URI
+                intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                intent.setComponent(null);
+                intent.setSelector(null);
+            } else {
+                intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e("WebViewActivity", "无法打开外部URI: " + url, e);
+            Toast.makeText(WebViewActivity.this, "无法打开此链接: " + url, Toast.LENGTH_SHORT).show();
+        }
+    }
+
     
 
     @Override
@@ -614,6 +652,149 @@ public class WebViewActivity extends AppCompatActivity {
                         PlaybackStateCompat.ACTION_PLAY_PAUSE);
         mediaSession.setPlaybackState(stateBuilder.build());
     }
+
+    // --- Continuous-reading helpers ---
+    private void parseNavigationContext() {
+        try {
+            Intent it = getIntent();
+            if (it != null && it.hasExtra("context_ids")) {
+                contextIds = it.getLongArrayExtra("context_ids");
+                currentIndex = it.getIntExtra("context_index", 0);
+            } else {
+                contextIds = null;
+                currentIndex = -1;
+            }
+        } catch (Exception e) {
+            Log.w("WebViewActivity", "parseNavigationContext failed: " + e.getMessage());
+            contextIds = null;
+            currentIndex = -1;
+        }
+    }
+
+    private boolean hasValidNavigationContext() {
+        return contextIds != null && contextIds.length > 1
+                && currentIndex >= 0 && currentIndex < contextIds.length;
+    }
+
+    private void setupNavigationControls() {
+        try {
+            navigationControls = findViewById(R.id.navigation_controls);
+            if (navigationControls == null) return;
+            buttonPrevious = navigationControls.findViewById(R.id.button_previous);
+            buttonNext = navigationControls.findViewById(R.id.button_next);
+            if (buttonPrevious != null) buttonPrevious.setOnClickListener(v -> navigateToPrevious());
+            if (buttonNext != null) buttonNext.setOnClickListener(v -> navigateToNext());
+            hideControlsRunnable = () -> runOnUiThread(() -> {
+                if (navigationControls != null) navigationControls.setVisibility(View.GONE);
+            });
+            navigationControls.setVisibility(hasValidNavigationContext() ? View.VISIBLE : View.GONE);
+        } catch (Exception e) {
+            Log.w("WebViewActivity", "setupNavigationControls failed: " + e.getMessage());
+        }
+    }
+
+    private void initControlsIfNeeded() {
+        if (navigationControls == null) setupNavigationControls();
+        if (!hasValidNavigationContext()) {
+            if (navigationControls != null) {
+                navigationControls.setVisibility(View.GONE);
+            }
+            return;
+        }
+        boolean smoothMode = isSmoothReadingMode();
+        if (navigationControls != null) {
+            navigationControls.setVisibility(smoothMode ? View.GONE : View.VISIBLE);
+            if (smoothMode) {
+                navigationControls.setVisibility(View.VISIBLE);
+                controlsHandler.removeCallbacks(hideControlsRunnable);
+                controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
+            }
+        }
+    }
+
+    private void showControlsTemporarily() {
+        if (navigationControls == null || !hasValidNavigationContext()) return;
+        navigationControls.setVisibility(View.VISIBLE);
+        controlsHandler.removeCallbacks(hideControlsRunnable);
+        controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
+    }
+
+    private boolean isSmoothReadingMode() {
+        try {
+            SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
+            String mode = prefs.getString("reading_mode", "normal");
+            return "smooth".equals(mode);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void attachControlRevealTouchListener() {
+        if (webView == null) {
+            return;
+        }
+        webView.setOnTouchListener((view, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN
+                    && hasValidNavigationContext()
+                    && isSmoothReadingMode()) {
+                showControlsTemporarily();
+            }
+            return false;
+        });
+    }
+
+    private void navigateToPrevious() {
+        if (!hasValidNavigationContext() || isNavigating) return;
+        int previousIndex = (currentIndex - 1 + contextIds.length) % contextIds.length;
+        loadByContextIndex(previousIndex);
+    }
+
+    private void navigateToNext() {
+        if (!hasValidNavigationContext() || isNavigating) return;
+        int nextIndex = (currentIndex + 1) % contextIds.length;
+        loadByContextIndex(nextIndex);
+    }
+
+    private void loadByContextIndex(int index) {
+        if (contextIds == null || index < 0 || index >= contextIds.length) return;
+        if (isNavigating) return;
+        isNavigating = true;
+        long targetId = contextIds[index];
+        new Thread(() -> {
+            LinkDao dao = new LinkDao(this);
+            String url = null;
+            String title = null;
+            try {
+                dao.open();
+                person.notfresh.readingshare.model.LinkItem item = dao.getLinkById(targetId);
+                if (item != null) {
+                    url = item.getUrl();
+                    title = item.getTitle();
+                }
+            } catch (Exception e) {
+                Log.w("WebViewActivity", "loadByContextIndex lookup failed: " + e.getMessage());
+            } finally {
+                try { dao.close(); } catch (Exception ignored) {}
+            }
+            final String finalUrl = url;
+            final String finalTitle = title;
+            runOnUiThread(() -> {
+                if (finalUrl != null && webView != null) {
+                    if (!finalUrl.equals(currentUrl)) {
+                        webView.loadUrl(finalUrl);
+                        currentUrl = finalUrl;
+                        if (finalTitle != null && toolbar != null) toolbar.setTitle(finalTitle);
+                    }
+                    currentIndex = index;
+                    showControlsTemporarily();
+                } else {
+                    Toast.makeText(this, "无法加载下一页", Toast.LENGTH_SHORT).show();
+                }
+                isNavigating = false;
+            });
+        }).start();
+    }
+    // --- end continuous-reading helpers ---
 
     // 添加一个JS接口类来处理媒体操作
     private class MediaInterfaceObject {

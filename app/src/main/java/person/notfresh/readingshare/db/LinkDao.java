@@ -641,6 +641,27 @@ public class LinkDao {
         return item;
     }
 
+    /**
+     * Get a single LinkItem by its id.
+     * Returns null if not found.
+     */
+    public LinkItem getLinkById(long linkId) {
+        Cursor cursor = database.query(
+                LinkDbHelper.TABLE_LINKS,
+                null,
+                LinkDbHelper.COLUMN_ID + " = ?",
+                new String[]{String.valueOf(linkId)},
+                null, null, null, "1");
+        try {
+            if (cursor.moveToFirst()) {
+                return createLinkItemFromCursor(cursor);
+            }
+            return null;
+        } finally {
+            cursor.close();
+        }
+    }
+
     private LinkItem cursorToLinkItem(Cursor cursor) {
         long id = cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID));
         String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));

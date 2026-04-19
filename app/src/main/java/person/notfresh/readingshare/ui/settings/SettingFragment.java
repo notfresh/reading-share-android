@@ -130,7 +130,9 @@ public class SettingFragment extends Fragment {
         serverUrlInput = root.findViewById(R.id.server_url_input);
         
         // 从 SharedPreferences 加载保存的URL
-        String savedUrl = prefs.getString("server_url", DEFAULT_SERVER_URL);
+        // use named prefs for cross-component access
+        SharedPreferences globalPrefs = requireActivity().getSharedPreferences("settings", Context.MODE_PRIVATE);
+        String savedUrl = globalPrefs.getString("server_url", DEFAULT_SERVER_URL);
         serverUrlInput.setText(savedUrl);
 
         // 监听输入框内容变化
@@ -141,11 +143,33 @@ public class SettingFragment extends Fragment {
                     newUrl = DEFAULT_SERVER_URL;
                     serverUrlInput.setText(newUrl);
                 }
-                // 保存新的URL
-                SharedPreferences.Editor editor = prefs.edit();
+                // 保存新的URL到全局设置
+                SharedPreferences.Editor editor = globalPrefs.edit();
                 editor.putString("server_url", newUrl);
                 editor.apply();
             }
+        });
+
+        // 阅读模式设置（normal / smooth）
+        RadioGroup readingModeGroup = root.findViewById(R.id.reading_mode_group);
+        RadioButton normalRb = root.findViewById(R.id.reading_mode_normal);
+        RadioButton smoothRb = root.findViewById(R.id.reading_mode_smooth);
+
+        String readingMode = globalPrefs.getString("reading_mode", "normal");
+        if ("smooth".equals(readingMode)) {
+            smoothRb.setChecked(true);
+        } else {
+            normalRb.setChecked(true);
+        }
+
+        readingModeGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            SharedPreferences.Editor editor = globalPrefs.edit();
+            if (checkedId == R.id.reading_mode_smooth) {
+                editor.putString("reading_mode", "smooth");
+            } else {
+                editor.putString("reading_mode", "normal");
+            }
+            editor.apply();
         });
 
         // 添加导入文件按钮

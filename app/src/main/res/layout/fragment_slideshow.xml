@@ -67,5 +67,34 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="阅读模式"
+            android:textSize="18sp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/reading_mode_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <RadioButton
+                android:id="@+id/reading_mode_normal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="常规" />
+
+            <RadioButton
+                android:id="@+id/reading_mode_smooth"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="平滑（自动隐藏控制层）" />
+
+        </RadioGroup>
+
     </LinearLayout>
 </ScrollView>
