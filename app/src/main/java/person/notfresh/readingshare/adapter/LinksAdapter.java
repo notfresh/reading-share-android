@@ -1208,15 +1208,16 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         // 创建基础 Intent
                         Intent intent = new Intent(Intent.ACTION_VIEW);
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        adapter.openLink(v.getContext(), url, getAdapterPosition());
 
-                        if (url.contains("b23.tv")) {
-                            handleBilibiliLink(url); //@Def Line408
-                        // } else if (url.contains("weread.qq.com")) {
-                        //     handleWereadLink(url);
-                        } else {
-                            // 使用内置 WebView 打开普通链接
-                            adapter.openLink(v.getContext(), url, getAdapterPosition());
-                        }
+                        // if (url.contains("b23.tv")) {
+                        //     handleBilibiliLink(url); //@Def Line408
+                        // // } else if (url.contains("weread.qq.com")) {
+                        // //     handleWereadLink(url);
+                        // } else {
+                        //     // 使用内置 WebView 打开普通链接
+                        //     adapter.openLink(v.getContext(), url, getAdapterPosition());
+                        // }
                     } catch (Exception e) {
                         Snackbar.make(v, "无法打开此链接: " + e.getMessage(), 
                                 Snackbar.LENGTH_LONG).show();
