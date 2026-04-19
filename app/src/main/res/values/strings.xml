@@ -53,4 +53,5 @@
     <string name="webview_switch_out">临时切出</string>
     <string name="webview_share">分享</string>
     <string name="extract_web_content">提取Web内容</string>
+    <string name="toggle_navigation">显示/隐藏导航控件</string>
 </resources>

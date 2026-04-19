@@ -5,6 +5,23 @@
         android:id="@+id/action_save_to_documents"
         android:title="保存到文档"
         android:icon="@android:drawable/ic_menu_save"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_orientation"
+        android:title="屏幕方向"
+        android:icon="@android:drawable/ic_menu_rotate"
+        app:showAsAction="always">
+        <menu>
+            <item
+                android:id="@+id/action_orientation_landscape"
+                android:title="横屏" />
+            <item
+                android:id="@+id/action_orientation_portrait"
+                android:title="竖屏" />
+            <item
+                android:id="@+id/action_orientation_auto"
+                android:title="跟随系统" />
+        </menu>
+    </item>
 </menu>
 

@@ -1,6 +1,7 @@
 package person.notfresh.readingshare.ui.document;
 
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
@@ -209,6 +210,15 @@ public class DocumentViewerActivity extends AppCompatActivity {
         int id = item.getItemId();
         if (id == R.id.action_save_to_documents) {
             saveToDocuments();
+            return true;
+        } else if (id == R.id.action_orientation_landscape) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+            return true;
+        } else if (id == R.id.action_orientation_portrait) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            return true;
+        } else if (id == R.id.action_orientation_auto) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
             return true;
         }
         return super.onOptionsItemSelected(item);
