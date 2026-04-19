@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.WebViewActivity;
 import person.notfresh.readingshare.adapter.SubjectItemAdapter;
 import person.notfresh.readingshare.core.model.Subject;
 import person.notfresh.readingshare.core.model.SubjectItem;
@@ -44,6 +45,7 @@ public class SubjectDetailActivity extends AppCompatActivity implements
     private Subject subject;
     private long subjectId;
     private ItemTouchHelper itemTouchHelper;
+    private List<SubjectItem> currentSubjectItems; // 保存当前主题项列表用于构建 context_ids
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,11 +148,12 @@ public class SubjectDetailActivity extends AppCompatActivity implements
         // 重新从数据库加载主题（包含主题项）
         subject = subjectDao.getSubjectById(subjectId);
         if (subject != null) {
-            List<SubjectItem> items = subject.getSubItems();
-            adapter.setItems(items);
-            updateEmptyState(items);
-            Log.d(TAG, "加载了 " + items.size() + " 个主题项");
+            currentSubjectItems = subject.getSubItems();
+            adapter.setItems(currentSubjectItems);
+            updateEmptyState(currentSubjectItems);
+            Log.d(TAG, "加载了 " + currentSubjectItems.size() + " 个主题项");
         } else {
+            currentSubjectItems = null;
             updateEmptyState(null);
         }
     }
@@ -166,7 +169,62 @@ public class SubjectDetailActivity extends AppCompatActivity implements
 
     @Override
     public void onSubjectItemClick(SubjectItem item) {
-        showEditSubjectItemDialog(item);
+        // 如果有链接ID，构造 context_ids 并启动 WebViewActivity
+        if (item.getLinkId() != null && item.getLinkId() > 0) {
+            openWebViewWithContext(item);
+        } else {
+            // 没有链接，显示编辑对话框
+            showEditSubjectItemDialog(item);
+        }
+    }
+
+    /**
+     * 启动 WebViewActivity 并传递上下文信息
+     */
+    private void openWebViewWithContext(SubjectItem clickedItem) {
+        if (currentSubjectItems == null || currentSubjectItems.isEmpty()) {
+            return;
+        }
+
+        // 收集所有有链接的 SubjectItem 的 linkId
+        java.util.ArrayList<Long> contextIdsList = new java.util.ArrayList<>();
+        int clickedIndex = -1;
+
+        for (int i = 0; i < currentSubjectItems.size(); i++) {
+            SubjectItem item = currentSubjectItems.get(i);
+            if (item.getLinkId() != null && item.getLinkId() > 0) {
+                contextIdsList.add(item.getLinkId());
+                if (clickedIndex == -1 && item.getId() == clickedItem.getId()) {
+                    clickedIndex = contextIdsList.size() - 1;
+                }
+            }
+        }
+
+        if (contextIdsList.size() <= 1 || clickedIndex == -1) {
+            // 只有一个或没有链接，直接打开编辑对话框
+            showEditSubjectItemDialog(clickedItem);
+            return;
+        }
+
+        // 获取链接的 URL
+        LinkItem linkItem = linkDao.getLinkById(clickedItem.getLinkId());
+        if (linkItem == null || linkItem.getUrl() == null) {
+            Toast.makeText(this, "无法获取链接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 构建 context_ids 数组
+        long[] contextIds = new long[contextIdsList.size()];
+        for (int i = 0; i < contextIdsList.size(); i++) {
+            contextIds[i] = contextIdsList.get(i);
+        }
+
+        // 启动 WebViewActivity
+        Intent intent = new Intent(this, WebViewActivity.class);
+        intent.putExtra("url", linkItem.getUrl());
+        intent.putExtra("context_ids", contextIds);
+        intent.putExtra("context_index", clickedIndex);
+        startActivity(intent);
     }
 
     private void showEditSubjectItemDialog(SubjectItem item) {

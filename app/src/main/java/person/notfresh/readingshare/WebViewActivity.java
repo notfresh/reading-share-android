@@ -163,11 +163,20 @@ public class WebViewActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.webview_menu, menu);
+
+        // 普通模式不显示"显示/隐藏导航控件"菜单项
+        if (!isSmoothReadingMode()) {
+            MenuItem toggleItem = menu.findItem(R.id.action_toggle_navigation);
+            if (toggleItem != null) {
+                toggleItem.setVisible(false);
+            }
+        }
+
         // 添加调试代码
         MenuItem item = menu.findItem(R.id.action_open_browser);
         if (item == null) {
             Log.e("WebViewActivityMenu", "菜单项加载失败");
-        } 
+        }
         return true;
     }
 
@@ -394,6 +403,9 @@ public class WebViewActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.action_toggle_navigation) {
             toggleNavigationControls();
             return true;
+        } else if (item.getItemId() == R.id.action_toggle_external_block) {
+            toggleExternalBlockMode();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -556,34 +568,50 @@ public class WebViewActivity extends AppCompatActivity {
             return false;
         }
 
-        // 获取外部链接打开模式
+        // 获取外部链接打开模式：2=拦截所有（默认），0=弹窗确认，1=直接跳转
         int externalLinkMode = getExternalLinkMode();
 
         // 所有非 http(s) 链接（自定义 scheme 如 snssdk://, intent://, weixin:// 等）
         Log.d("WebViewActivity", "拦截非HTTP链接: " + url + " (模式: " + externalLinkMode + ")");
 
-        // 根据模式处理
-        if (externalLinkMode == 1) {
+        if (externalLinkMode == 0) {
+            // 模式0：弹窗确认
+            showExternalOpenConfirmDialog(url);
+        } else if (externalLinkMode == 1) {
             // 模式1：直接跳转
             openExternalUri(url);
-            return true;
-        } else if (externalLinkMode == 2) {
-            // 模式2：全部拦截，静默不处理
-            return true;
-        } else {
-            // 模式0（默认）：弹窗确认
-            showExternalOpenConfirmDialog(url);
-            return true;
         }
+        // 模式2（默认）：拦截所有，静默不处理
+        return true;
     }
 
     private int getExternalLinkMode() {
         try {
             SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
-            return prefs.getInt("external_link_mode", 0);
+            return prefs.getInt("external_link_mode", 2); // 默认拦截
         } catch (Exception ignored) {
-            return 0;
+            return 2;
         }
+    }
+
+    private void toggleExternalBlockMode() {
+        SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
+        int currentMode = prefs.getInt("external_link_mode", 2);
+        // 三种模式循环：2(拦截) -> 0(弹窗) -> 1(直接跳转) -> 2(拦截)
+        int newMode;
+        String message;
+        if (currentMode == 2) {
+            newMode = 0;
+            message = "已切换为：弹窗确认";
+        } else if (currentMode == 0) {
+            newMode = 1;
+            message = "已切换为：直接跳转";
+        } else {
+            newMode = 2;
+            message = "已切换为：拦截所有外部链接";
+        }
+        prefs.edit().putInt("external_link_mode", newMode).apply();
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     private void showExternalOpenConfirmDialog(String url) {
@@ -754,9 +782,11 @@ public class WebViewActivity extends AppCompatActivity {
             if (it != null && it.hasExtra("context_ids")) {
                 contextIds = it.getLongArrayExtra("context_ids");
                 currentIndex = it.getIntExtra("context_index", 0);
+                Log.d("WebViewActivity", "parseNavigationContext: contextIds.length=" + contextIds.length + ", currentIndex=" + currentIndex);
             } else {
                 contextIds = null;
                 currentIndex = -1;
+                Log.d("WebViewActivity", "parseNavigationContext: no context_ids in intent");
             }
         } catch (Exception e) {
             Log.w("WebViewActivity", "parseNavigationContext failed: " + e.getMessage());
@@ -801,17 +831,17 @@ public class WebViewActivity extends AppCompatActivity {
 
         boolean smoothMode = isSmoothReadingMode();
         if (navigationControls != null) {
-            if (navigationControlsManuallyHidden) {
-                // 用户手动隐藏了，保持隐藏
+            if (!smoothMode) {
+                // 普通模式：完全不显示导航控件
                 navigationControls.setVisibility(View.GONE);
-            } else if (smoothMode) {
-                // 平滑模式：默认显示，3秒后自动隐藏
+            } else if (navigationControlsManuallyHidden) {
+                // 丝滑模式但用户手动隐藏了，保持隐藏
+                navigationControls.setVisibility(View.GONE);
+            } else {
+                // 丝滑模式：默认显示，3秒后自动隐藏
                 navigationControls.setVisibility(View.VISIBLE);
                 controlsHandler.removeCallbacks(hideControlsRunnable);
                 controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
-            } else {
-                // 普通模式：默认显示
-                navigationControls.setVisibility(View.VISIBLE);
             }
         }
     }

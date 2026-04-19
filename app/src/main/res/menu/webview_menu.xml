@@ -38,9 +38,9 @@
         android:id="@+id/action_toggle_navigation"
         android:title="@string/toggle_navigation"
         app:showAsAction="never"/>
-    
-    <!-- <item
-        android:id="@+id/action_webview_switch_out"
-        android:title="@string/webview_switch_out"
-        app:showAsAction="never"/> -->
+
+    <item
+        android:id="@+id/action_toggle_external_block"
+        android:title="@string/toggle_external_block"
+        app:showAsAction="ifRoom"/>
 </menu>
