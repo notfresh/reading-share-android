@@ -96,5 +96,40 @@
 
         </RadioGroup>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="外部链接打开模式"
+            android:textSize="18sp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/external_link_mode_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="8dp">
+
+            <RadioButton
+                android:id="@+id/external_link_mode_confirm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="弹窗确认（默认）" />
+
+            <RadioButton
+                android:id="@+id/external_link_mode_direct"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="直接跳转（自动打开外部应用）" />
+
+            <RadioButton
+                android:id="@+id/external_link_mode_block"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="全部拦截（禁止打开外部应用）" />
+
+        </RadioGroup>
+
     </LinearLayout>
 </ScrollView>

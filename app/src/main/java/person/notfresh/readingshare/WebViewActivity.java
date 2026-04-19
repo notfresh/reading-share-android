@@ -556,11 +556,34 @@ public class WebViewActivity extends AppCompatActivity {
             return false;
         }
 
+        // 获取外部链接打开模式
+        int externalLinkMode = getExternalLinkMode();
+
         // 所有非 http(s) 链接（自定义 scheme 如 snssdk://, intent://, weixin:// 等）
-        // 一律拦截并弹窗确认，防止网页强制跳转到外部应用
-        Log.d("WebViewActivity", "拦截非HTTP链接: " + url + " (来自页面: " + (view != null ? view.getUrl() : currentUrl) + ")");
-        showExternalOpenConfirmDialog(url);
-        return true;
+        Log.d("WebViewActivity", "拦截非HTTP链接: " + url + " (模式: " + externalLinkMode + ")");
+
+        // 根据模式处理
+        if (externalLinkMode == 1) {
+            // 模式1：直接跳转
+            openExternalUri(url);
+            return true;
+        } else if (externalLinkMode == 2) {
+            // 模式2：全部拦截，静默不处理
+            return true;
+        } else {
+            // 模式0（默认）：弹窗确认
+            showExternalOpenConfirmDialog(url);
+            return true;
+        }
+    }
+
+    private int getExternalLinkMode() {
+        try {
+            SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
+            return prefs.getInt("external_link_mode", 0);
+        } catch (Exception ignored) {
+            return 0;
+        }
     }
 
     private void showExternalOpenConfirmDialog(String url) {

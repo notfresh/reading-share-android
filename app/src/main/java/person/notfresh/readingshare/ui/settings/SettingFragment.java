@@ -172,6 +172,33 @@ public class SettingFragment extends Fragment {
             editor.apply();
         });
 
+        // 外部链接打开模式设置
+        RadioGroup externalLinkModeGroup = root.findViewById(R.id.external_link_mode_group);
+        RadioButton confirmRb = root.findViewById(R.id.external_link_mode_confirm);
+        RadioButton directRb = root.findViewById(R.id.external_link_mode_direct);
+        RadioButton blockRb = root.findViewById(R.id.external_link_mode_block);
+
+        int externalLinkMode = globalPrefs.getInt("external_link_mode", 0);
+        if (externalLinkMode == 1) {
+            directRb.setChecked(true);
+        } else if (externalLinkMode == 2) {
+            blockRb.setChecked(true);
+        } else {
+            confirmRb.setChecked(true);
+        }
+
+        externalLinkModeGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            SharedPreferences.Editor editor = globalPrefs.edit();
+            if (checkedId == R.id.external_link_mode_direct) {
+                editor.putInt("external_link_mode", 1);
+            } else if (checkedId == R.id.external_link_mode_block) {
+                editor.putInt("external_link_mode", 2);
+            } else {
+                editor.putInt("external_link_mode", 0);
+            }
+            editor.apply();
+        });
+
         // 添加导入文件按钮
         root.findViewById(R.id.button_import_csv).setOnClickListener(v -> {
             importFile();  // 支持 CSV 和 JSON
