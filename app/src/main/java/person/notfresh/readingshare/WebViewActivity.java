@@ -25,10 +25,6 @@ import androidx.appcompat.widget.Toolbar;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.ImageButton;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.content.SharedPreferences;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
@@ -40,6 +36,10 @@ import android.media.AudioManager;
 import android.os.PowerManager;
 import android.content.Context;
 import android.os.Build;
+import android.Manifest;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import android.content.pm.PackageManager;
 import android.webkit.PermissionRequest;
 import android.view.ViewGroup;
 
@@ -78,11 +78,7 @@ public class WebViewActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "settings";
     private static final String KEY_NAV_CONTROLS_HIDDEN = "nav_controls_hidden";
-    // 底部播放状态条
-    private LinearLayout audioPlayerBar;
-    private ImageButton btnPlayPause;
-    private ImageButton btnStopAudio;
-    private TextView audioStatusText;
+    // 底部播放状态条已移除，使用系统通知栏控制
     private BroadcastReceiver audioControlReceiver;
 
     @Override
@@ -157,7 +153,15 @@ public class WebViewActivity extends AppCompatActivity {
         }
 
         initAudio();
-        setupAudioPlayerBar();
+
+        // Android 13+ 需要运行时申请通知权限，以便前台服务通知显示在通知栏
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
+            }
+        }
     }
 
     @Override
@@ -519,15 +523,18 @@ public class WebViewActivity extends AppCompatActivity {
                     ".concat([].slice.call(document.getElementsByTagName('video')));" +
                     "for(var i=0;i<els.length;i++){if(!els[i].paused&&!els[i].ended)return true;}" +
                     "return false;}" +
+                    "function notify(p){if(window.AndroidMediaInterface)window.AndroidMediaInterface.setMediaPlaying(p);}" +
                     "function attach(el){" +
                     "if(el.__listenersAttached)return;el.__listenersAttached=true;" +
-                    "el.addEventListener('play',function(){if(window.AndroidMediaInterface)window.AndroidMediaInterface.setMediaPlaying(true);});" +
-                    "el.addEventListener('pause',function(){if(!checkAnyPlaying()&&window.AndroidMediaInterface)window.AndroidMediaInterface.setMediaPlaying(false);});" +
-                    "el.addEventListener('ended',function(){if(!checkAnyPlaying()&&window.AndroidMediaInterface)window.AndroidMediaInterface.setMediaPlaying(false);})" +
+                    "el.addEventListener('play',function(){notify(true);});" +
+                    "el.addEventListener('pause',function(){if(!checkAnyPlaying())notify(false);});" +
+                    "el.addEventListener('ended',function(){if(!checkAnyPlaying())notify(false);})" +
                     "}" +
                     "var existing=[].slice.call(document.getElementsByTagName('audio'))" +
                     ".concat([].slice.call(document.getElementsByTagName('video')));" +
                     "existing.forEach(attach);" +
+                    // 立即检测当前是否已有音频在播放（监听前已开始的情况）
+                    "if(checkAnyPlaying())notify(true);" +
                     "var obs=new MutationObserver(function(ms){ms.forEach(function(m){" +
                     "m.addedNodes.forEach(function(n){" +
                     "if(n.tagName==='AUDIO'||n.tagName==='VIDEO'){attach(n);}" +
@@ -590,13 +597,13 @@ public class WebViewActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         isAppInForeground = false;
-        if (audioPlaying && webView != null) {
-            Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
-            serviceIntent.putExtra("current_url", currentUrl);
-            startForegroundService(serviceIntent);
-            if (wakeLock != null && !wakeLock.isHeld()) {
-                wakeLock.acquire(30 * 60 * 1000L);
-            }
+        // 无条件启动前台服务，确保通知栏一定出现
+        // （即使 audioPlaying 标志因 JS 异步没有及时更新，服务也会启动）
+        Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
+        serviceIntent.putExtra("current_url", currentUrl);
+        startForegroundService(serviceIntent);
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            wakeLock.acquire(30 * 60 * 1000L);
         }
         super.onPause();
     }
@@ -703,8 +710,6 @@ public class WebViewActivity extends AppCompatActivity {
 
     private void onMediaPlayingChanged(boolean isPlaying) {
         audioPlaying = isPlaying;
-        // 更新底部播放状态条
-        updatePlayerBar(isPlaying);
         if (mediaSession != null) {
             mediaSession.setPlaybackState(new PlaybackStateCompat.Builder()
                     .setActions(PlaybackStateCompat.ACTION_PLAY
@@ -908,51 +913,7 @@ public class WebViewActivity extends AppCompatActivity {
     }
     // --- end continuous-reading helpers ---
 
-    // --- 底部播放状态条 ---
-    private void setupAudioPlayerBar() {
-        audioPlayerBar = findViewById(R.id.audio_player_bar);
-        btnPlayPause = findViewById(R.id.btn_play_pause);
-        btnStopAudio = findViewById(R.id.btn_stop_audio);
-        audioStatusText = findViewById(R.id.audio_status_text);
-
-        btnPlayPause.setOnClickListener(v -> togglePlayPause());
-        btnStopAudio.setOnClickListener(v -> stopAudioPlayback());
-    }
-
-    private void updatePlayerBar(boolean isPlaying) {
-        if (audioPlayerBar == null) return;
-        if (isPlaying) {
-            audioPlayerBar.setVisibility(View.VISIBLE);
-            btnPlayPause.setImageResource(R.drawable.ic_pause);
-            btnPlayPause.setContentDescription("暂停");
-            String title = (pageTitleCache != null && !pageTitleCache.isEmpty())
-                    ? pageTitleCache : "音频";
-            audioStatusText.setText("正在播放: " + title);
-        } else {
-            // 暂停状态：仍显示bar但切换图标
-            btnPlayPause.setImageResource(R.drawable.ic_play);
-            btnPlayPause.setContentDescription("播放");
-            audioStatusText.setText("已暂停");
-        }
-    }
-
-    private void togglePlayPause() {
-        if (webView == null) return;
-        if (audioPlaying) {
-            // 暂停
-            webView.evaluateJavascript(
-                "(function(){[].slice.call(document.getElementsByTagName('audio'))"
-                + ".concat([].slice.call(document.getElementsByTagName('video')))"
-                + ".forEach(function(e){e.pause();});})()", null);
-        } else {
-            // 恢复播放
-            webView.evaluateJavascript(
-                "(function(){[].slice.call(document.getElementsByTagName('audio'))"
-                + ".concat([].slice.call(document.getElementsByTagName('video')))"
-                + ".forEach(function(e){e.play().catch(function(){});});})()", null);
-        }
-    }
-
+    // --- 通知栏停止音频辅助 ---
     private void stopAudioPlayback() {
         if (webView != null) {
             webView.evaluateJavascript(
@@ -960,12 +921,8 @@ public class WebViewActivity extends AppCompatActivity {
                 + ".concat([].slice.call(document.getElementsByTagName('video')))"
                 + ".forEach(function(e){e.pause();e.currentTime=0;});})()", null);
         }
-        // 隐藏播放栏
-        if (audioPlayerBar != null) {
-            audioPlayerBar.setVisibility(View.GONE);
-        }
     }
-    // --- end 底部播放状态条 ---
+    // --- end 通知栏停止音频辅助 ---
 
     private class MediaInterfaceObject {
         @android.webkit.JavascriptInterface
