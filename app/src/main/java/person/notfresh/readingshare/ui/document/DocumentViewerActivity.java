@@ -71,6 +71,7 @@ public class DocumentViewerActivity extends AppCompatActivity {
     private boolean isExternalOpen = false; // 是否是从外部打开
     private boolean isSavedToDocuments = false; // 是否已保存到文档列表
     private Uri originalUri; // 原始URI（用于外部打开的文件）
+    private boolean isLandscape = false; // 当前是否为横屏
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -211,14 +212,14 @@ public class DocumentViewerActivity extends AppCompatActivity {
         if (id == R.id.action_save_to_documents) {
             saveToDocuments();
             return true;
-        } else if (id == R.id.action_orientation_landscape) {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-            return true;
-        } else if (id == R.id.action_orientation_portrait) {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-            return true;
-        } else if (id == R.id.action_orientation_auto) {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        } else if (id == R.id.action_toggle_orientation) {
+            // 切换横竖屏
+            if (isLandscape) {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            } else {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+            }
+            isLandscape = !isLandscape;
             return true;
         }
         return super.onOptionsItemSelected(item);
