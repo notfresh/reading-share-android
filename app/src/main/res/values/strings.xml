@@ -36,6 +36,7 @@
     <string name="publish_failed">发布失败</string>
 
     <string name="open_in_browser">在系统浏览器打开</string>
+    <string name="action_refresh">刷新</string>
     <string name="add_statistics">新增统计</string>
     <string name="read_statistics">阅读统计</string>
 

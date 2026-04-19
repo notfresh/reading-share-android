@@ -53,8 +53,6 @@ Intent shareIntent = new Intent(Intent.ACTION_SEND); Intent.createChooser(...)
 Uri uri = FileProvider.getUriForFile(...); Intent shareIntent = new Intent(Intent.ACTION_SEND); putExtra(EXTRA_STREAM, uri);
 ```
 
-
-
 ### 完备性检查结论
 - 文本分享：完备（多处直接构造 + `ShareUtil.shareLinkAsText` 封装）。
 - 文件分享：完备（多处直接构造，`ShareUtil.shareLinkAsFile` 也已提供，可统一迁移）。

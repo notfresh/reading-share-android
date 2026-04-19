@@ -284,7 +284,10 @@ public class WebViewActivity extends AppCompatActivity {
     
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_open_browser) {
+        if (item.getItemId() == R.id.action_refresh) {
+            if (webView != null) webView.reload();
+            return true;
+        } else if (item.getItemId() == R.id.action_open_browser) {
             // 添加日志打印
             String menuTitle = item.getTitle().toString();
             Log.d("WebViewActivityMenu", "点击了菜单项: " + menuTitle);
