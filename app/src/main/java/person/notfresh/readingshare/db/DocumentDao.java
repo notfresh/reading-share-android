@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
+import person.notfresh.readingshare.model.BookmarkItem;
 import person.notfresh.readingshare.model.DocumentItem;
 import person.notfresh.readingshare.model.DocumentType;
 
@@ -284,6 +285,117 @@ public class DocumentDao {
         item.setClickCount(clickCount);
 
         return item;
+    }
+
+    /**
+     * 添加书签
+     * @return bookmarkId，失败返回 -1
+     */
+    public long addBookmark(long documentId, int pageIndex, String note) {
+        try {
+            ContentValues values = new ContentValues();
+            values.put(LinkDbHelper.COLUMN_BOOKMARK_DOC_ID, documentId);
+            values.put(LinkDbHelper.COLUMN_BOOKMARK_PAGE_INDEX, pageIndex);
+            values.put(LinkDbHelper.COLUMN_BOOKMARK_NOTE, note);
+            values.put(LinkDbHelper.COLUMN_BOOKMARK_CREATED_AT, System.currentTimeMillis());
+            return database.insert(LinkDbHelper.TABLE_BOOKMARKS, null, values);
+        } catch (Exception e) {
+            Log.e(TAG, "添加书签失败", e);
+            return -1;
+        }
+    }
+
+    /**
+     * 删除书签
+     * @return 是否成功
+     */
+    public boolean deleteBookmark(long bookmarkId) {
+        try {
+            int rows = database.delete(
+                    LinkDbHelper.TABLE_BOOKMARKS,
+                    LinkDbHelper.COLUMN_BOOKMARK_ID + " = ?",
+                    new String[]{String.valueOf(bookmarkId)}
+            );
+            return rows > 0;
+        } catch (Exception e) {
+            Log.e(TAG, "删除书签失败", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取指定文档的所有书签，按创建时间升序
+     */
+    public List<BookmarkItem> getBookmarksByDocument(long documentId) {
+        List<BookmarkItem> bookmarks = new ArrayList<>();
+        Cursor cursor = database.query(
+                LinkDbHelper.TABLE_BOOKMARKS,
+                null,
+                LinkDbHelper.COLUMN_BOOKMARK_DOC_ID + " = ?",
+                new String[]{String.valueOf(documentId)},
+                null,
+                null,
+                LinkDbHelper.COLUMN_BOOKMARK_CREATED_AT + " ASC"
+        );
+        if (cursor.moveToFirst()) {
+            do {
+                BookmarkItem item = new BookmarkItem();
+                item.setId(cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_BOOKMARK_ID)));
+                item.setDocumentId(cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_BOOKMARK_DOC_ID)));
+                item.setPageIndex(cursor.getInt(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_BOOKMARK_PAGE_INDEX)));
+                int noteIdx = cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_BOOKMARK_NOTE);
+                if (!cursor.isNull(noteIdx)) {
+                    item.setNote(cursor.getString(noteIdx));
+                }
+                item.setCreatedAt(cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_BOOKMARK_CREATED_AT)));
+                bookmarks.add(item);
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return bookmarks;
+    }
+
+    /**
+     * 保存阅读进度到 config 表
+     */
+    public void saveReadingProgress(long documentId, int pageIndex) {
+        try {
+            String key = "reading_progress_" + documentId;
+            ContentValues values = new ContentValues();
+            values.put(LinkDbHelper.COLUMN_CONFIG_KEY, key);
+            values.put(LinkDbHelper.COLUMN_CONFIG_VALUE, String.valueOf(pageIndex));
+            database.delete(LinkDbHelper.TABLE_CONFIG,
+                    LinkDbHelper.COLUMN_CONFIG_KEY + " = ?",
+                    new String[]{key});
+            database.insert(LinkDbHelper.TABLE_CONFIG, null, values);
+        } catch (Exception e) {
+            Log.e(TAG, "保存阅读进度失败", e);
+        }
+    }
+
+    /**
+     * 读取阅读进度，无记录返回 -1
+     */
+    public int getReadingProgress(long documentId) {
+        try {
+            String key = "reading_progress_" + documentId;
+            Cursor cursor = database.query(
+                    LinkDbHelper.TABLE_CONFIG,
+                    new String[]{LinkDbHelper.COLUMN_CONFIG_VALUE},
+                    LinkDbHelper.COLUMN_CONFIG_KEY + " = ?",
+                    new String[]{key},
+                    null, null, null
+            );
+            int page = -1;
+            if (cursor.moveToFirst()) {
+                page = Integer.parseInt(cursor.getString(0));
+            }
+            cursor.close();
+            return page;
+        } catch (Exception e) {
+            Log.e(TAG, "读取阅读进度失败", e);
+            return -1;
+        }
     }
 }
 
