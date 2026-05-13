@@ -13,7 +13,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     //private static final int DATABASE_VERSION = 10; // 添加文档表
     //private static final int DATABASE_VERSION = 11; // 添加主题表
 
-    private static final int DATABASE_VERSION = 12; // 主题项增加归档字段
+    private static final int DATABASE_VERSION = 13; // 书签表
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_TITLE = "title";
@@ -51,6 +51,14 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String COLUMN_DOC_REMARK = "remark";
     public static final String COLUMN_DOC_IS_PINNED = "is_pinned";
     public static final String COLUMN_DOC_CLICK_COUNT = "click_count";
+
+    // 书签表
+    public static final String TABLE_BOOKMARKS = "document_bookmarks";
+    public static final String COLUMN_BOOKMARK_ID = "_id";
+    public static final String COLUMN_BOOKMARK_DOC_ID = "document_id";
+    public static final String COLUMN_BOOKMARK_PAGE_INDEX = "page_index";
+    public static final String COLUMN_BOOKMARK_NOTE = "note";
+    public static final String COLUMN_BOOKMARK_CREATED_AT = "created_at";
 
     // 主题表
     public static final String TABLE_SUBJECTS = "subjects";
@@ -139,6 +147,15 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     COLUMN_DOC_IS_PINNED + " INTEGER DEFAULT 0, " +
                     COLUMN_DOC_CLICK_COUNT + " INTEGER DEFAULT 0)";
 
+    private static final String SQL_CREATE_BOOKMARKS =
+            "CREATE TABLE " + TABLE_BOOKMARKS + " (" +
+                    COLUMN_BOOKMARK_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_BOOKMARK_DOC_ID + " INTEGER NOT NULL, " +
+                    COLUMN_BOOKMARK_PAGE_INDEX + " INTEGER NOT NULL, " +
+                    COLUMN_BOOKMARK_NOTE + " TEXT, " +
+                    COLUMN_BOOKMARK_CREATED_AT + " INTEGER NOT NULL, " +
+                    "FOREIGN KEY (" + COLUMN_BOOKMARK_DOC_ID + ") REFERENCES " + TABLE_DOCUMENTS + "(" + COLUMN_DOC_ID + "))";
+
     private static final String SQL_CREATE_SUBJECTS =
             "CREATE TABLE " + TABLE_SUBJECTS + " (" +
                     COLUMN_SUBJECT_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -207,6 +224,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
             // 创建文档表
             Log.d("LinkDbHelper", "Creating documents table");
             db.execSQL(SQL_CREATE_DOCUMENTS);
+            db.execSQL(SQL_CREATE_BOOKMARKS);
             
             // 创建主题相关表
             Log.d("LinkDbHelper", "Creating subject tables");
@@ -239,6 +257,11 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                 db.execSQL("ALTER TABLE " + TABLE_SUBJECT_ITEMS + " ADD COLUMN " + COLUMN_SUBJECT_ITEM_IS_ARCHIVED + " INTEGER DEFAULT 0");
                 db.execSQL("ALTER TABLE " + TABLE_SUBJECT_ITEMS + " ADD COLUMN " + COLUMN_SUBJECT_ITEM_ARCHIVED_AT + " INTEGER DEFAULT 0");
                 Log.d("LinkDbHelper", "Added subject item archive columns");
+            }
+
+            if (oldVersion < 13) {
+                db.execSQL(SQL_CREATE_BOOKMARKS);
+                Log.d("LinkDbHelper", "Created bookmarks table");
             }
 
             if (oldVersion < 10) {
