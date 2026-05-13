@@ -488,8 +488,16 @@ public class DocumentViewerActivity extends AppCompatActivity {
             
             Log.d(TAG, "PDF加载成功，共 " + totalPages + " 页");
 
-            // 显示第一页
-            currentPageIndex = 0;
+            // 尝试恢复上次阅读进度
+            int savedPage = -1;
+            if (document != null && document.getId() > 0) {
+                savedPage = documentDao.getReadingProgress(document.getId());
+            }
+            if (savedPage > 0 && savedPage < totalPages) {
+                currentPageIndex = savedPage;
+            } else {
+                currentPageIndex = 0;
+            }
             showPage(currentPageIndex);
 
             // 初始化目录
@@ -674,6 +682,11 @@ public class DocumentViewerActivity extends AppCompatActivity {
             // 更新目录高亮
             if (tocAdapter != null) {
                 tocAdapter.setCurrentPage(pageIndex);
+            }
+
+            // 保存阅读进度
+            if (document != null && document.getId() > 0) {
+                documentDao.saveReadingProgress(document.getId(), currentPageIndex);
             }
 
             // 刷新菜单以更新书签按钮文字
