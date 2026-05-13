@@ -259,17 +259,18 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                 Log.d("LinkDbHelper", "Added subject item archive columns");
             }
 
-            if (oldVersion < 13) {
-                db.execSQL(SQL_CREATE_BOOKMARKS);
-                Log.d("LinkDbHelper", "Created bookmarks table");
-            }
-
             if (oldVersion < 10) {
                 // 版本10：添加文档表
                 db.execSQL(SQL_CREATE_DOCUMENTS);
                 Log.d("LinkDbHelper", "Created documents table");
             }
-            
+
+            if (oldVersion < 13) {
+                // 版本13：添加书签表
+                db.execSQL(SQL_CREATE_BOOKMARKS);
+                Log.d("LinkDbHelper", "Created bookmarks table");
+            }
+
             if (oldVersion < 9) {
                 // 版本9：添加配置表
                 db.execSQL(SQL_CREATE_CONFIG);
