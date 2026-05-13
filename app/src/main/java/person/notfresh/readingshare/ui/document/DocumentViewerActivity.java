@@ -51,6 +51,7 @@ public class DocumentViewerActivity extends AppCompatActivity {
     private Button btnCloseToc;
     private Button btnViewPages;
     private Button btnViewOutline;
+    private Button btnViewBookmarks;
     private TextView tvPageInfo;
     
     private DocumentDao documentDao;
@@ -111,6 +112,7 @@ public class DocumentViewerActivity extends AppCompatActivity {
         btnCloseToc = findViewById(R.id.btn_close_toc);
         btnViewPages = findViewById(R.id.btn_view_pages);
         btnViewOutline = findViewById(R.id.btn_view_outline);
+        btnViewBookmarks = findViewById(R.id.btn_view_bookmarks);
         tvPageInfo = findViewById(R.id.tv_page_info);
         drawerLayout = findViewById(R.id.drawer_layout);
         recyclerViewToc = findViewById(R.id.recycler_view_toc);
@@ -190,6 +192,13 @@ public class DocumentViewerActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 switchToOutlineView();
+            }
+        });
+
+        btnViewBookmarks.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                switchToBookmarkView();
             }
         });
     }
@@ -521,6 +530,20 @@ public class DocumentViewerActivity extends AppCompatActivity {
             }
         });
 
+        tocAdapter.setOnBookmarkDeleteCallback(bookmarkId -> {
+            documentDao.deleteBookmark(bookmarkId);
+            // 刷新书签列表
+            List<BookmarkItem> updated = documentDao.getBookmarksByDocument(document.getId());
+            tocAdapter.setBookmarks(updated);
+            Toast.makeText(DocumentViewerActivity.this, "书签已删除", Toast.LENGTH_SHORT).show();
+            invalidateOptionsMenu();
+        });
+
+        // 加载书签数据
+        if (document != null && document.getId() > 0) {
+            tocAdapter.setBookmarks(documentDao.getBookmarksByDocument(document.getId()));
+        }
+
         recyclerViewToc.setLayoutManager(new LinearLayoutManager(this));
         recyclerViewToc.setAdapter(tocAdapter);
 
@@ -568,6 +591,7 @@ public class DocumentViewerActivity extends AppCompatActivity {
             tocAdapter.setPageView(true);
             btnViewPages.setEnabled(false);
             btnViewOutline.setEnabled(true);
+            btnViewBookmarks.setEnabled(true);
         }
     }
 
@@ -579,6 +603,16 @@ public class DocumentViewerActivity extends AppCompatActivity {
             tocAdapter.setPageView(false);
             btnViewPages.setEnabled(true);
             btnViewOutline.setEnabled(false);
+            btnViewBookmarks.setEnabled(true);
+        }
+    }
+
+    private void switchToBookmarkView() {
+        if (tocAdapter != null) {
+            tocAdapter.setViewType(TocAdapter.ViewType.BOOKMARK);
+            btnViewPages.setEnabled(true);
+            btnViewOutline.setEnabled(true);
+            btnViewBookmarks.setEnabled(false);
         }
     }
 
