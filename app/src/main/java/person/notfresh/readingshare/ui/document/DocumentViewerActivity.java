@@ -865,6 +865,11 @@ public class DocumentViewerActivity extends AppCompatActivity {
             if (result > 0) {
                 Toast.makeText(this, isEdit ? "书签已更新" : "已添加书签", Toast.LENGTH_SHORT).show();
                 invalidateOptionsMenu();
+                // 刷新侧边栏书签列表
+                if (tocAdapter != null) {
+                    List<BookmarkItem> updated = documentDao.getBookmarksByDocument(document.getId());
+                    tocAdapter.setBookmarks(updated);
+                }
             } else {
                 Toast.makeText(this, "添加书签失败", Toast.LENGTH_SHORT).show();
             }
@@ -877,6 +882,11 @@ public class DocumentViewerActivity extends AppCompatActivity {
                 documentDao.deleteBookmark(bookmarkToDelete.getId());
                 Toast.makeText(this, "书签已删除", Toast.LENGTH_SHORT).show();
                 invalidateOptionsMenu();
+                // 刷新侧边栏书签列表
+                if (tocAdapter != null) {
+                    List<BookmarkItem> updated = documentDao.getBookmarksByDocument(document.getId());
+                    tocAdapter.setBookmarks(updated);
+                }
             });
         }
 
