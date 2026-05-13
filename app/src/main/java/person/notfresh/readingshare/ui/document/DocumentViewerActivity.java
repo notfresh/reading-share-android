@@ -12,12 +12,14 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -34,6 +36,7 @@ import java.util.Locale;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.db.DocumentDao;
+import person.notfresh.readingshare.model.BookmarkItem;
 import person.notfresh.readingshare.model.DocumentItem;
 import person.notfresh.readingshare.model.DocumentType;
 import person.notfresh.readingshare.util.PdfOutlineExtractor;
@@ -72,6 +75,7 @@ public class DocumentViewerActivity extends AppCompatActivity {
     private boolean isSavedToDocuments = false; // 是否已保存到文档列表
     private Uri originalUri; // 原始URI（用于外部打开的文件）
     private boolean isLandscape = false; // 当前是否为横屏
+    private boolean bookmarkExistsForCurrentPage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -203,13 +207,33 @@ public class DocumentViewerActivity extends AppCompatActivity {
             // 只有从外部打开且未保存时才显示保存按钮
             saveItem.setVisible(isExternalOpen && !isSavedToDocuments && pdfFile != null);
         }
+        MenuItem bookmarkItem = menu.findItem(R.id.action_add_bookmark);
+        if (bookmarkItem != null) {
+            if (document != null && document.getId() > 0) {
+                List<BookmarkItem> bookmarks = documentDao.getBookmarksByDocument(document.getId());
+                bookmarkExistsForCurrentPage = false;
+                for (BookmarkItem bm : bookmarks) {
+                    if (bm.getPageIndex() == currentPageIndex) {
+                        bookmarkExistsForCurrentPage = true;
+                        bookmarkItem.setTitle("编辑书签");
+                        break;
+                    }
+                }
+                if (!bookmarkExistsForCurrentPage) {
+                    bookmarkItem.setTitle("添加书签");
+                }
+            }
+        }
         return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.action_save_to_documents) {
+        if (id == R.id.action_add_bookmark) {
+            showBookmarkDialog();
+            return true;
+        } else if (id == R.id.action_save_to_documents) {
             saveToDocuments();
             return true;
         } else if (id == R.id.action_toggle_orientation) {
@@ -618,6 +642,9 @@ public class DocumentViewerActivity extends AppCompatActivity {
                 tocAdapter.setCurrentPage(pageIndex);
             }
 
+            // 刷新菜单以更新书签按钮文字
+            invalidateOptionsMenu();
+
         } catch (Exception e) {
             Log.e(TAG, "显示页面失败", e);
             Toast.makeText(this, "显示页面失败", Toast.LENGTH_SHORT).show();
@@ -742,6 +769,71 @@ public class DocumentViewerActivity extends AppCompatActivity {
             Log.e(TAG, "保存文档失败", e);
             Toast.makeText(this, "保存失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /**
+     * 显示书签添加/编辑对话框
+     */
+    private void showBookmarkDialog() {
+        if (document == null || document.getId() <= 0) {
+            Toast.makeText(this, "请先将文档保存到文档列表", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 检查当前页是否已有书签
+        List<BookmarkItem> bookmarks = documentDao.getBookmarksByDocument(document.getId());
+        BookmarkItem existingBookmark = null;
+        for (BookmarkItem bm : bookmarks) {
+            if (bm.getPageIndex() == currentPageIndex) {
+                existingBookmark = bm;
+                break;
+            }
+        }
+
+        boolean isEdit = existingBookmark != null;
+        final BookmarkItem bookmarkToDelete = existingBookmark;
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(isEdit ? "编辑书签" : "添加书签");
+
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_bookmark, null);
+        final EditText etNote = dialogView.findViewById(R.id.et_bookmark_note);
+        TextView tvHint = dialogView.findViewById(R.id.tv_bookmark_hint);
+        tvHint.setText("当前第 " + (currentPageIndex + 1) + " 页，是否为书签添加备注？");
+        if (isEdit && existingBookmark.getNote() != null) {
+            etNote.setText(existingBookmark.getNote());
+        }
+        builder.setView(dialogView);
+
+        builder.setPositiveButton("确定", (dialog, which) -> {
+            String note = etNote.getText().toString().trim();
+            if (note.isEmpty()) {
+                note = null;
+            }
+            if (isEdit) {
+                // 更新备注：先删除旧书签，再添加新书签
+                documentDao.deleteBookmark(bookmarkToDelete.getId());
+            }
+            long result = documentDao.addBookmark(document.getId(), currentPageIndex, note);
+            if (result > 0) {
+                Toast.makeText(this, isEdit ? "书签已更新" : "已添加书签", Toast.LENGTH_SHORT).show();
+                invalidateOptionsMenu();
+            } else {
+                Toast.makeText(this, "添加书签失败", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        builder.setNegativeButton("取消", null);
+
+        if (isEdit) {
+            builder.setNeutralButton("删除", (dialog, which) -> {
+                documentDao.deleteBookmark(bookmarkToDelete.getId());
+                Toast.makeText(this, "书签已删除", Toast.LENGTH_SHORT).show();
+                invalidateOptionsMenu();
+            });
+        }
+
+        builder.show();
     }
 
     @Override
