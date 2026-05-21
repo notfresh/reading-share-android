@@ -8,6 +8,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -78,13 +80,19 @@ public class DocumentViewerActivity extends AppCompatActivity {
     private boolean isLandscape = false; // 当前是否为横屏
     private boolean bookmarkExistsForCurrentPage;
 
+    // 双击隐藏标题栏
+    private Toolbar toolbar;
+    private GestureDetector gestureDetector;
+    private View bottomControlBar;
+    private boolean toolbarVisible = true;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_document_viewer);
 
         // 设置 Toolbar
-        Toolbar toolbar = findViewById(R.id.toolbar);
+        toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -201,6 +209,33 @@ public class DocumentViewerActivity extends AppCompatActivity {
                 switchToBookmarkView();
             }
         });
+
+        // 双击隐藏/显示标题栏
+        setupDoubleTapGesture();
+    }
+
+    private void setupDoubleTapGesture() {
+        androidx.core.widget.NestedScrollView scrollView = findViewById(R.id.content_scroll_view);
+        if (scrollView == null) return;
+
+        toolbarVisible = toolbar.getVisibility() == View.VISIBLE;
+        bottomControlBar = findViewById(R.id.bottom_control_bar);
+
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                toggleToolbar();
+                return true;
+            }
+        });
+
+        scrollView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+    }
+
+    private void toggleToolbar() {
+        if (toolbar == null) return;
+        toolbarVisible = !toolbarVisible;
+        toolbar.setVisibility(toolbarVisible ? View.VISIBLE : View.INVISIBLE);
     }
 
     @Override
