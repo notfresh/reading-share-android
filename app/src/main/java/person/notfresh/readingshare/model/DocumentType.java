@@ -5,17 +5,19 @@ package person.notfresh.readingshare.model;
  * 支持多种文档格式：PDF、LaTeX、Markdown等
  */
 public enum DocumentType {
-    PDF("PDF", ".pdf"),
-    LATEX("LaTeX", ".tex"),
-    MARKDOWN("Markdown", ".md"),
-    TEXT("文本", ".txt");
+    PDF("PDF", ".pdf", "application/pdf"),
+    LATEX("LaTeX", ".tex", "text/plain"),
+    MARKDOWN("Markdown", ".md", "text/markdown"),
+    TEXT("文本", ".txt", "text/plain");
 
     private final String displayName;
     private final String extension;
+    private final String mimeType;
 
-    DocumentType(String displayName, String extension) {
+    DocumentType(String displayName, String extension, String mimeType) {
         this.displayName = displayName;
         this.extension = extension;
+        this.mimeType = mimeType;
     }
 
     public String getDisplayName() {
@@ -24,6 +26,10 @@ public enum DocumentType {
 
     public String getExtension() {
         return extension;
+    }
+
+    public String getMimeType() {
+        return mimeType;
     }
 
     /**

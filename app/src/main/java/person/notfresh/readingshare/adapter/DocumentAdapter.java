@@ -2,6 +2,7 @@ package person.notfresh.readingshare.adapter;
 
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -12,9 +13,12 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -269,7 +273,10 @@ public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         
         popupMenu.setOnMenuItemClickListener(menuItem -> {
             int id = menuItem.getItemId();
-            if (id == R.id.action_delete) {
+            if (id == R.id.action_share) {
+                shareDocument(item);
+                return true;
+            } else if (id == R.id.action_delete) {
                 if (listener != null) {
                     listener.onDeleteDocument(item);
                 }
@@ -279,6 +286,36 @@ public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         });
         
         popupMenu.show();
+    }
+
+    /**
+     * 分享文档文件
+     */
+    private void shareDocument(DocumentItem item) {
+        File file = new File(item.getFilePath());
+        if (!file.exists()) {
+            Toast.makeText(context, "文件不存在", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            Uri fileUri = FileProvider.getUriForFile(
+                    context,
+                    context.getPackageName() + ".provider",
+                    file
+            );
+
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType(item.getType().getMimeType());
+            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, item.getTitle());
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            Intent chooser = Intent.createChooser(shareIntent, "分享文档");
+            context.startActivity(chooser);
+        } catch (Exception e) {
+            Toast.makeText(context, "分享失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     static class DateHeaderViewHolder extends RecyclerView.ViewHolder {

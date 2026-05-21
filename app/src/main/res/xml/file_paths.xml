@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <files-path
+        name="internal_files"
+        path="documents/" />
     <external-files-path
         name="external_files"
         path="." />
