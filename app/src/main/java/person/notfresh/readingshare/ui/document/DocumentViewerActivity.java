@@ -17,6 +17,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -83,7 +84,6 @@ public class DocumentViewerActivity extends AppCompatActivity {
     // 双击隐藏标题栏
     private Toolbar toolbar;
     private GestureDetector gestureDetector;
-    private View bottomControlBar;
     private boolean toolbarVisible = true;
 
     @Override
@@ -215,11 +215,10 @@ public class DocumentViewerActivity extends AppCompatActivity {
     }
 
     private void setupDoubleTapGesture() {
-        androidx.core.widget.NestedScrollView scrollView = findViewById(R.id.content_scroll_view);
+        ScrollView scrollView = findViewById(R.id.content_scroll_view);
         if (scrollView == null) return;
 
         toolbarVisible = toolbar.getVisibility() == View.VISIBLE;
-        bottomControlBar = findViewById(R.id.bottom_control_bar);
 
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
             @Override
@@ -235,7 +234,7 @@ public class DocumentViewerActivity extends AppCompatActivity {
     private void toggleToolbar() {
         if (toolbar == null) return;
         toolbarVisible = !toolbarVisible;
-        toolbar.setVisibility(toolbarVisible ? View.VISIBLE : View.INVISIBLE);
+        toolbar.setVisibility(toolbarVisible ? View.VISIBLE : View.GONE);
     }
 
     @Override

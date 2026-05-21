@@ -6,10 +6,9 @@
     android:layout_height="match_parent">
 
     <!-- 主内容区域 -->
-    <LinearLayout
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="match_parent">
 
         <!-- Toolbar -->
         <androidx.appcompat.widget.Toolbar
@@ -20,12 +19,13 @@
             android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
             app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
 
-        <!-- 使用Android系统内置的PDFRenderer -->
-        <androidx.core.widget.NestedScrollView
+        <!-- PDF 阅读区域 -->
+        <ScrollView
             android:id="@+id/content_scroll_view"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_above="@id/bottom_control_bar"
+            android:layout_below="@id/toolbar"
             android:fillViewport="true">
 
             <ImageView
@@ -34,13 +34,14 @@
                 android:layout_height="wrap_content"
                 android:adjustViewBounds="true"
                 android:scaleType="fitCenter" />
-        </androidx.core.widget.NestedScrollView>
+        </ScrollView>
 
         <!-- 底部控制栏 -->
         <LinearLayout
             android:id="@+id/bottom_control_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
             android:orientation="horizontal"
             android:padding="16dp"
             android:background="?attr/colorSurface"
@@ -80,7 +81,7 @@
                 android:text="下一页"
                 android:layout_marginStart="8dp" />
         </LinearLayout>
-    </LinearLayout>
+    </RelativeLayout>
 
     <!-- 目录侧边栏 -->
     <LinearLayout
@@ -176,4 +177,3 @@
     </LinearLayout>
 
 </androidx.drawerlayout.widget.DrawerLayout>
-
