@@ -49,6 +49,7 @@ public class SubjectDao {
         values.put(LinkDbHelper.COLUMN_SUBJECT_TITLE, subject.getTitle());
         values.put(LinkDbHelper.COLUMN_SUBJECT_DESCRIBE, subject.getDescribe());
         values.put(LinkDbHelper.COLUMN_SUBJECT_CREATE_TIME, subject.getCreateTime());
+        values.put(LinkDbHelper.COLUMN_SUBJECT_ORDER_INDEX, subject.getOrderIndex());
 
         long subjectId = database.insert(LinkDbHelper.TABLE_SUBJECTS, null, values);
         subject.setId(subjectId);
@@ -62,6 +63,7 @@ public class SubjectDao {
         ContentValues values = new ContentValues();
         values.put(LinkDbHelper.COLUMN_SUBJECT_TITLE, subject.getTitle());
         values.put(LinkDbHelper.COLUMN_SUBJECT_DESCRIBE, subject.getDescribe());
+        values.put(LinkDbHelper.COLUMN_SUBJECT_ORDER_INDEX, subject.getOrderIndex());
 
         int rowsAffected = database.update(
                 LinkDbHelper.TABLE_SUBJECTS,
@@ -70,6 +72,32 @@ public class SubjectDao {
                 new String[]{String.valueOf(subject.getId())}
         );
         return rowsAffected > 0;
+    }
+
+    /**
+     * 批量更新主题的 orderIndex
+     */
+    public void updateSubjectsOrderIndex(List<Subject> subjects) {
+        if (subjects == null || subjects.isEmpty()) {
+            return;
+        }
+
+        database.beginTransaction();
+        try {
+            for (Subject subject : subjects) {
+                ContentValues values = new ContentValues();
+                values.put(LinkDbHelper.COLUMN_SUBJECT_ORDER_INDEX, subject.getOrderIndex());
+                database.update(
+                        LinkDbHelper.TABLE_SUBJECTS,
+                        values,
+                        LinkDbHelper.COLUMN_SUBJECT_ID + " = ?",
+                        new String[]{String.valueOf(subject.getId())}
+                );
+            }
+            database.setTransactionSuccessful();
+        } finally {
+            database.endTransaction();
+        }
     }
 
     /**
@@ -160,7 +188,7 @@ public class SubjectDao {
                 null,
                 null,
                 null,
-                LinkDbHelper.COLUMN_SUBJECT_CREATE_TIME + " DESC"
+                LinkDbHelper.COLUMN_SUBJECT_ORDER_INDEX + " ASC"
         );
 
         if (cursor.moveToFirst()) {
@@ -617,6 +645,7 @@ public class SubjectDao {
         subject.setTitle(cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUBJECT_TITLE)));
         subject.setDescribe(cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUBJECT_DESCRIBE)));
         subject.setCreateTime(cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUBJECT_CREATE_TIME)));
+        subject.setOrderIndex(cursor.getInt(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUBJECT_ORDER_INDEX)));
         return subject;
     }
 
