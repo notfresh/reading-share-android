@@ -28,6 +28,7 @@ public class SubjectAdapter extends RecyclerView.Adapter<SubjectAdapter.SubjectV
     private OnSubjectClickListener listener;
     private OnSubjectActionListener actionListener;
     private Context context;
+    private boolean sortMode = false;
 
     public interface OnSubjectClickListener {
         void onSubjectClick(Subject subject);
@@ -54,6 +55,10 @@ public class SubjectAdapter extends RecyclerView.Adapter<SubjectAdapter.SubjectV
 
     public void setOnSubjectActionListener(OnSubjectActionListener listener) {
         this.actionListener = listener;
+    }
+
+    public void setSortMode(boolean sortMode) {
+        this.sortMode = sortMode;
     }
 
     public void setSubjects(List<Subject> subjects) {
@@ -96,8 +101,12 @@ public class SubjectAdapter extends RecyclerView.Adapter<SubjectAdapter.SubjectV
                 }
             });
 
-            // 长按显示操作菜单
+            // 长按显示操作菜单（排序模式下禁用）
             itemView.setOnLongClickListener(v -> {
+                if (sortMode) {
+                    // 排序模式下不处理长按，交给 ItemTouchHelper 处理拖拽
+                    return false;
+                }
                 int position = getAdapterPosition();
                 if (position != RecyclerView.NO_POSITION) {
                     showActionMenu(v, subjects.get(position));
