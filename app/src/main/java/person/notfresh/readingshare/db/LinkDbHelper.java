@@ -13,7 +13,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     //private static final int DATABASE_VERSION = 10; // 添加文档表
     //private static final int DATABASE_VERSION = 11; // 添加主题表
 
-    private static final int DATABASE_VERSION = 13; // 书签表
+    private static final int DATABASE_VERSION = 14; // 主题表增加排序字段
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_TITLE = "title";
@@ -66,6 +66,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String COLUMN_SUBJECT_TITLE = "title";
     public static final String COLUMN_SUBJECT_DESCRIBE = "describe";
     public static final String COLUMN_SUBJECT_CREATE_TIME = "create_time";
+    public static final String COLUMN_SUBJECT_ORDER_INDEX = "order_index";
 
     // 主题项表
     public static final String TABLE_SUBJECT_ITEMS = "subject_items";
@@ -161,7 +162,8 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     COLUMN_SUBJECT_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     COLUMN_SUBJECT_TITLE + " TEXT NOT NULL, " +
                     COLUMN_SUBJECT_DESCRIBE + " TEXT, " +
-                    COLUMN_SUBJECT_CREATE_TIME + " INTEGER NOT NULL)";
+                    COLUMN_SUBJECT_CREATE_TIME + " INTEGER NOT NULL, " +
+                    COLUMN_SUBJECT_ORDER_INDEX + " INTEGER DEFAULT 0)";
 
     private static final String SQL_CREATE_SUBJECT_ITEMS =
             "CREATE TABLE " + TABLE_SUBJECT_ITEMS + " (" +
@@ -269,6 +271,12 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                 // 版本13：添加书签表
                 db.execSQL(SQL_CREATE_BOOKMARKS);
                 Log.d("LinkDbHelper", "Created bookmarks table");
+            }
+
+            if (oldVersion < 14) {
+                // 版本14：主题表增加排序字段
+                db.execSQL("ALTER TABLE " + TABLE_SUBJECTS + " ADD COLUMN " + COLUMN_SUBJECT_ORDER_INDEX + " INTEGER DEFAULT 0");
+                Log.d("LinkDbHelper", "Added subject order_index column");
             }
 
             if (oldVersion < 9) {
