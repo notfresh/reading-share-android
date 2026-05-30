@@ -85,6 +85,13 @@ public class SubjectAdapter extends RecyclerView.Adapter<SubjectAdapter.SubjectV
         return subjects.size();
     }
 
+    /**
+     * 获取当前主题列表（用于拖拽排序）
+     */
+    public List<Subject> getSubjects() {
+        return subjects;
+    }
+
     class SubjectViewHolder extends RecyclerView.ViewHolder {
         private TextView textTitle;
         private TextView textDescribe;

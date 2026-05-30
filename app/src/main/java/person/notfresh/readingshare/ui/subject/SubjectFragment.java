@@ -10,12 +10,14 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import androidx.appcompat.widget.Toolbar;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -24,6 +26,7 @@ import java.util.List;
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.SubjectAdapter;
 import person.notfresh.readingshare.core.model.Subject;
+import person.notfresh.readingshare.core.model.SubjectUtil;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.ui.subject.CreateSubjectDialog;
 import person.notfresh.readingshare.ui.subject.SubjectDetailActivity;
@@ -41,6 +44,9 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
     private SubjectAdapter adapter;
     private SubjectDao subjectDao;
     private Subject pendingIconSubject; // 临时存储待处理图标的主题
+    private boolean isSortMode = false;
+    private ItemTouchHelper itemTouchHelper;
+    private MenuItem sortMenuItem;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -51,6 +57,7 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         inflater.inflate(R.menu.subject_menu, menu);
+        sortMenuItem = menu.findItem(R.id.action_sort_subjects);
         super.onCreateOptionsMenu(menu, inflater);
     }
 
@@ -59,8 +66,34 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
         if (item.getItemId() == R.id.action_create_subject) {
             showCreateSubjectDialog();
             return true;
+        } else if (item.getItemId() == R.id.action_sort_subjects) {
+            toggleSortMode();
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void toggleSortMode() {
+        isSortMode = !isSortMode;
+        adapter.setSortMode(isSortMode);
+
+        if (isSortMode) {
+            // 进入排序模式
+            sortMenuItem.setTitle("完成");
+            Toolbar toolbar = requireActivity().findViewById(R.id.toolbar);
+            if (toolbar != null) {
+                toolbar.setTitle("排序中...");
+            }
+            itemTouchHelper.attachToRecyclerView(recyclerView);
+        } else {
+            // 退出排序模式
+            sortMenuItem.setTitle("排序");
+            Toolbar toolbar = requireActivity().findViewById(R.id.toolbar);
+            if (toolbar != null) {
+                toolbar.setTitle(getString(R.string.app_name));
+            }
+            itemTouchHelper.attachToRecyclerView(null);
+        }
     }
 
     private void showCreateSubjectDialog() {
@@ -126,6 +159,8 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
         recyclerView.setAdapter(adapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
+        setupDragAndDrop();
+
         loadSubjects();
 
         return root;
@@ -143,6 +178,53 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
         List<Subject> subjects = subjectDao.getAllSubjects();
         adapter.setSubjects(subjects);
         Log.d(TAG, "加载了 " + subjects.size() + " 个主题");
+    }
+
+    private void setupDragAndDrop() {
+        ItemTouchHelper.Callback callback = new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                                 @NonNull RecyclerView.ViewHolder viewHolder,
+                                 @NonNull RecyclerView.ViewHolder target) {
+                int fromPos = viewHolder.getAdapterPosition();
+                int toPos = target.getAdapterPosition();
+
+                List<Subject> items = adapter.getSubjects();
+                if (fromPos < 0 || fromPos >= items.size() || toPos < 0 || toPos >= items.size()) {
+                    return false;
+                }
+
+                Subject draggedItem = items.get(fromPos);
+                items.remove(fromPos);
+                items.add(toPos, draggedItem);
+                adapter.notifyItemMoved(fromPos, toPos);
+
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                // 不需要实现
+            }
+
+            @Override
+            public void clearView(@NonNull RecyclerView recyclerView,
+                                 @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+
+                // 拖拽结束，按当前顺序重新分配 orderIndex 并保存
+                List<Subject> items = adapter.getSubjects();
+                for (int i = 0; i < items.size(); i++) {
+                    items.get(i).setOrderIndex(i * SubjectUtil.ORDER_INTERVAL);
+                }
+
+                subjectDao.updateSubjectsOrderIndex(items);
+                Log.d(TAG, "拖拽排序完成，已更新 " + items.size() + " 个主题的 orderIndex");
+            }
+        };
+
+        itemTouchHelper = new ItemTouchHelper(callback);
     }
 
     @Override
