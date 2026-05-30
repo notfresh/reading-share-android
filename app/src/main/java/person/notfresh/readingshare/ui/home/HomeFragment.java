@@ -264,8 +264,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             selectAllItems();
             return true;
         } else if (id == R.id.action_shuffle) {
-            // 进入洗牌模式
-            toggleShuffleMode();
+            if (isShuffleMode) {
+                // 已经在洗牌模式，再次洗牌
+                reshuffleLinks();
+            } else {
+                // 进入洗牌模式
+                toggleShuffleMode();
+            }
             return true;
         } else if (id == R.id.action_exit_shuffle) {
             // 退出洗牌模式
@@ -774,10 +779,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             exitSortMenuItem.setVisible(isSortMode);
         }
 
-        // 洗牌模式菜单项（仅在非选择模式、非排序模式下显示）
+        // 洗牌模式菜单项
+        // 洗牌按钮：在非洗牌模式下显示（进入洗牌），在洗牌模式下也显示（再次洗牌）
+        // 退出洗牌按钮：仅在洗牌模式下显示（退出洗牌模式）
         Log.d(TAG, "updateMenuVisibility: isSelectionMode=" + isSelectionMode + ", isSortMode=" + isSortMode + ", isShuffleMode=" + isShuffleMode);
         if (shuffleMenuItem != null) {
-            shuffleMenuItem.setVisible(!isSelectionMode && !isSortMode && !isShuffleMode);
+            shuffleMenuItem.setVisible(!isSelectionMode && !isSortMode);
             Log.d(TAG, "updateMenuVisibility: shuffleMenuItem visible=" + shuffleMenuItem.isVisible());
         }
         if (exitShuffleMenuItem != null) {
@@ -863,7 +870,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 保存洗牌模式状态
         saveShuffleModeState();
 
-        // 重新加载数据
+        // 重新加载数据（会触发洗牌）
         refreshLinksList();
 
         // 更新菜单可见性
@@ -879,6 +886,22 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
         requireActivity().invalidateOptionsMenu();
         Log.d(TAG, "toggleShuffleMode: completed, isShuffleMode=" + isShuffleMode);
+    }
+
+    /**
+     * 再次洗牌（在洗牌模式下点击洗牌按钮）
+     * 不切换模式状态，只是重新洗牌
+     */
+    private void reshuffleLinks() {
+        if (!isShuffleMode) {
+            return;
+        }
+        Log.d(TAG, "reshuffleLinks: reshuffling links");
+
+        // 重新加载数据（触发洗牌）
+        refreshLinksList();
+
+        Toast.makeText(requireContext(), "重新洗牌", Toast.LENGTH_SHORT).show();
     }
 
     /**
