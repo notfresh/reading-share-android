@@ -338,22 +338,22 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         
         // 从 items 列表中移除
         items.remove(position);
-        
-        // 从 originalItems 中移除
+
+        // 从 originalItems 中移除（保持数据一致）
         originalItems.remove(item);
-        
+
         // 从 pinnedLinks 中移除
         pinnedLinks.removeIf(link -> link.getId() == item.getId());
-        
+
         // 从 groupedLinks 中移除
         for (Map.Entry<String, List<LinkItem>> entry : groupedLinks.entrySet()) {
             entry.getValue().removeIf(link -> link.getId() == item.getId());
         }
-        
-        // 通知适配器项目已移除（最小改动，只移除项目本身）
+
+        // 通知适配器项目已移除（只刷新删除位置，不触发整体刷新）
         notifyItemRemoved(position);
-        
-        Log.d("LinksAdapter", "已从适配器中移除链接: " + item.getTitle() + ", 位置: " + position);
+
+        Log.d("LinksAdapter", "已从适配器中移除链接: " + item.getTitle() + ", 位置: " + position + ", items.size=" + items.size() + ", originalItems.size=" + originalItems.size());
         return true;
     }
 

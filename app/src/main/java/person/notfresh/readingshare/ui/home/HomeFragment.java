@@ -654,7 +654,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linkDao.deleteLink(link.getId());
 
         // 直接从适配器中移除，避免重新查询数据库
-        adapter.removeLinkItem(link);
+        boolean removed = adapter.removeLinkItem(link);
+        Log.d("HomeFragment", "onDeleteLink: removeLinkItem returned " + removed + ", adapter itemCount=" + adapter.getItemCount());
 
         // 退出洗牌模式（新增/删除链接后按时间排序显示）
         if (isShuffleMode) {
@@ -664,11 +665,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
 
         // 如果标签区域可见，重新加载标签（更新标签计数）
-        if (tagsContainer != null && tagsContainer.getVisibility() == View.VISIBLE) {
-            loadTags();
-        }
+        // 注意：这里可能导致列表刷新，临时禁用调试
+        // if (tagsContainer != null && tagsContainer.getVisibility() == View.VISIBLE) {
+        //     loadTags();
+        // }
 
-        Log.d("HomeFragment", "Link deletion completed, UI updated");
+        Log.d("HomeFragment", "onDeleteLink completed, adapter itemCount=" + adapter.getItemCount());
     }
 
     @Override
