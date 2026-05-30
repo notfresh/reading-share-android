@@ -775,11 +775,14 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
 
         // 洗牌模式菜单项（仅在非选择模式、非排序模式下显示）
+        Log.d(TAG, "updateMenuVisibility: isSelectionMode=" + isSelectionMode + ", isSortMode=" + isSortMode + ", isShuffleMode=" + isShuffleMode);
         if (shuffleMenuItem != null) {
             shuffleMenuItem.setVisible(!isSelectionMode && !isSortMode && !isShuffleMode);
+            Log.d(TAG, "updateMenuVisibility: shuffleMenuItem visible=" + shuffleMenuItem.isVisible());
         }
         if (exitShuffleMenuItem != null) {
             exitShuffleMenuItem.setVisible(isShuffleMode);
+            Log.d(TAG, "updateMenuVisibility: exitShuffleMenuItem visible=" + exitShuffleMenuItem.isVisible());
         }
     }
     
@@ -853,7 +856,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * 退出洗牌模式：按时间倒序显示
      */
     private void toggleShuffleMode() {
+        Log.d(TAG, "toggleShuffleMode: start, current isShuffleMode=" + isShuffleMode);
         isShuffleMode = !isShuffleMode;
+        Log.d(TAG, "toggleShuffleMode: toggled to isShuffleMode=" + isShuffleMode);
 
         // 保存洗牌模式状态
         saveShuffleModeState();
@@ -873,6 +878,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
 
         requireActivity().invalidateOptionsMenu();
+        Log.d(TAG, "toggleShuffleMode: completed, isShuffleMode=" + isShuffleMode);
     }
 
     /**
@@ -1087,11 +1093,21 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
                 // 洗牌模式：对非置顶链接随机排序（刚添加链接时强制按时间排序）
                 if (isShuffleMode && !recentlyAdded) {
+                    Log.d(TAG, "refreshLinksList: shuffling " + normalLinks.size() + " links");
                     Collections.shuffle(normalLinks);
+                } else {
+                    Log.d(TAG, "refreshLinksList: NOT shuffling, isShuffleMode=" + isShuffleMode + ", recentlyAdded=" + recentlyAdded);
                 }
 
                 // 按日期分组非置顶链接
-                Map<String, List<LinkItem>> groupedLinks = groupLinksByDate(normalLinks);
+                Map<String, List<LinkItem>> groupedLinks;
+                if (isShuffleMode && !recentlyAdded) {
+                    // 洗牌模式：保持随机顺序，按日期分组但不排序组内顺序
+                    groupedLinks = groupLinksWithoutSort(normalLinks);
+                } else {
+                    // 时间模式：按时间排序
+                    groupedLinks = groupLinksByDate(normalLinks);
+                }
                 
                 // 计算总链接数
                 int totalLinks = pinnedLinks.size();
@@ -1168,7 +1184,27 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         
         return groupedLinks;
     }
-    
+
+    /**
+     * 按日期分组链接（不排序）
+     * 将链接列表按日期分组，返回TreeMap（日期为key，链接列表为value）
+     * 保持链接原有顺序，用于洗牌模式
+     * @param links 要分组的链接列表
+     * @return 按日期分组的Map，日期倒序排列
+     */
+    private Map<String, List<LinkItem>> groupLinksWithoutSort(List<LinkItem> links) {
+        Map<String, List<LinkItem>> groupedLinks = new TreeMap<>(Collections.reverseOrder());
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+        for (LinkItem link : links) {
+            String date = dateFormat.format(new Date(link.getTimestamp()));
+            List<LinkItem> dayLinks = groupedLinks.computeIfAbsent(date, k -> new ArrayList<>());
+            dayLinks.add(link);
+        }
+
+        return groupedLinks;
+    }
+
     /**
      * 计算置顶链接与筛选结果的交集
      * 仅返回在筛选结果中存在的置顶链接
