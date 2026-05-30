@@ -14,6 +14,7 @@ public class Subject {
     private String title;                    // 主题标题
     private String describe;                 // 主题描述
     private long createTime;                 // 创建时间
+    private int orderIndex;                // 排序索引（间隔值：0, 10, 20, 30...）
     private List<SubjectItem> subItems;      // 主题项列表
 
     public Subject() {
@@ -139,6 +140,14 @@ public class Subject {
 
     public void setCreateTime(long createTime) {
         this.createTime = createTime;
+    }
+
+    public int getOrderIndex() {
+        return orderIndex;
+    }
+
+    public void setOrderIndex(int orderIndex) {
+        this.orderIndex = orderIndex;
     }
 
     public List<SubjectItem> getSubItems() {
