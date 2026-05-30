@@ -1141,10 +1141,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 } else {
                     totalLinks += normalLinks.size();
                 }
-                for (List<LinkItem> links : groupedLinks.values()) {
-                    totalLinks += links.size();
-                }
-                
+
                 Log.d(TAG, "refreshLinksList: refresh link list (all): pinned=" + pinnedLinks.size()
                     + ", groups=" + (groupedLinks != null ? groupedLinks.size() : "flat") + ", total links=" + totalLinks);
 
