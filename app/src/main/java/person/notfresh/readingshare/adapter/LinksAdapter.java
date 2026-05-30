@@ -229,9 +229,36 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         // 保存原始数据
         originalItems.addAll(items);
         notifyDataSetChanged();
-        
-        Log.d("LinksAdapter", "设置数据: 置顶链接数=" + pinnedLinks.size() + 
+
+        Log.d("LinksAdapter", "设置数据: 置顶链接数=" + pinnedLinks.size() +
                 ", 总项目数=" + items.size());
+    }
+
+    /**
+     * 设置扁平化的链接列表（无日期分组，用于洗牌模式）
+     * @param links 扁平化的链接列表
+     */
+    public void setFlatLinks(List<LinkItem> links) {
+        items.clear();
+        originalItems.clear();
+
+        // 首先添加置顶链接区域
+        if (!pinnedLinks.isEmpty()) {
+            items.add("置顶");  // 添加置顶区域的标题
+            items.addAll(pinnedLinks);
+        }
+
+        // 添加扁平化的链接列表（无日期分组）
+        if (links != null && !links.isEmpty()) {
+            items.addAll(links);
+        }
+
+        // 保存原始数据
+        originalItems.addAll(items);
+        notifyDataSetChanged();
+
+        Log.d("LinksAdapter", "设置扁平数据: 置顶链接数=" + pinnedLinks.size() +
+                ", 普通链接数=" + (links != null ? links.size() : 0) + ", 总项目数=" + items.size());
     }
 
     public Set<LinkItem> getSelectedItems() {

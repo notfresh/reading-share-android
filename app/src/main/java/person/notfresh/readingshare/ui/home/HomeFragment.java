@@ -1125,31 +1125,43 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 // 按日期分组非置顶链接
                 Map<String, List<LinkItem>> groupedLinks;
                 if (isShuffleMode && !recentlyAdded) {
-                    // 洗牌模式：保持随机顺序，按日期分组但不排序组内顺序
-                    groupedLinks = groupLinksWithoutSort(normalLinks);
+                    // 洗牌模式：扁平化显示，无日期分组
+                    groupedLinks = null;
                 } else {
-                    // 时间模式：按时间排序
+                    // 时间模式：按时间排序并按日期分组
                     groupedLinks = groupLinksByDate(normalLinks);
                 }
-                
+
                 // 计算总链接数
                 int totalLinks = pinnedLinks.size();
+                if (groupedLinks != null) {
+                    for (List<LinkItem> links : groupedLinks.values()) {
+                        totalLinks += links.size();
+                    }
+                } else {
+                    totalLinks += normalLinks.size();
+                }
                 for (List<LinkItem> links : groupedLinks.values()) {
                     totalLinks += links.size();
                 }
                 
-                Log.d(TAG, "refreshLinksList: refresh link list (all): pinned=" + pinnedLinks.size() 
-                    + ", groups=" + groupedLinks.size() + ", total links=" + totalLinks);
-                
+                Log.d(TAG, "refreshLinksList: refresh link list (all): pinned=" + pinnedLinks.size()
+                    + ", groups=" + (groupedLinks != null ? groupedLinks.size() : "flat") + ", total links=" + totalLinks);
+
                 if (totalLinks == 0) {
                     Log.w(TAG, "refreshLinksList: WARNING! No link data found");
                 }
-                
+
                 // 直接设置数据到adapter（onCreateView时RecyclerView已经准备好）
                 Log.d(TAG, "refreshLinksList: setting data to adapter directly");
                 adapter.setPinnedLinks(pinnedLinks);
-                adapter.setGroupedLinks(groupedLinks);
-                // setGroupedLinks内部已经调用了notifyDataSetChanged，不需要再次调用
+                if (groupedLinks != null) {
+                    adapter.setGroupedLinks(groupedLinks);
+                } else {
+                    // 洗牌模式：使用扁平化显示
+                    adapter.setFlatLinks(normalLinks);
+                }
+                // setGroupedLinks/setFlatLinks内部已经调用了notifyDataSetChanged，不需要再次调用
                 Log.d(TAG, "refreshLinksList: data set to adapter, notifyDataSetChanged called");
 
                 // 刚添加链接时退出洗牌模式（按时间排序显示，方便确认添加成功）
@@ -1801,20 +1813,25 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             // 按日期分组显示
             Map<String, List<LinkItem>> groupedLinks;
             if (isShuffleMode && !recentlyAdded) {
-                // 洗牌模式：保持随机顺序
-                groupedLinks = groupLinksWithoutSort(links);
+                // 洗牌模式：扁平化显示，无日期分组
+                groupedLinks = null;  // 用 null 标记洗牌模式
             } else {
-                // 时间模式：按时间排序
+                // 时间模式：按时间排序并按日期分组
                 groupedLinks = groupLinksByDate(links);
             }
-            Log.d(TAG, "updateContentBySelectedTags: grouping completed, groupedLinks.size=" + groupedLinks.size());
-            
+            Log.d(TAG, "updateContentBySelectedTags: grouping completed, groupedLinks.size=" + (groupedLinks != null ? groupedLinks.size() : 0));
+
             // 计算置顶与筛选结果的交集
             List<LinkItem> pinnedOverlap = calculatePinnedOverlap(links);
             Log.d(TAG, "updateContentBySelectedTags: pinned overlap=" + pinnedOverlap.size());
-            
+
             adapter.setPinnedLinks(pinnedOverlap);
-            adapter.setGroupedLinks(groupedLinks);
+            if (groupedLinks != null) {
+                adapter.setGroupedLinks(groupedLinks);
+            } else {
+                // 洗牌模式：使用扁平化显示
+                adapter.setFlatLinks(links);
+            }
             adapter.notifyDataSetChanged();
 
             // 保存选择状态
