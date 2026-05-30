@@ -762,13 +762,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             selectAllMenuItem.setVisible(isSelectionMode);
         }
         
-        // 标签管理菜单项（仅在非选择模式、非排序模式下显示，且标签区域可见时）
+        // 标签管理菜单项（仅在非选择模式、非排序模式、非洗牌模式下显示，且标签区域可见时）
         boolean tagsVisible = tagsContainer != null && tagsContainer.getVisibility() == View.VISIBLE;
         if (addTagMenuItem != null) {
-            addTagMenuItem.setVisible(tagsVisible && !isSelectionMode && !isSortMode);
+            addTagMenuItem.setVisible(tagsVisible && !isSelectionMode && !isSortMode && !isShuffleMode);
         }
         if (sortMenuItem != null) {
-            sortMenuItem.setVisible(tagsVisible && !isSelectionMode && !isSortMode);
+            sortMenuItem.setVisible(tagsVisible && !isSelectionMode && !isSortMode && !isShuffleMode);
         }
         if (exitSortMenuItem != null) {
             exitSortMenuItem.setVisible(isSortMode);
@@ -1766,8 +1766,24 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             // 更新标题
             updateTitle(tagNames, hasNoTagFilter);
 
+            // 判断是否刚添加链接（5秒内）
+            boolean recentlyAdded = (System.currentTimeMillis() - lastLinkAddTime) < LINK_ADD_INTERVAL_MS;
+
+            // 洗牌模式：对非置顶链接随机排序（刚添加链接时强制按时间排序）
+            if (isShuffleMode && !recentlyAdded) {
+                Log.d(TAG, "updateContentBySelectedTags: shuffling " + links.size() + " links");
+                Collections.shuffle(links);
+            }
+
             // 按日期分组显示
-            Map<String, List<LinkItem>> groupedLinks = groupLinksByDate(links);
+            Map<String, List<LinkItem>> groupedLinks;
+            if (isShuffleMode && !recentlyAdded) {
+                // 洗牌模式：保持随机顺序
+                groupedLinks = groupLinksWithoutSort(links);
+            } else {
+                // 时间模式：按时间排序
+                groupedLinks = groupLinksByDate(links);
+            }
             Log.d(TAG, "updateContentBySelectedTags: grouping completed, groupedLinks.size=" + groupedLinks.size());
             
             // 计算置顶与筛选结果的交集
