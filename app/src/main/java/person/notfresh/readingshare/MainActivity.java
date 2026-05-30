@@ -32,6 +32,7 @@ import androidx.fragment.app.Fragment;
 import person.notfresh.readingshare.databinding.ActivityMainBinding;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.ui.home.HomeFragment;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.app.AlertDialog;
@@ -53,6 +54,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.app.ActivityManager;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import java.net.URLConnection;
 import android.content.SharedPreferences;
 import androidx.core.view.GravityCompat;
@@ -611,9 +613,27 @@ public class MainActivity extends AppCompatActivity {
                         Snackbar.make(binding.getRoot(), "已保存：" + title, 
                                 Snackbar.LENGTH_LONG).show();
 
-                        NavController navController = Navigation.findNavController(this, 
+                        NavController navController = Navigation.findNavController(this,
                                 R.id.nav_host_fragment_content_main);
                         navController.navigate(R.id.nav_home);
+
+                        // 通知 HomeFragment 记录添加链接的时间（用于洗牌模式判断）
+                        navController.addOnDestinationChangedListener(new NavController.OnDestinationChangedListener() {
+                            @Override
+                            public void onDestinationChanged(@NonNull NavController controller,
+                                                            @NonNull NavDestination destination,
+                                                            @Nullable Bundle arguments) {
+                                if (destination.getId() == R.id.nav_home) {
+                                    // 找到 HomeFragment 并记录添加链接的时间
+                                    Fragment fragment = getSupportFragmentManager()
+                                            .findFragmentById(R.id.nav_host_fragment_content_main);
+                                    if (fragment instanceof HomeFragment) {
+                                        ((HomeFragment) fragment).recordLinkAddTime();
+                                    }
+                                    navController.removeOnDestinationChangedListener(this);
+                                }
+                            }
+                        });
                     }
                 })
                 .setNegativeButton("取消", (dialog1, which) -> {

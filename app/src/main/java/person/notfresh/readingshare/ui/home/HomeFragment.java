@@ -116,6 +116,10 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private static final int FIXED_TAGS_COUNT = 10;  // 固定显示的标签数量
     private static final int COLLAPSED_HEIGHT_DP = 120;  // 折叠高度
     private static final int SORT_MODE_MAX_HEIGHT_DP = 400;  // 排序模式下的最大高度（dp）
+
+    // 洗牌模式相关常量
+    private static final String KEY_SHUFFLE_MODE = "shuffle_mode";
+    private static final long LINK_ADD_INTERVAL_MS = 5000;  // 5秒内的新增链接视为刚添加
     
     private RecyclerView tagsRecyclerView;
     private RecyclerView tagsRecyclerViewCollapsed;  // 折叠标签区
@@ -134,6 +138,10 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private boolean isTagsExpanded = false;  // 默认折叠
     private Set<String> highlightedTags = new HashSet<>();  // 保存高亮的标签
     private View tagsContainer;  // 标签容器（用于控制显示/隐藏）
+    private boolean isShuffleMode = false;  // 是否处于洗牌模式
+    private MenuItem shuffleMenuItem;  // 洗牌菜单项
+    private MenuItem exitShuffleMenuItem;  // 退出洗牌菜单项
+    private long lastLinkAddTime = 0;  // 上次添加链接的时间戳（用于判断是否刚添加链接）
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -146,6 +154,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             Log.e(TAG, "onCreate: exception", e);
             throw e;
         }
+
+        // 恢复洗牌模式状态
+        restoreShuffleModeState();
     }
 
     @Override
@@ -163,15 +174,19 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             addTagMenuItem = menu.findItem(R.id.action_add_tag);  // 添加标签菜单项
             sortMenuItem = menu.findItem(R.id.action_sort_tags);  // 排序菜单项
             exitSortMenuItem = menu.findItem(R.id.action_exit_sort);  // 退出排序菜单项
+            shuffleMenuItem = menu.findItem(R.id.action_shuffle);  // 洗牌菜单项
+            exitShuffleMenuItem = menu.findItem(R.id.action_exit_shuffle);  // 退出洗牌菜单项
             MenuItem statisticsMenuItem = menu.findItem(R.id.action_statistics);  // 新增的统计
-            
-            Log.d(TAG, "onCreateOptionsMenu: menu items found - share=" + (shareMenuItem != null) + 
-                    ", close=" + (closeSelectionMenuItem != null) + 
+
+            Log.d(TAG, "onCreateOptionsMenu: menu items found - share=" + (shareMenuItem != null) +
+                    ", close=" + (closeSelectionMenuItem != null) +
                     ", enter=" + (enterSelectionMenuItem != null) +
                     ", selectAll=" + (selectAllMenuItem != null) +
                     ", addTag=" + (addTagMenuItem != null) +
                     ", sort=" + (sortMenuItem != null) +
-                    ", exitSort=" + (exitSortMenuItem != null));
+                    ", exitSort=" + (exitSortMenuItem != null) +
+                    ", shuffle=" + (shuffleMenuItem != null) +
+                    ", exitShuffle=" + (exitShuffleMenuItem != null));
 
             // 调整新增统计按钮的位置
             View actionView = requireActivity().findViewById(statisticsMenuItem.getItemId());
@@ -247,6 +262,14 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         } else if (id == R.id.action_select_all) {
             // 全选（从TagsFragment合并）
             selectAllItems();
+            return true;
+        } else if (id == R.id.action_shuffle) {
+            // 进入洗牌模式
+            toggleShuffleMode();
+            return true;
+        } else if (id == R.id.action_exit_shuffle) {
+            // 退出洗牌模式
+            toggleShuffleMode();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -621,24 +644,37 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public void onDeleteLink(LinkItem link) {
         Log.d("HomeFragment", "onDeleteLink: " + link.getTitle() + ", link id " + link.getId());
-        
+
         // 删除数据库中的链接
         linkDao.deleteLink(link.getId());
-        
+
         // 直接从适配器中移除，避免重新查询数据库
         adapter.removeLinkItem(link);
-        
+
+        // 退出洗牌模式（新增/删除链接后按时间排序显示）
+        if (isShuffleMode) {
+            isShuffleMode = false;
+            saveShuffleModeState();
+            updateMenuVisibility();
+        }
+
         // 如果标签区域可见，重新加载标签（更新标签计数）
         if (tagsContainer != null && tagsContainer.getVisibility() == View.VISIBLE) {
             loadTags();
         }
-        
+
         Log.d("HomeFragment", "Link deletion completed, UI updated");
     }
 
     @Override
     public void onUpdateLink(LinkItem oldLink, String newTitle) {
         linkDao.updateLinkTitle(oldLink.getUrl(), newTitle);
+        // 退出洗牌模式（新增/删除链接后按时间排序显示）
+        if (isShuffleMode) {
+            isShuffleMode = false;
+            saveShuffleModeState();
+            updateMenuVisibility();
+        }
         // 统一刷新：根据是否有标签筛选来决定刷新方式
         refreshLinksList();
     }
@@ -737,6 +773,14 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (exitSortMenuItem != null) {
             exitSortMenuItem.setVisible(isSortMode);
         }
+
+        // 洗牌模式菜单项（仅在非选择模式、非排序模式下显示）
+        if (shuffleMenuItem != null) {
+            shuffleMenuItem.setVisible(!isSelectionMode && !isSortMode && !isShuffleMode);
+        }
+        if (exitShuffleMenuItem != null) {
+            exitShuffleMenuItem.setVisible(isShuffleMode);
+        }
     }
     
     /**
@@ -791,6 +835,63 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
         
         requireActivity().invalidateOptionsMenu();
+    }
+
+    /**
+     * 记录添加链接的时间
+     * 用于在 refreshLinksList 时判断是否刚添加链接
+     */
+    public void recordLinkAddTime() {
+        lastLinkAddTime = System.currentTimeMillis();
+    }
+
+    // ========== 洗牌模式 ==========
+
+    /**
+     * 切换洗牌模式
+     * 进入洗牌模式：对非置顶链接随机排序显示
+     * 退出洗牌模式：按时间倒序显示
+     */
+    private void toggleShuffleMode() {
+        isShuffleMode = !isShuffleMode;
+
+        // 保存洗牌模式状态
+        saveShuffleModeState();
+
+        // 重新加载数据
+        refreshLinksList();
+
+        // 更新菜单可见性
+        updateMenuVisibility();
+
+        // 更新标题
+        if (isShuffleMode) {
+            requireActivity().setTitle("随机推荐");
+            Toast.makeText(requireContext(), "洗牌后随机排序", Toast.LENGTH_SHORT).show();
+        } else {
+            requireActivity().setTitle(R.string.app_name);
+        }
+
+        requireActivity().invalidateOptionsMenu();
+    }
+
+    /**
+     * 保存洗牌模式状态到SharedPreferences
+     */
+    private void saveShuffleModeState() {
+        requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_SHUFFLE_MODE, isShuffleMode)
+                .apply();
+    }
+
+    /**
+     * 恢复洗牌模式状态从SharedPreferences
+     */
+    private void restoreShuffleModeState() {
+        isShuffleMode = requireContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_SHUFFLE_MODE, false);
+        Log.d(TAG, "restoreShuffleModeState: isShuffleMode=" + isShuffleMode);
     }
 
     // ========== 选择模式：分享与导出 ==========
@@ -967,7 +1068,30 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             if (selectedTagNames.isEmpty()) {
                 // 原有逻辑：加载所有链接（HomeFragment原有行为）
                 List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
-                Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
+                List<LinkItem> allLinks = linkDao.getAllLinks();
+
+                // 分离非置顶链接
+                Set<Long> pinnedIds = new HashSet<>();
+                for (LinkItem p : pinnedLinks) {
+                    pinnedIds.add(p.getId());
+                }
+                List<LinkItem> normalLinks = new ArrayList<>();
+                for (LinkItem link : allLinks) {
+                    if (!pinnedIds.contains(link.getId())) {
+                        normalLinks.add(link);
+                    }
+                }
+
+                // 判断是否刚添加链接（5秒内）
+                boolean recentlyAdded = (System.currentTimeMillis() - lastLinkAddTime) < LINK_ADD_INTERVAL_MS;
+
+                // 洗牌模式：对非置顶链接随机排序（刚添加链接时强制按时间排序）
+                if (isShuffleMode && !recentlyAdded) {
+                    Collections.shuffle(normalLinks);
+                }
+
+                // 按日期分组非置顶链接
+                Map<String, List<LinkItem>> groupedLinks = groupLinksByDate(normalLinks);
                 
                 // 计算总链接数
                 int totalLinks = pinnedLinks.size();
@@ -988,6 +1112,15 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 adapter.setGroupedLinks(groupedLinks);
                 // setGroupedLinks内部已经调用了notifyDataSetChanged，不需要再次调用
                 Log.d(TAG, "refreshLinksList: data set to adapter, notifyDataSetChanged called");
+
+                // 刚添加链接时退出洗牌模式（按时间排序显示，方便确认添加成功）
+                if (isShuffleMode && recentlyAdded) {
+                    isShuffleMode = false;
+                    saveShuffleModeState();
+                    updateMenuVisibility();
+                    requireActivity().setTitle(R.string.app_name);
+                    requireActivity().invalidateOptionsMenu();
+                }
                 
                 // 验证数据是否设置成功
                 RecyclerView recyclerView = binding.recyclerView;

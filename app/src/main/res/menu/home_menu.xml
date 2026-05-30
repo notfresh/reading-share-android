@@ -21,6 +21,20 @@
         android:title="完成排序"
         android:visible="false"
         app:showAsAction="always" />
+
+    <!-- 洗牌模式菜单项 -->
+    <item
+        android:id="@+id/action_shuffle"
+        android:icon="@android:drawable/ic_menu_rotate"
+        android:title="洗牌"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_exit_shuffle"
+        android:icon="@drawable/ic_close"
+        android:title="退出洗牌"
+        android:visible="false"
+        app:showAsAction="always" />
     
     <!-- 选择模式菜单项（原有） -->
     <item
