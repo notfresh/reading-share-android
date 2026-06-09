@@ -75,4 +75,5 @@
     <string name="search_history_delete">删除</string>
     <string name="search_history_max_count_label">搜索历史保留条数（非固定）</string>
     <string name="search_history_max_count_hint">默认 10</string>
+    <string name="search_clear">清除搜索</string>
 </resources>
