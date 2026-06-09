@@ -37,6 +37,7 @@ import java.util.List;
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.db.SearchHistoryManager;
 import com.google.android.material.snackbar.Snackbar;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.ImportUtil;
@@ -234,6 +235,27 @@ public class SettingFragment extends Fragment {
         // 添加导出按钮的点击事件
         root.findViewById(R.id.button_export).setOnClickListener(v -> {
             showExportDialog();
+        });
+
+        // 搜索历史 maxCount
+        TextInputEditText maxCountInput = root.findViewById(R.id.search_history_max_count_input);
+        SearchHistoryManager historyManager = new SearchHistoryManager(requireContext());
+        maxCountInput.setText(String.valueOf(historyManager.getMaxCount()));
+        maxCountInput.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                String raw = maxCountInput.getText().toString().trim();
+                int count;
+                try {
+                    count = Integer.parseInt(raw);
+                } catch (NumberFormatException e) {
+                    count = 10;
+                }
+                if (count < 1) count = 1;
+                if (count > 100) count = 100;
+                historyManager.setMaxCount(count);
+                maxCountInput.setText(String.valueOf(count));
+                Snackbar.make(requireView(), "已保存：保留 " + count + " 条历史", Snackbar.LENGTH_SHORT).show();
+            }
         });
 
         return root;
