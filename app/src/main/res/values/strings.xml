@@ -67,4 +67,12 @@
     <string name="toggle_navigation">显示/隐藏导航控件</string>
     <string name="toggle_external_block">切换外部链接拦截模式</string>
     <string name="add_tag">添加标签</string>
+
+    <!-- 搜索历史下拉 -->
+    <string name="search_history_empty">暂无搜索历史</string>
+    <string name="search_history_pin">固定</string>
+    <string name="search_history_unpin">取消固定</string>
+    <string name="search_history_delete">删除</string>
+    <string name="search_history_max_count_label">搜索历史保留条数（非固定）</string>
+    <string name="search_history_max_count_hint">默认 10</string>
 </resources>
