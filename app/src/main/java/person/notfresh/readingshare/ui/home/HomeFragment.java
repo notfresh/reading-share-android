@@ -15,6 +15,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.PopupWindow;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -33,11 +34,14 @@ import com.google.android.material.snackbar.Snackbar;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.LinksAdapter;
+import person.notfresh.readingshare.adapter.SearchHistoryAdapter;
 import person.notfresh.readingshare.adapter.TagsAdapter;
 import person.notfresh.readingshare.databinding.FragmentHomeBinding;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.db.SearchHistoryManager;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.model.SearchHistoryItem;
 import person.notfresh.readingshare.core.model.SubjectItem;
 import person.notfresh.readingshare.core.model.SubjectUtil;
 import person.notfresh.readingshare.ui.subject.SelectSubjectDialog;
@@ -102,7 +106,23 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private MenuItem sortMenuItem;  // 排序菜单项（从TagsFragment合并）
     private MenuItem exitSortMenuItem;  // 退出排序菜单项（从TagsFragment合并）
     private EditText searchEditText;
-    
+
+    // ========== 搜索历史下拉 ==========
+    private static final long SEARCH_DEBOUNCE_MS = 300L;
+    private static final long SEARCH_BLUR_HIDE_DELAY_MS = 200L;
+    private static final int SEARCH_HISTORY_POPUP_MAX_DP = 300;
+
+    private SearchHistoryManager searchHistoryManager;
+    private List<SearchHistoryItem> historyCache = new ArrayList<>();
+    private PopupWindow historyPopup;
+    private SearchHistoryAdapter historyAdapter;
+    private final Runnable debounceSearchRunnable = new Runnable() {
+        @Override public void run() { performSearch(searchEditText.getText().toString()); }
+    };
+    private final Runnable hidePopupRunnable = new Runnable() {
+        @Override public void run() { dismissHistoryPopup(); }
+    };
+
     // 用于保存图片选择时的临时数据
     private LinkItem pendingIconItem;
     private String pendingIconUrl;
@@ -328,18 +348,31 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             Log.d(TAG, "onCreateView: initializing search box");
             searchEditText = binding.searchEditText;
             if (searchEditText != null) {
+                // 搜索历史管理器
+                searchHistoryManager = new SearchHistoryManager(requireContext());
+                refreshHistoryCache();
+
                 searchEditText.addTextChangedListener(new TextWatcher() {
-                    @Override
-                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-                    @Override
-                    public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
+                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
                     @Override
                     public void afterTextChanged(Editable s) {
-                        if (adapter != null) {
-                            adapter.filter(s.toString());
+                        String text = s.toString();
+                        searchEditText.removeCallbacks(debounceSearchRunnable);
+                        searchEditText.postDelayed(debounceSearchRunnable, SEARCH_DEBOUNCE_MS);
+                    }
+                });
+
+                // focus: 空时弹下拉
+                searchEditText.setOnFocusChangeListener((v, hasFocus) -> {
+                    if (hasFocus) {
+                        if (searchEditText.getText().toString().trim().isEmpty()) {
+                            showHistoryPopup();
                         }
+                    } else {
+                        // 200ms 延迟，给点击下拉留时间窗
+                        searchEditText.removeCallbacks(hidePopupRunnable);
+                        searchEditText.postDelayed(hidePopupRunnable, SEARCH_BLUR_HIDE_DELAY_MS);
                     }
                 });
             } else {
@@ -383,7 +416,96 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             throw e;
         }
     }
-    
+
+    /**
+     * 实际执行搜索 + 入历史 + 刷新下拉
+     * 由 debounce 和点选历史项两种路径调用
+     */
+    private void performSearch(String rawText) {
+        if (adapter == null) return;
+        String text = rawText == null ? "" : rawText.trim();
+        adapter.filter(text);
+        // 入历史（非空才记）
+        if (!text.isEmpty() && searchHistoryManager != null) {
+            searchHistoryManager.addSearchKeyword(text);
+            refreshHistoryCache();
+        }
+    }
+
+    /** 重新读取历史到内存缓存，并按需重渲下拉 */
+    private void refreshHistoryCache() {
+        if (searchHistoryManager == null) return;
+        historyCache = searchHistoryManager.loadHistory();
+        if (historyAdapter != null) {
+            historyAdapter.setItems(historyCache);
+        }
+    }
+
+    /** 显示下拉：仅在 EditText 获得焦点且输入为空时调用 */
+    private void showHistoryPopup() {
+        if (searchEditText == null || searchEditText.getWindowToken() == null) return;
+        refreshHistoryCache();
+        if (historyPopup == null) {
+            buildHistoryPopup();
+        }
+        if (historyPopup != null && !historyPopup.isShowing()) {
+            historyPopup.showAsDropDown(searchEditText, 0, 0);
+        }
+    }
+
+    private void dismissHistoryPopup() {
+        if (historyPopup != null && historyPopup.isShowing()) {
+            historyPopup.dismiss();
+        }
+    }
+
+    /** 构造 PopupWindow（只构造一次） */
+    private void buildHistoryPopup() {
+        Context ctx = requireContext();
+        historyAdapter = new SearchHistoryAdapter();
+        historyAdapter.setOnItemClickListener(new SearchHistoryAdapter.OnItemClickListener() {
+            @Override public void onItemClick(SearchHistoryItem item) {
+                String kw = item.getText();
+                searchEditText.removeCallbacks(hidePopupRunnable);
+                searchEditText.setText(kw);
+                searchEditText.setSelection(kw.length());
+                searchEditText.removeCallbacks(debounceSearchRunnable);
+                dismissHistoryPopup();
+                // 手动同步副作用：setText 不触发 TextWatcher
+                performSearch(kw);
+            }
+            @Override public void onPinClick(SearchHistoryItem item) {
+                searchHistoryManager.togglePinKeyword(item.getText());
+                refreshHistoryCache();
+            }
+            @Override public void onDeleteClick(SearchHistoryItem item) {
+                searchHistoryManager.deleteKeyword(item.getText());
+                refreshHistoryCache();
+            }
+        });
+        historyAdapter.setItems(historyCache);
+
+        RecyclerView rv = new RecyclerView(ctx);
+        rv.setLayoutManager(new LinearLayoutManager(ctx));
+        rv.setAdapter(historyAdapter);
+        rv.setBackgroundResource(R.drawable.search_history_popup_bg);
+        rv.setElevation(8f);
+
+        int width = searchEditText.getWidth();
+        int maxHeight = (int) (SEARCH_HISTORY_POPUP_MAX_DP * ctx.getResources().getDisplayMetrics().density);
+        historyPopup = new PopupWindow(rv, width, ViewGroup.LayoutParams.WRAP_CONTENT, false);
+        historyPopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        historyPopup.setOutsideTouchable(false);
+        historyPopup.setFocusable(false);  // 关键：不抢焦点，避免 EditText 失焦
+        historyPopup.setHeight(maxHeight);
+
+        // 在下拉区域内触摸时取消 pending hide（spec 6.6 等价物）
+        rv.setOnTouchListener((v, ev) -> {
+            searchEditText.removeCallbacks(hidePopupRunnable);
+            return false;
+        });
+    }
+
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
@@ -628,6 +750,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     public void onDestroyView() {
         Log.d(TAG, "onDestroyView: start");
         super.onDestroyView();
+        if (searchEditText != null) {
+            searchEditText.removeCallbacks(debounceSearchRunnable);
+            searchEditText.removeCallbacks(hidePopupRunnable);
+        }
+        dismissHistoryPopup();
+        historyPopup = null;
+        historyAdapter = null;
         binding = null;
         if (linkDao != null) {
             linkDao.close();
