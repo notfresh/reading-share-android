@@ -52,6 +52,7 @@ import person.notfresh.readingshare.util.ImageUtil;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -122,6 +123,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private final Runnable hidePopupRunnable = new Runnable() {
         @Override public void run() { dismissHistoryPopup(); }
     };
+    private ImageButton searchClearButton;
 
     // 用于保存图片选择时的临时数据
     private LinkItem pendingIconItem;
@@ -357,24 +359,35 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
                     @Override
                     public void afterTextChanged(Editable s) {
-                        String text = s.toString();
+                        // 立即同步 × 和下拉的显隐（不等 300ms 防抖）
+                        updateInputChrome();
+                        // 防抖触发实际搜索 + 入历史
                         searchEditText.removeCallbacks(debounceSearchRunnable);
                         searchEditText.postDelayed(debounceSearchRunnable, SEARCH_DEBOUNCE_MS);
                     }
                 });
 
-                // focus: 空时弹下拉
+                // focus: 统一走 updateInputChrome 让它决定是否弹下拉
                 searchEditText.setOnFocusChangeListener((v, hasFocus) -> {
                     if (hasFocus) {
-                        if (searchEditText.getText().toString().trim().isEmpty()) {
-                            showHistoryPopup();
-                        }
+                        updateInputChrome();
                     } else {
                         // 200ms 延迟，给点击下拉留时间窗
                         searchEditText.removeCallbacks(hidePopupRunnable);
                         searchEditText.postDelayed(hidePopupRunnable, SEARCH_BLUR_HIDE_DELAY_MS);
                     }
                 });
+
+                // × 清除按钮：清空文本 + 保持焦点 + 由 updateInputChrome 决定是否弹下拉
+                searchClearButton = binding.searchClearButton;
+                if (searchClearButton != null) {
+                    searchClearButton.setOnClickListener(v -> {
+                        searchEditText.removeCallbacks(debounceSearchRunnable);
+                        searchEditText.setText("");
+                        // 手动同步：setText 不触发 TextWatcher
+                        updateInputChrome();
+                    });
+                }
             } else {
                 Log.w(TAG, "onCreateView: searchEditText is null");
             }
@@ -429,6 +442,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (!text.isEmpty() && searchHistoryManager != null) {
             searchHistoryManager.addSearchKeyword(text);
             refreshHistoryCache();
+            updateInputChrome();
         }
     }
 
@@ -441,10 +455,32 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
+    /**
+     * 统一处理输入框周围的 × 按钮和下拉的显隐
+     * - 有文字：显示 ×，不显示下拉
+     * - 空 + 焦点 + 有历史：显示下拉
+     * - 空 + 无历史：什么都不显示
+     */
+    private void updateInputChrome() {
+        if (searchEditText == null) return;
+        String text = searchEditText.getText().toString();
+        boolean hasText = !text.isEmpty();
+
+        if (searchClearButton != null) {
+            searchClearButton.setVisibility(hasText ? View.VISIBLE : View.GONE);
+        }
+        if (!hasText && searchEditText.hasFocus() && !historyCache.isEmpty()) {
+            showHistoryPopup();
+        } else {
+            dismissHistoryPopup();
+        }
+    }
+
     /** 显示下拉：仅在 EditText 获得焦点且输入为空时调用 */
     private void showHistoryPopup() {
         if (searchEditText == null || searchEditText.getWindowToken() == null) return;
-        refreshHistoryCache();
+        if (historyCache.isEmpty()) return;   // 新增：空历史不弹
+        refreshHistoryCache();               // 重读：保证下拉里删除最后一条时立即反映
         if (historyPopup == null) {
             buildHistoryPopup();
         }
@@ -473,14 +509,17 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 dismissHistoryPopup();
                 // 手动同步副作用：setText 不触发 TextWatcher
                 performSearch(kw);
+                updateInputChrome();
             }
             @Override public void onPinClick(SearchHistoryItem item) {
                 searchHistoryManager.togglePinKeyword(item.getText());
                 refreshHistoryCache();
+                updateInputChrome();
             }
             @Override public void onDeleteClick(SearchHistoryItem item) {
                 searchHistoryManager.deleteKeyword(item.getText());
                 refreshHistoryCache();
+                updateInputChrome();
             }
         });
         historyAdapter.setItems(historyCache);
@@ -757,6 +796,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         dismissHistoryPopup();
         historyPopup = null;
         historyAdapter = null;
+        searchClearButton = null;   // 新增
         binding = null;
         if (linkDao != null) {
             linkDao.close();
