@@ -112,6 +112,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private static final long SEARCH_DEBOUNCE_MS = 300L;
     private static final long SEARCH_BLUR_HIDE_DELAY_MS = 200L;
     private static final int SEARCH_HISTORY_POPUP_MAX_DP = 300;
+    private static final int SEARCH_DEFAULT_END_PADDING_DP = 8;
+    private static final int SEARCH_CLEAR_END_PADDING_DP = 36;
 
     private SearchHistoryManager searchHistoryManager;
     private List<SearchHistoryItem> historyCache = new ArrayList<>();
@@ -455,6 +457,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
+    /** dp → px 转换（用于 setPadding） */
+    private int dpToPx(int dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density);
+    }
+
     /**
      * 统一处理输入框周围的 × 按钮和下拉的显隐
      * - 有文字：显示 ×，不显示下拉
@@ -469,6 +476,16 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (searchClearButton != null) {
             searchClearButton.setVisibility(hasText ? View.VISIBLE : View.GONE);
         }
+        // 动态 paddingEnd：× 在时 36dp 让位，× 不在时 8dp 恢复原始
+        // paddingStart / Top / Bottom 保持 8dp 写死在 XML
+        int endPaddingPx = dpToPx(hasText ? SEARCH_CLEAR_END_PADDING_DP : SEARCH_DEFAULT_END_PADDING_DP);
+        searchEditText.setPaddingRelative(
+            searchEditText.getPaddingStart(),
+            searchEditText.getPaddingTop(),
+            endPaddingPx,
+            searchEditText.getPaddingBottom()
+        );
+
         if (!hasText && searchEditText.hasFocus() && !historyCache.isEmpty()) {
             showHistoryPopup();
         } else {
