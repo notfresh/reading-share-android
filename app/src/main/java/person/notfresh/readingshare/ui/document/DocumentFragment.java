@@ -1,6 +1,7 @@
 package person.notfresh.readingshare.ui.document;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
@@ -39,9 +40,12 @@ import person.notfresh.readingshare.databinding.FragmentDocumentBinding;
 import person.notfresh.readingshare.db.DocumentDao;
 import person.notfresh.readingshare.model.DocumentItem;
 import person.notfresh.readingshare.model.DocumentType;
+import person.notfresh.readingshare.util.ImageUtil;
 
 public class DocumentFragment extends Fragment implements DocumentAdapter.OnDocumentActionListener {
     private static final int REQUEST_CODE_PICK_FILE = 1001;
+    private static final int REQUEST_CODE_PICK_ICON = 1002;
+    private DocumentItem pendingIconDocItem;
 
     private FragmentDocumentBinding binding;
     private DocumentAdapter adapter;
@@ -139,6 +143,24 @@ public class DocumentFragment extends Fragment implements DocumentAdapter.OnDocu
             if (data != null && data.getData() != null) {
                 Uri uri = data.getData();
                 handleFileImport(uri);
+            }
+        } else if (requestCode == REQUEST_CODE_PICK_ICON && resultCode == android.app.Activity.RESULT_OK
+                && data != null && pendingIconDocItem != null) {
+            Uri uri = data.getData();
+            if (uri == null) return;
+            try {
+                Bitmap src = ImageUtil.uriToBitmap(requireContext(), uri);
+                if (src != null) {
+                    Bitmap square = ImageUtil.resizeToSquareForShortcut(src);
+                    if (square != src) src.recycle();
+                    adapter.createShortcutWithCustomIcon(requireContext(), pendingIconDocItem, square);
+                } else {
+                    Toast.makeText(requireContext(), "无法读取图片", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(requireContext(), "处理图片时出错: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            } finally {
+                pendingIconDocItem = null;
             }
         }
     }
@@ -277,8 +299,10 @@ public class DocumentFragment extends Fragment implements DocumentAdapter.OnDocu
 
     @Override
     public void onRequestCustomIcon(DocumentItem item) {
-        // Stub: full implementation added in Task 5 (DocumentFragment onRequestCustomIcon + onActivityResult)
-        Toast.makeText(requireContext(), "请稍候", Toast.LENGTH_SHORT).show();
+        pendingIconDocItem = item;
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setType("image/*");
+        startActivityForResult(intent, REQUEST_CODE_PICK_ICON);
     }
 }
 
