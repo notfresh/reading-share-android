@@ -12,6 +12,7 @@ import android.graphics.Bitmap;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.WebShortcutActivity;
+import person.notfresh.readingshare.ui.document.DocumentViewerActivity;
 import person.notfresh.readingshare.ui.subject.SubjectDetailActivity;
 
 /**
@@ -399,6 +400,89 @@ public class ShortcutUtil {
             Toast.makeText(context, "创建快捷方式失败：" + e.getMessage(), Toast.LENGTH_SHORT).show();
             return false;
         }
+    }
+
+    /**
+     * 创建文档桌面快捷方式
+     * @param context 上下文
+     * @param title 快捷方式名称(文档标题)
+     * @param documentId 文档 ID,点击快捷方式后传给 DocumentViewerActivity
+     * @param iconBitmap 可选,自定义图标 Bitmap,如果为 null 则使用默认图标
+     * @return 是否创建成功
+     */
+    public static boolean createDocumentShortcut(Context context, String title, long documentId, Bitmap iconBitmap) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                if (ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
+                    boolean modernSuccess = tryCreateDocumentShortcutModern(context, title, documentId, iconBitmap);
+                    if (modernSuccess) {
+                        return true;
+                    }
+                }
+            }
+            return createDocumentShortcutLegacy(context, title, documentId, iconBitmap);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutUtil", "Failed to create document shortcut", e);
+            Toast.makeText(context, "创建快捷方式失败:" + e.getMessage(), Toast.LENGTH_SHORT).show();
+            return false;
+        }
+    }
+
+    /**
+     * 创建文档桌面快捷方式(兼容旧接口,使用默认图标)
+     */
+    public static boolean createDocumentShortcut(Context context, String title, long documentId) {
+        return createDocumentShortcut(context, title, documentId, null);
+    }
+
+    private static boolean tryCreateDocumentShortcutModern(Context context, String title, long documentId, Bitmap iconBitmap) {
+        try {
+            String shortcutId = "document_" + documentId;
+            Intent shortcutIntent = new Intent(context, DocumentViewerActivity.class);
+            shortcutIntent.setAction(Intent.ACTION_VIEW);
+            shortcutIntent.putExtra("document_id", documentId);
+            shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            IconCompat icon;
+            if (iconBitmap != null) {
+                icon = IconCompat.createWithBitmap(iconBitmap);
+            } else {
+                icon = IconCompat.createWithResource(context, R.mipmap.ic_launcher);
+            }
+
+            ShortcutInfoCompat info = new ShortcutInfoCompat.Builder(context, shortcutId)
+                    .setShortLabel(title)
+                    .setLongLabel(title)
+                    .setIcon(icon)
+                    .setIntent(shortcutIntent)
+                    .build();
+
+            return ShortcutManagerCompat.requestPinShortcut(context, info, null);
+        } catch (Exception e) {
+            android.util.Log.e("ShortcutUtil", "Modern document shortcut failed", e);
+            return false;
+        }
+    }
+
+    private static boolean createDocumentShortcutLegacy(Context context, String title, long documentId, Bitmap iconBitmap) {
+        Intent shortcutIntent = new Intent(context, DocumentViewerActivity.class);
+        shortcutIntent.setAction(Intent.ACTION_VIEW);
+        shortcutIntent.putExtra("document_id", documentId);
+        shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        Intent intent = new Intent("com.android.launcher.action.INSTALL_SHORTCUT");
+        intent.putExtra(Intent.EXTRA_SHORTCUT_NAME, title);
+        intent.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
+        if (iconBitmap != null) {
+            intent.putExtra(Intent.EXTRA_SHORTCUT_ICON, iconBitmap);
+        } else {
+            Intent.ShortcutIconResource iconResource = Intent.ShortcutIconResource.fromContext(context, R.mipmap.ic_launcher);
+            intent.putExtra(Intent.EXTRA_SHORTCUT_ICON, iconResource);
+        }
+        context.sendBroadcast(intent);
+        return true;
     }
 }
 
