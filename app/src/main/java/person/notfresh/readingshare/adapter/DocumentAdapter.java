@@ -2,7 +2,6 @@ package person.notfresh.readingshare.adapter;
 
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.text.format.DateFormat;
 import android.util.Log;
@@ -34,7 +33,6 @@ import java.util.TreeMap;
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.model.DocumentItem;
 import person.notfresh.readingshare.ui.document.DocumentViewerActivity;
-import person.notfresh.readingshare.util.ShortcutUtil;
 
 public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_DATE_HEADER = 0;
