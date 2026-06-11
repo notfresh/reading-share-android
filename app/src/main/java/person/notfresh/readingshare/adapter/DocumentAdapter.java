@@ -2,6 +2,7 @@ package person.notfresh.readingshare.adapter;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.text.format.DateFormat;
 import android.util.Log;
@@ -10,9 +11,11 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.PopupMenu;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.FileProvider;
 
 import androidx.annotation.NonNull;
@@ -31,6 +34,7 @@ import java.util.TreeMap;
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.model.DocumentItem;
 import person.notfresh.readingshare.ui.document.DocumentViewerActivity;
+import person.notfresh.readingshare.util.ShortcutUtil;
 
 public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_DATE_HEADER = 0;
@@ -276,6 +280,9 @@ public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             if (id == R.id.action_share) {
                 shareDocument(item);
                 return true;
+            } else if (id == R.id.action_rename) {
+                showRenameDialog(view, item);
+                return true;
             } else if (id == R.id.action_delete) {
                 if (listener != null) {
                     listener.onDeleteDocument(item);
@@ -286,6 +293,30 @@ public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         });
         
         popupMenu.show();
+    }
+
+    /**
+     * 显示重命名对话框
+     * 复用 OnDocumentActionListener.onUpdateDocument 已有回调(由 DocumentFragment.onUpdateDocument 实现 DAO 写入 + loadDocuments)
+     */
+    private void showRenameDialog(View view, DocumentItem item) {
+        EditText input = new EditText(view.getContext());
+        input.setText(item.getTitle());
+        input.setSelection(item.getTitle() != null ? item.getTitle().length() : 0);
+
+        new AlertDialog.Builder(view.getContext())
+                .setTitle("重命名")
+                .setView(input)
+                .setPositiveButton("确定", (dialog, which) -> {
+                    String newTitle = input.getText().toString();
+                    if (!newTitle.isEmpty() && listener != null) {
+                        listener.onUpdateDocument(item, newTitle);
+                    } else {
+                        Toast.makeText(view.getContext(), "标题不能为空", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     /**
