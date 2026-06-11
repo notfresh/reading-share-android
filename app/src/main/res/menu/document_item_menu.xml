@@ -5,6 +5,14 @@
         android:title="分享"
         android:icon="@android:drawable/ic_menu_share" />
     <item
+        android:id="@+id/action_rename"
+        android:title="重命名"
+        android:icon="@android:drawable/ic_menu_edit" />
+    <item
+        android:id="@+id/action_add_to_desktop"
+        android:title="添加到桌面"
+        android:icon="@android:drawable/ic_menu_add" />
+    <item
         android:id="@+id/action_delete"
         android:title="删除"
         android:icon="@android:drawable/ic_menu_delete" />
