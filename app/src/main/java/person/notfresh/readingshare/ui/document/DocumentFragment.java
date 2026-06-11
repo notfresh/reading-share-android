@@ -274,5 +274,11 @@ public class DocumentFragment extends Fragment implements DocumentAdapter.OnDocu
     public void onPinStatusChanged() {
         loadDocuments();
     }
+
+    @Override
+    public void onRequestCustomIcon(DocumentItem item) {
+        // Stub: full implementation added in Task 5 (DocumentFragment onRequestCustomIcon + onActivityResult)
+        Toast.makeText(requireContext(), "请稍候", Toast.LENGTH_SHORT).show();
+    }
 }
 

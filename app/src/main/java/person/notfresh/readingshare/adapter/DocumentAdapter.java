@@ -2,6 +2,7 @@ package person.notfresh.readingshare.adapter;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.text.format.DateFormat;
 import android.util.Log;
@@ -33,6 +34,7 @@ import java.util.TreeMap;
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.model.DocumentItem;
 import person.notfresh.readingshare.ui.document.DocumentViewerActivity;
+import person.notfresh.readingshare.util.ShortcutUtil;
 
 public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_DATE_HEADER = 0;
@@ -48,6 +50,7 @@ public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         void onDeleteDocument(DocumentItem document);
         void onUpdateDocument(DocumentItem oldDocument, String newTitle);
         void onPinStatusChanged();
+        void onRequestCustomIcon(DocumentItem item);
     }
 
     private OnDocumentActionListener listener;
@@ -281,6 +284,14 @@ public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             } else if (id == R.id.action_rename) {
                 showRenameDialog(view, item);
                 return true;
+            } else if (id == R.id.action_add_to_desktop) {
+                File f = new File(item.getFilePath());
+                if (!f.exists()) {
+                    Toast.makeText(context, "文件不存在", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
+                showIconSelectionDialog(view, item);
+                return true;
             } else if (id == R.id.action_delete) {
                 if (listener != null) {
                     listener.onDeleteDocument(item);
@@ -315,6 +326,44 @@ public class DocumentAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+    /**
+     * 显示快捷方式图标选择对话框(2 选项:默认图标 / 相册选图)
+     */
+    private void showIconSelectionDialog(View view, DocumentItem item) {
+        String[] options = {"使用默认图标", "从相册选择"};
+
+        new AlertDialog.Builder(view.getContext())
+                .setTitle("选择快捷方式图标")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        createShortcutWithDefaultIcon(view, item);
+                    } else if (which == 1) {
+                        if (listener != null) {
+                            listener.onRequestCustomIcon(item);
+                        } else {
+                            Toast.makeText(view.getContext(), "无法打开相册", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void createShortcutWithDefaultIcon(View view, DocumentItem item) {
+        String title = item.getTitle() == null || item.getTitle().isEmpty() ? "<无标题>" : item.getTitle();
+        boolean success = ShortcutUtil.createDocumentShortcut(view.getContext(), title, item.getId());
+        Toast.makeText(view.getContext(), success ? "已添加快捷方式" : "创建快捷方式失败", Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * 使用自定义图标创建快捷方式(由 DocumentFragment.onActivityResult 回调)
+     */
+    public void createShortcutWithCustomIcon(Context context, DocumentItem item, Bitmap customIcon) {
+        String title = item.getTitle() == null || item.getTitle().isEmpty() ? "<无标题>" : item.getTitle();
+        boolean success = ShortcutUtil.createDocumentShortcut(context, title, item.getId(), customIcon);
+        Toast.makeText(context, success ? "已添加快捷方式" : "创建快捷方式失败", Toast.LENGTH_SHORT).show();
     }
 
     /**
