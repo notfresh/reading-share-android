@@ -90,7 +90,7 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
             sortMenuItem.setTitle("排序");
             Toolbar toolbar = requireActivity().findViewById(R.id.toolbar);
             if (toolbar != null) {
-                toolbar.setTitle(getString(R.string.app_name));
+                toolbar.setTitle(getString(R.string.menu_subject));
             }
             itemTouchHelper.attachToRecyclerView(null);
         }
