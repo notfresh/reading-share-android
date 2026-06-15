@@ -34,6 +34,7 @@ OUT_DIR = Path(__file__).parent
 SOFTWARE_NAME = "读享 V1.0 软件"
 PAGE_LINES = 50
 LINE_MAX = 80
+SECTION_MAX_LINES = 1500  # 前/后 30 页各 30×50=1500 行
 
 # 注册中文字体(支持页眉中文与代码中文注释)
 pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
@@ -172,14 +173,54 @@ def render_section(
             lines = all_lines[-30:] if len(all_lines) >= 30 else all_lines
         pages = [lines]
         total_pages = 1
+        # 独立鉴别件不画标题页,只 1 页
     else:
-        lines = collect_code_lines(file_list)
-        pages = paginate(lines, PAGE_LINES)
+        # 主体 section: 逐文件独立分页,文件间不混排
+        all_lines = collect_code_lines(file_list)[:SECTION_MAX_LINES]
+        # 按文件分组
+        file_groups: dict = {}
+        order: list = []
+        for fname, lno, text in all_lines:
+            if fname not in file_groups:
+                file_groups[fname] = []
+                order.append(fname)
+            file_groups[fname].append((fname, lno, text))
+        # 逐文件 50 行/页
+        pages = []
+        for fname in order:
+            flines = file_groups[fname]
+            for i in range(0, len(flines), PAGE_LINES):
+                pages.append(flines[i:i + PAGE_LINES])
+        # 1 页标题 + 主体页
         total_pages = len(pages) + 1
-        draw_title_page(c, section_title, file_list, len(lines))
+        # 标题页 = 第 1 页
+        # 先画标题页主体内容(注意:draw_title_page 内部已 c.showPage() 收尾)
+        # 但我们要在标题页加页脚,所以改为手工绘制
+        c.setFont("STSong-Light", 20)
+        c.drawCentredString(A4[0] / 2, A4[1] - 40 * mm, SOFTWARE_NAME)
+        c.setFont("STSong-Light", 16)
+        c.drawCentredString(A4[0] / 2, A4[1] - 55 * mm, section_title)
+        c.setFont("STSong-Light", 12)
+        c.drawString(25 * mm, A4[1] - 80 * mm, "著作权人:XX 有限公司")
+        c.drawString(25 * mm, A4[1] - 90 * mm, f"生成日期:{date.today().isoformat()}")
+        c.drawString(25 * mm, A4[1] - 100 * mm, f"摘选总行数:{len(all_lines)}")
+        c.drawString(25 * mm, A4[1] - 110 * mm, "文件清单:")
+        y = A4[1] - 120 * mm
+        c.setFont("STSong-Light", 9)
+        for f in file_groups.keys():
+            c.drawString(30 * mm, y, f"  - {f}")
+            y -= 5 * mm
+            if y < 25 * mm:
+                c.showPage()
+                y = A4[1] - 20 * mm
+        # 在标题页(最后一页)底部画页脚
+        c.setFont("STSong-Light", 9)
+        c.drawCentredString(A4[0] / 2, 12 * mm, f"第 1 页 / 共 {total_pages} 页")
+        c.showPage()
 
+    # 主体页(标题页已 showPage 结束)
     for idx, page_lines in enumerate(pages, start=1):
-        page_idx = idx + 1 if not is_standalone else idx
+        page_idx = idx + 1  # 标题页占 page_idx=1,代码页从 2 开始
         if not page_lines:
             continue
         file_name = page_lines[0][0]
@@ -202,7 +243,7 @@ def main() -> int:
     render_section(out, "前 30 页", FRONT_FILES)
     outputs.append(out)
     md_out = OUT_DIR / "源程序代码-前30页.md"
-    lines = collect_code_lines(FRONT_FILES)
+    lines = collect_code_lines(FRONT_FILES)[:SECTION_MAX_LINES]
     md_out.write_text(
         "\n".join(f"{lno:4d}  {text}" for _, lno, text in lines),
         encoding="utf-8",
@@ -214,7 +255,7 @@ def main() -> int:
     render_section(out, "后 30 页", BACK_FILES)
     outputs.append(out)
     md_out = OUT_DIR / "源程序代码-后30页.md"
-    lines = collect_code_lines(BACK_FILES)
+    lines = collect_code_lines(BACK_FILES)[:SECTION_MAX_LINES]
     md_out.write_text(
         "\n".join(f"{lno:4d}  {text}" for _, lno, text in lines),
         encoding="utf-8",
