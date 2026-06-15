@@ -185,12 +185,16 @@ def render_section(
                 file_groups[fname] = []
                 order.append(fname)
             file_groups[fname].append((fname, lno, text))
-        # 逐文件 50 行/页
+        # 逐文件 50 行/页,主体固定 30 页(超出部分截断)
         pages = []
         for fname in order:
             flines = file_groups[fname]
             for i in range(0, len(flines), PAGE_LINES):
+                if len(pages) >= 30:
+                    break
                 pages.append(flines[i:i + PAGE_LINES])
+            if len(pages) >= 30:
+                break
         # 1 页标题 + 主体页
         total_pages = len(pages) + 1
         # 标题页 = 第 1 页
