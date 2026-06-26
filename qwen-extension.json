@@ -1,0 +1,8 @@
+{
+  "name": "superpowers-plus",
+  "version": "5.1.0",
+  "contextFileName": "QWEN.md",
+  "commands": "commands",
+  "skills": "skills",
+  "agents": "agents"
+}

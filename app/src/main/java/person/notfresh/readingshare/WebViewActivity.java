@@ -461,6 +461,7 @@ public class WebViewActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                Log.d("WVUrlTrace", "shouldOverrideUrlLoading(String) url=" + url);
                 return handleUrlOverride(view, url, true);
             }
 
@@ -470,6 +471,8 @@ public class WebViewActivity extends AppCompatActivity {
                         ? request.getUrl().toString()
                         : null;
                 boolean isMainFrame = request == null || request.isForMainFrame();
+                Log.d("WVUrlTrace", "shouldOverrideUrlLoading(Request) url=" + url
+                        + ", isMainFrame=" + isMainFrame);
                 return handleUrlOverride(view, url, isMainFrame);
             }
             
@@ -572,20 +575,30 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private boolean handleUrlOverride(WebView view, String url, boolean isMainFrame) {
-        if (url == null || !isMainFrame) {
+        if (url == null ) {
+            Log.d("WVUrlTrace", "handleUrlOverride early-return: url=" + url
+                    + ", isMainFrame=" + isMainFrame);
             return false;
         }
 
         // http(s) 链接直接在 WebView 内加载
         if (url.startsWith("http://") || url.startsWith("https://")) {
+            Log.d("WVUrlTrace", "handleUrlOverride http(s) → load in WebView: " + url);
             return false;
         }
+
+        // if (!isMainFrame) {
+        //     Log.d("WVUrlTrace", "handleUrlOverride early-return: url=" + url
+        //             + ", isMainFrame=" + isMainFrame);
+        //     return false;
+        // }
 
         // 获取外部链接打开模式：2=拦截所有（默认），0=弹窗确认，1=直接跳转
         int externalLinkMode = getExternalLinkMode();
 
         // 所有非 http(s) 链接（自定义 scheme 如 snssdk://, intent://, weixin:// 等）
-        Log.d("WebViewActivity", "拦截非HTTP链接: " + url + " (模式: " + externalLinkMode + ")");
+        Log.d("WVUrlTrace", "handleUrlOverride non-http url=" + url
+                + ", mode=" + externalLinkMode);
 
         if (externalLinkMode == 0) {
             // 模式0：弹窗确认
@@ -800,13 +813,19 @@ public class WebViewActivity extends AppCompatActivity {
                 intent.addCategory(Intent.CATEGORY_BROWSABLE);
                 intent.setComponent(null);
                 intent.setSelector(null);
+                Log.d("WVUrlTrace", "openExternalUri intent:// parsed: action=" + intent.getAction()
+                        + ", data=" + intent.getData()
+                        + ", package=" + intent.getPackage()
+                        + ", categories=" + intent.getCategories()
+                        + ", extras=" + intent.getExtras());
             } else {
                 intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                Log.d("WVUrlTrace", "openExternalUri ACTION_VIEW url=" + url);
             }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
         } catch (Exception e) {
-            Log.e("WebViewActivity", "无法打开外部URI: " + url, e);
+            Log.e("WVUrlTrace", "openExternalUri failed for url=" + url, e);
             Toast.makeText(WebViewActivity.this, "无法打开此链接: " + url, Toast.LENGTH_SHORT).show();
         }
     }

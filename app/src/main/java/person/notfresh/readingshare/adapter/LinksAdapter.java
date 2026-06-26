@@ -47,6 +47,7 @@ import com.google.android.flexbox.FlexboxLayout;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
+import person.notfresh.readingshare.util.SearchQueryParser;
 import java.io.IOException;
 import person.notfresh.readingshare.util.AppUtils;
 import person.notfresh.readingshare.WebViewActivity;
@@ -943,9 +944,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     // 添加搜索方法
     public void filter(String query) {
-        query = query.toLowerCase().trim();
+        query = query.trim();
         items.clear();
-        
+
         if (query.isEmpty()) {
             // 如果搜索框为空，显示所有数据
             items.addAll(originalItems);
@@ -953,34 +954,26 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             return;
         }
 
+        // 解析搜索语法，支持 AND/OR/NOT/|/&/!/短语/"..."
+        SearchQueryParser.SearchNode rootNode = SearchQueryParser.parse(query);
+
         Map<String, List<LinkItem>> filteredGroups = new TreeMap<>(Collections.reverseOrder());
-        
+
         // 遍历原始数据进行过滤
         for (Object item : originalItems) {
             if (item instanceof String) {
                 continue;  // 跳过日期标题
             }
-            
+
             LinkItem linkItem = (LinkItem) item;
-            boolean matchesTitle = linkItem.getTitle().toLowerCase().contains(query);
-            boolean matchesUrl = linkItem.getUrl().toLowerCase().contains(query);
-            boolean matchesTags = false;
-            
-            // 检查标签
-            for (String tag : linkItem.getTags()) {
-                if (tag.toLowerCase().contains(query)) {
-                    matchesTags = true;
-                    break;
-                }
-            }
-            
-            // 如果标题或标签匹配，添加到过滤结果中
-            if (matchesTitle || matchesTags || matchesUrl) {
+
+            // 使用 SearchQueryParser 匹配
+            if (SearchQueryParser.matches(rootNode, linkItem)) {
                 String date = formatDate(linkItem.getTimestamp());
                 filteredGroups.computeIfAbsent(date, k -> new ArrayList<>()).add(linkItem);
             }
         }
-        
+
         // 将过滤后的结果转换为展平的列表
         for (Map.Entry<String, List<LinkItem>> entry : filteredGroups.entrySet()) {
             if (!entry.getValue().isEmpty()) {
@@ -988,8 +981,8 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 items.addAll(entry.getValue());  // 添加该日期下的链接
             }
         }
-        
-            notifyDataSetChanged();
+
+        notifyDataSetChanged();
     }
 
     private static void handleBilibiliLink(String shortUrl) {
