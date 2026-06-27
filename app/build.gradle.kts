@@ -43,9 +43,12 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.navigation.fragment)
     implementation(libs.navigation.ui)
-    
-    // PDF阅读器 - 使用Android系统内置的PDFRenderer（API 21+），无需外部依赖    
-    
+
+    // PDF阅读器 - 使用Android系统内置的PDFRenderer（API 21+），无需外部依赖
+
+    // ONNX Runtime Mobile for embedding inference
+    implementation("com.microsoft.onnxruntime:onnxruntime-mobile:1.16.3")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
