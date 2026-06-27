@@ -47,6 +47,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.core.model.SubjectItem;
 import person.notfresh.readingshare.core.model.SubjectUtil;
+import person.notfresh.readingshare.embedding.TagEmbeddingManager;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.ui.subject.SelectSubjectDialog;
 import person.notfresh.readingshare.util.ExportUtil;
@@ -58,6 +59,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -125,6 +127,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private boolean isTagsExpanded = false;  // 默认折叠
     private static final int COLLAPSED_HEIGHT_DP = 120;  // 减小折叠高度
     private Set<String> highlightedTags = new HashSet<>();  // 保存高亮的标签
+    private TagEmbeddingManager tagEmbeddingManager;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -243,6 +246,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linkDao = new LinkDao(requireContext());
         linkDao.open();
 
+        tagEmbeddingManager = new TagEmbeddingManager(requireContext());
+
         // 设置 RecyclerView
         linksAdapter = new LinksAdapter(requireContext());
         linksAdapter.setOnLinkActionListener(this);
@@ -328,6 +333,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         super.onDestroyView();
         if (linkDao != null) {
             linkDao.close();
+        }
+        if (tagEmbeddingManager != null) {
+            tagEmbeddingManager.checkAndUnload();
         }
     }
 
@@ -1068,11 +1076,46 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 更新标题
         if (isSortMode) {
             requireActivity().setTitle("拖拽排序标签");
-            Toast.makeText(requireContext(), "长按标签可拖拽排序", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "正在计算标签相似度...", Toast.LENGTH_SHORT).show();
+
+            // Compute similarity-based sort
+            tagEmbeddingManager.sortTagsBySimilarity(new TagEmbeddingManager.SortCallback() {
+                @Override
+                public void onSuccess(List<Long> sortedTagIds, List<String> sortedTagNames) {
+                    requireActivity().runOnUiThread(() -> {
+                        // Convert sorted tag IDs to TagItem list and update adapter
+                        List<TagsAdapter.TagItem> currentTags = tagsAdapter.getTags();
+                        Map<Long, TagsAdapter.TagItem> tagMap = new HashMap<>();
+                        for (TagsAdapter.TagItem tag : currentTags) {
+                            tagMap.put(tag.getId(), tag);
+                        }
+
+                        List<TagsAdapter.TagItem> sortedItems = new ArrayList<>();
+                        for (Long tagId : sortedTagIds) {
+                            TagsAdapter.TagItem item = tagMap.get(tagId);
+                            if (item != null) {
+                                sortedItems.add(item);
+                            }
+                        }
+
+                        if (!sortedItems.isEmpty()) {
+                            tagsAdapter.setTags(sortedItems);
+                        }
+                        Toast.makeText(requireContext(), "相似度排序完成，可拖拽微调", Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onError(String message) {
+                    requireActivity().runOnUiThread(() ->
+                        Toast.makeText(requireContext(), "排序失败: " + message, Toast.LENGTH_SHORT).show()
+                    );
+                }
+            });
         } else {
             requireActivity().setTitle("标签");
         }
-        
+
         requireActivity().invalidateOptionsMenu();
     }
     
