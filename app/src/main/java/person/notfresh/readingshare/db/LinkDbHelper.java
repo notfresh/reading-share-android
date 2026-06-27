@@ -5,6 +5,8 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
+import person.notfresh.readingshare.embedding.TagEmbeddingDbHelper;
+
 public class LinkDbHelper extends SQLiteOpenHelper {
     private static final String DEFAULT_DATABASE_NAME = "links.db";
     private static String databaseName = "links.db";
@@ -13,7 +15,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     //private static final int DATABASE_VERSION = 10; // 添加文档表
     //private static final int DATABASE_VERSION = 11; // 添加主题表
 
-    private static final int DATABASE_VERSION = 14; // 主题表增加排序字段
+    private static final int DATABASE_VERSION = 15; // 标签嵌入向量表
     public static final String TABLE_LINKS = "links";
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_TITLE = "title";
@@ -233,7 +235,11 @@ public class LinkDbHelper extends SQLiteOpenHelper {
             db.execSQL(SQL_CREATE_SUBJECTS);
             db.execSQL(SQL_CREATE_SUBJECT_ITEMS);
             db.execSQL(SQL_CREATE_SUBJECT_ITEM_IMAGES);
-            
+
+            // 创建标签嵌入向量表
+            db.execSQL(TagEmbeddingDbHelper.SQL_CREATE_TABLE);
+            Log.d("LinkDbHelper", "Created tag_embeddings table");
+
             Log.d("LinkDbHelper", "Database tables created successfully");
         } catch (Exception e) {
             Log.e("LinkDbHelper", "Error creating database tables", e);
@@ -277,6 +283,12 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                 // 版本14：主题表增加排序字段
                 db.execSQL("ALTER TABLE " + TABLE_SUBJECTS + " ADD COLUMN " + COLUMN_SUBJECT_ORDER_INDEX + " INTEGER DEFAULT 0");
                 Log.d("LinkDbHelper", "Added subject order_index column");
+            }
+
+            if (oldVersion < 15) {
+                // 版本15：添加标签嵌入向量表
+                db.execSQL(TagEmbeddingDbHelper.SQL_CREATE_TABLE);
+                Log.d("LinkDbHelper", "Created tag_embeddings table");
             }
 
             if (oldVersion < 9) {
