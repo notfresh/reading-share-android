@@ -18,6 +18,12 @@
         android:visible="false"
         app:showAsAction="always" />
     <item
+        android:id="@+id/action_auto_sort"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="自动排序"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/action_select_all"
         android:icon="@drawable/ic_select_all"
         android:title="全选"

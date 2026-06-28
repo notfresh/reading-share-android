@@ -46,8 +46,8 @@ dependencies {
 
     // PDF阅读器 - 使用Android系统内置的PDFRenderer（API 21+），无需外部依赖
 
-    // ONNX Runtime Mobile for embedding inference
-    implementation("com.microsoft.onnxruntime:onnxruntime-mobile:1.16.3")
+    // ONNX Runtime for embedding inference
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.16.3")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

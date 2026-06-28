@@ -37,6 +37,7 @@ import person.notfresh.readingshare.adapter.LinksAdapter;
 import person.notfresh.readingshare.adapter.SearchHistoryAdapter;
 import person.notfresh.readingshare.adapter.TagsAdapter;
 import person.notfresh.readingshare.databinding.FragmentHomeBinding;
+import person.notfresh.readingshare.embedding.TagEmbeddingManager;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SearchHistoryManager;
 import person.notfresh.readingshare.db.SubjectDao;
@@ -106,6 +107,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private MenuItem addTagMenuItem;  // 添加标签菜单项（从TagsFragment合并）
     private MenuItem sortMenuItem;  // 排序菜单项（从TagsFragment合并）
     private MenuItem exitSortMenuItem;  // 退出排序菜单项（从TagsFragment合并）
+    private MenuItem autoSortMenuItem;  // 自动排序菜单项
+    private MenuItem similarityConfigMenuItem;  // 相关度配置菜单项
+    private TagEmbeddingManager tagEmbeddingManager;  // 标签嵌入管理器
     private EditText searchEditText;
 
     // ========== 搜索历史下拉 ==========
@@ -198,6 +202,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             addTagMenuItem = menu.findItem(R.id.action_add_tag);  // 添加标签菜单项
             sortMenuItem = menu.findItem(R.id.action_sort_tags);  // 排序菜单项
             exitSortMenuItem = menu.findItem(R.id.action_exit_sort);  // 退出排序菜单项
+            autoSortMenuItem = menu.findItem(R.id.action_auto_sort);  // 自动排序菜单项
+            similarityConfigMenuItem = menu.findItem(R.id.action_similarity_config);  // 相关度配置菜单项
             shuffleMenuItem = menu.findItem(R.id.action_shuffle);  // 洗牌菜单项
             exitShuffleMenuItem = menu.findItem(R.id.action_exit_shuffle);  // 退出洗牌菜单项
             MenuItem statisticsMenuItem = menu.findItem(R.id.action_statistics);  // 新增的统计
@@ -209,6 +215,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     ", addTag=" + (addTagMenuItem != null) +
                     ", sort=" + (sortMenuItem != null) +
                     ", exitSort=" + (exitSortMenuItem != null) +
+                    ", similarityConfig=" + (similarityConfigMenuItem != null) +
                     ", shuffle=" + (shuffleMenuItem != null) +
                     ", exitShuffle=" + (exitShuffleMenuItem != null));
 
@@ -283,6 +290,14 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             // 退出排序模式（从TagsFragment合并）
             toggleSortMode();
             return true;
+        } else if (id == R.id.action_auto_sort) {
+            // 执行自动排序
+            performAutoSort();
+            return true;
+        } else if (id == R.id.action_similarity_config) {
+            Intent intent = new Intent(requireContext(), TagSimilarityConfigActivity.class);
+            startActivity(intent);
+            return true;
         } else if (id == R.id.action_select_all) {
             // 全选（从TagsFragment合并）
             selectAllItems();
@@ -323,6 +338,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             linkDao = new LinkDao(requireContext());
             linkDao.open();
             Log.d(TAG, "onCreateView: LinkDao opened successfully");
+
+            // 初始化标签嵌入管理器
+            tagEmbeddingManager = new TagEmbeddingManager(requireContext());
 
             Log.d(TAG, "onCreateView: initializing RecyclerView and Adapter");
             RecyclerView recyclerView = binding.recyclerView;
@@ -966,6 +984,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (exitSortMenuItem != null) {
             exitSortMenuItem.setVisible(isSortMode);
         }
+        if (autoSortMenuItem != null) {
+            autoSortMenuItem.setVisible(isSortMode);
+        }
+        if (similarityConfigMenuItem != null) {
+            similarityConfigMenuItem.setVisible(isSortMode);
+        }
 
         // 洗牌模式菜单项
         // 洗牌按钮：在非洗牌模式下显示（进入洗牌），在洗牌模式下也显示（再次洗牌）
@@ -1033,6 +1057,53 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
         
         requireActivity().invalidateOptionsMenu();
+    }
+
+    /**
+     * 执行基于相似度的自动排序
+     */
+    private void performAutoSort() {
+        Toast.makeText(requireContext(), "正在计算标签相似度...", Toast.LENGTH_SHORT).show();
+
+        tagEmbeddingManager.sortTagsBySimilarity(new TagEmbeddingManager.SortCallback() {
+            @Override
+            public void onSuccess(java.util.List<Long> sortedTagIds, java.util.List<String> sortedTagNames) {
+                Log.d("HomeFragment", "=== Auto Sort Result ===");
+                Log.d("HomeFragment", "Sorted tags (" + sortedTagNames.size() + "): " + sortedTagNames);
+                requireActivity().runOnUiThread(() -> {
+                    // Convert sorted tag IDs to TagItem list and update adapter
+                    java.util.List<TagsAdapter.TagItem> currentTags = tagsAdapter.getTags();
+                    java.util.Map<Long, TagsAdapter.TagItem> tagMap = new java.util.HashMap<>();
+                    for (TagsAdapter.TagItem tag : currentTags) {
+                        tagMap.put(tag.getId(), tag);
+                    }
+
+                    java.util.List<TagsAdapter.TagItem> sortedItems = new java.util.ArrayList<>();
+                    for (Long tagId : sortedTagIds) {
+                        TagsAdapter.TagItem item = tagMap.get(tagId);
+                        if (item != null) {
+                            sortedItems.add(item);
+                        }
+                    }
+
+                    if (!sortedItems.isEmpty()) {
+                        Log.d("HomeFragment", "Setting sorted items to adapter, count=" + sortedItems.size());
+                        tagsAdapter.setTags(sortedItems);
+                        Log.d("HomeFragment", "After setTags, adapter has " + tagsAdapter.getTags().size() + " tags");
+                    } else {
+                        Log.w("HomeFragment", "sortedItems is empty, sortedTagIds size=" + sortedTagIds.size() + ", currentTags size=" + currentTags.size());
+                    }
+                    Toast.makeText(requireContext(), "相似度排序完成，可拖拽微调", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                requireActivity().runOnUiThread(() ->
+                    Toast.makeText(requireContext(), "排序失败: " + message, Toast.LENGTH_SHORT).show()
+                );
+            }
+        });
     }
 
     /**
@@ -1781,6 +1852,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                             // 在排序模式下，显示所有标签在一个区域
                             if (isSortMode) {
                                 if (tagsAdapter != null) {
+                                    Log.d(TAG, "loadTags: sort mode setting " + finalAllTagItems.size() + " tags");
                                     tagsAdapter.setTags(finalAllTagItems);
                                     tagsAdapter.setHighlightedTags(highlightedTags);
                                     tagsAdapter.setSelectedTagNames(selectedTagNames);

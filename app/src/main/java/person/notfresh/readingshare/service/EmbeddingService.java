@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.FloatBuffer;
 import java.nio.LongBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,7 +18,6 @@ import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OnnxValue;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtSession;
-import ai.onnxruntime.RunOptions;
 import ai.onnxruntime.TensorInfo;
 
 /**
@@ -56,6 +56,7 @@ public class EmbeddingService {
     // Input/output names - these may need adjustment based on the actual model
     private static final String INPUT_IDS_NAME = "input_ids";
     private static final String ATTENTION_MASK_NAME = "attention_mask";
+    private static final String TOKEN_TYPE_IDS_NAME = "token_type_ids";
     private static final String OUTPUT_NAME = "output";
 
     private EmbeddingService() {
@@ -101,11 +102,14 @@ public class EmbeddingService {
                 // Create session options
                 OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
 
-                // Open model from assets
-                InputStream modelStream = appContext.getAssets().open(MODEL_PATH);
+                // Load model bytes from assets (ONNX Runtime Java API expects path or byte[])
+                byte[] modelBytes;
+                try (InputStream modelStream = appContext.getAssets().open(MODEL_PATH)) {
+                    modelBytes = readAllBytes(modelStream);
+                }
 
                 // Create the session - this loads the model
-                ortSession = ortEnvironment.createSession(modelStream, sessionOptions);
+                ortSession = ortEnvironment.createSession(modelBytes, sessionOptions);
                 Log.i(TAG, "Model loaded successfully. Session created.");
 
                 // Log input/output info for debugging
@@ -179,6 +183,7 @@ public class EmbeddingService {
                 // Pad or truncate to MAX_SEQ_LENGTH
                 long[] inputIdsPadded = padOrTruncate(tokenIds, MAX_SEQ_LENGTH);
                 long[] attentionMaskPadded = padOrTruncate(attentionMask, MAX_SEQ_LENGTH);
+                long[] tokenTypeIdsPadded = new long[MAX_SEQ_LENGTH];
 
                 // Create input tensors (int64)
                 long[] inputIdsShape = {1, MAX_SEQ_LENGTH};
@@ -188,38 +193,53 @@ public class EmbeddingService {
                         ortEnvironment, LongBuffer.wrap(inputIdsPadded), inputIdsShape);
                 OnnxTensor attentionMaskTensor = OnnxTensor.createTensor(
                         ortEnvironment, LongBuffer.wrap(attentionMaskPadded), attentionMaskShape);
+                OnnxTensor tokenTypeIdsTensor = null;
 
                 // Prepare inputs map
-                Map<String, OnnxValue> inputs = new HashMap<>();
+                Map<String, OnnxTensor> inputs = new HashMap<>();
                 inputs.put(INPUT_IDS_NAME, inputIdsTensor);
                 inputs.put(ATTENTION_MASK_NAME, attentionMaskTensor);
+                if (ortSession.getInputNames().contains(TOKEN_TYPE_IDS_NAME)) {
+                    tokenTypeIdsTensor = OnnxTensor.createTensor(
+                        ortEnvironment, LongBuffer.wrap(tokenTypeIdsPadded), attentionMaskShape);
+                    inputs.put(TOKEN_TYPE_IDS_NAME, tokenTypeIdsTensor);
+                }
 
                 // Run inference
-                RunOptions runOptions = new RunOptions();
-                Map<String, OnnxValue> outputs = ortSession.run(inputs, runOptions);
+                OrtSession.RunOptions runOptions = new OrtSession.RunOptions();
+                OrtSession.Result outputs = null;
 
-                // Extract embedding from output
-                OnnxValue outputValue = outputs.get(OUTPUT_NAME);
-                if (outputValue == null) {
-                    // Try to get first output if OUTPUT_NAME doesn't exist
-                    outputValue = outputs.values().iterator().next();
+                try {
+                    outputs = ortSession.run(inputs, runOptions);
+
+                    // Extract embedding from output
+                    OnnxValue outputValue = outputs.get(OUTPUT_NAME).orElse(null);
+                    if (outputValue == null && outputs.size() > 0) {
+                        // Fallback to first output if configured output name is unavailable
+                        outputValue = outputs.get(0);
+                    }
+                    if (outputValue == null) {
+                        throw new IllegalStateException("Model returned no outputs");
+                    }
+
+                    float[] embedding = extractEmbedding(outputValue);
+
+                    // Apply mean pooling
+                    float[] pooledEmbedding = meanPooling(embedding, attentionMaskPadded);
+
+                    callback.onSuccess(pooledEmbedding);
+                    Log.d(TAG, "Encoding completed successfully. Embedding dimension: " + pooledEmbedding.length);
+                } finally {
+                    if (outputs != null) {
+                        outputs.close();
+                    }
+                    inputIdsTensor.close();
+                    attentionMaskTensor.close();
+                    if (tokenTypeIdsTensor != null) {
+                        tokenTypeIdsTensor.close();
+                    }
+                    runOptions.close();
                 }
-
-                float[] embedding = extractEmbedding(outputValue);
-
-                // Apply mean pooling
-                float[] pooledEmbedding = meanPooling(embedding, attentionMaskPadded);
-
-                // Close outputs to release resources
-                for (OnnxValue value : outputs.values()) {
-                    value.close();
-                }
-                inputIdsTensor.close();
-                attentionMaskTensor.close();
-                runOptions.close();
-
-                callback.onSuccess(pooledEmbedding);
-                Log.d(TAG, "Encoding completed successfully. Embedding dimension: " + pooledEmbedding.length);
 
             } catch (Exception e) {
                 Log.e(TAG, "Failed to encode text", e);
@@ -355,6 +375,19 @@ public class EmbeddingService {
     }
 
     /**
+     * Read all bytes from an InputStream (compatible with Java 8 source level).
+     */
+    private byte[] readAllBytes(@NonNull InputStream inputStream) throws IOException {
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+            outputStream.write(buffer, 0, bytesRead);
+        }
+        return outputStream.toByteArray();
+    }
+
+    /**
      * Extract embedding tensor from model output.
      */
     private float[] extractEmbedding(OnnxValue outputValue) throws Exception {
@@ -372,8 +405,10 @@ public class EmbeddingService {
             numElements *= dim;
         }
 
-        // Get the tensor data as float array
-        float[] data = outputTensor.getFloatBuffer().array();
+        // Copy data from FloatBuffer safely (may be direct buffer without backing array)
+        FloatBuffer floatBuffer = outputTensor.getFloatBuffer();
+        float[] data = new float[floatBuffer.remaining()];
+        floatBuffer.get(data);
 
         // Flatten if multi-dimensional
         float[] result = new float[(int) numElements];

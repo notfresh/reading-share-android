@@ -119,6 +119,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private MenuItem selectAllMenuItem;  // 添加全选菜单项引用
     private MenuItem sortMenuItem;  // 排序按钮
     private MenuItem exitSortMenuItem;  // 退出排序按钮
+    private MenuItem autoSortMenuItem;  // 自动排序按钮
     private boolean isSelectionMode = false;
     private boolean isSortMode = false;  // 排序模式状态
     private ScrollView tagsScrollView;
@@ -285,13 +286,15 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         selectAllMenuItem = menu.findItem(R.id.action_select_all);  // 获取全选菜单项
         sortMenuItem = menu.findItem(R.id.action_sort_tags);  // 获取排序按钮
         exitSortMenuItem = menu.findItem(R.id.action_exit_sort);  // 获取退出排序按钮
-        
+        autoSortMenuItem = menu.findItem(R.id.action_auto_sort);  // 获取自动排序按钮
+
         // 设置菜单项可见性
         shareMenuItem.setVisible(isSelectionMode);
         closeSelectionMenuItem.setVisible(isSelectionMode);
         selectAllMenuItem.setVisible(isSelectionMode);
         sortMenuItem.setVisible(!isSortMode && !isSelectionMode);  // 非排序模式且非选择模式时显示
         exitSortMenuItem.setVisible(isSortMode);  // 排序模式时显示
+        autoSortMenuItem.setVisible(isSortMode);  // 排序模式时显示
     }
 
     @Override
@@ -305,6 +308,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
             return true;
         } else if (id == R.id.action_exit_sort) {
             toggleSortMode();
+            return true;
+        } else if (id == R.id.action_auto_sort) {
+            performAutoSort();
             return true;
         } else if (id == R.id.action_close_selection) {
             toggleSelectionMode();
@@ -1076,47 +1082,53 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 更新标题
         if (isSortMode) {
             requireActivity().setTitle("拖拽排序标签");
-            Toast.makeText(requireContext(), "正在计算标签相似度...", Toast.LENGTH_SHORT).show();
-
-            // Compute similarity-based sort
-            tagEmbeddingManager.sortTagsBySimilarity(new TagEmbeddingManager.SortCallback() {
-                @Override
-                public void onSuccess(List<Long> sortedTagIds, List<String> sortedTagNames) {
-                    requireActivity().runOnUiThread(() -> {
-                        // Convert sorted tag IDs to TagItem list and update adapter
-                        List<TagsAdapter.TagItem> currentTags = tagsAdapter.getTags();
-                        Map<Long, TagsAdapter.TagItem> tagMap = new HashMap<>();
-                        for (TagsAdapter.TagItem tag : currentTags) {
-                            tagMap.put(tag.getId(), tag);
-                        }
-
-                        List<TagsAdapter.TagItem> sortedItems = new ArrayList<>();
-                        for (Long tagId : sortedTagIds) {
-                            TagsAdapter.TagItem item = tagMap.get(tagId);
-                            if (item != null) {
-                                sortedItems.add(item);
-                            }
-                        }
-
-                        if (!sortedItems.isEmpty()) {
-                            tagsAdapter.setTags(sortedItems);
-                        }
-                        Toast.makeText(requireContext(), "相似度排序完成，可拖拽微调", Toast.LENGTH_SHORT).show();
-                    });
-                }
-
-                @Override
-                public void onError(String message) {
-                    requireActivity().runOnUiThread(() ->
-                        Toast.makeText(requireContext(), "排序失败: " + message, Toast.LENGTH_SHORT).show()
-                    );
-                }
-            });
+            Toast.makeText(requireContext(), "拖拽标签进行排序", Toast.LENGTH_SHORT).show();
         } else {
             requireActivity().setTitle("标签");
         }
 
         requireActivity().invalidateOptionsMenu();
+    }
+
+    /**
+     * 执行基于相似度的自动排序
+     */
+    private void performAutoSort() {
+        Toast.makeText(requireContext(), "正在计算标签相似度...", Toast.LENGTH_SHORT).show();
+
+        tagEmbeddingManager.sortTagsBySimilarity(new TagEmbeddingManager.SortCallback() {
+            @Override
+            public void onSuccess(List<Long> sortedTagIds, List<String> sortedTagNames) {
+                requireActivity().runOnUiThread(() -> {
+                    // Convert sorted tag IDs to TagItem list and update adapter
+                    List<TagsAdapter.TagItem> currentTags = tagsAdapter.getTags();
+                    Map<Long, TagsAdapter.TagItem> tagMap = new HashMap<>();
+                    for (TagsAdapter.TagItem tag : currentTags) {
+                        tagMap.put(tag.getId(), tag);
+                    }
+
+                    List<TagsAdapter.TagItem> sortedItems = new ArrayList<>();
+                    for (Long tagId : sortedTagIds) {
+                        TagsAdapter.TagItem item = tagMap.get(tagId);
+                        if (item != null) {
+                            sortedItems.add(item);
+                        }
+                    }
+
+                    if (!sortedItems.isEmpty()) {
+                        tagsAdapter.setTags(sortedItems);
+                    }
+                    Toast.makeText(requireContext(), "相似度排序完成，可拖拽微调", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                requireActivity().runOnUiThread(() ->
+                    Toast.makeText(requireContext(), "排序失败: " + message, Toast.LENGTH_SHORT).show()
+                );
+            }
+        });
     }
     
     /**

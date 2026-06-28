@@ -7,9 +7,12 @@ import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -35,6 +38,8 @@ public class TagEmbeddingManager {
 
     // In-memory cache: tagId -> embedding
     private final Map<Long, float[]> embeddingCache = new HashMap<>();
+    // Custom proximity boosts loaded from assets config.
+    private Map<String, Float> customPairBoosts = new HashMap<>();
 
     public interface SortCallback {
         void onSuccess(List<Long> sortedTagIds, List<String> sortedTagNames);
@@ -48,6 +53,7 @@ public class TagEmbeddingManager {
         this.embeddingService = EmbeddingService.getInstance(context);
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.executor = Executors.newSingleThreadExecutor();
+        this.customPairBoosts = loadCustomPairBoosts();
     }
 
     /**
@@ -59,10 +65,11 @@ public class TagEmbeddingManager {
     public void sortTagsBySimilarity(SortCallback callback) {
         executor.execute(() -> {
             try {
+                customPairBoosts = loadCustomPairBoosts();
+
                 // 1. Get all tags with their IDs
                 linkDao.open();
                 Map<String, Integer> tagsWithCount = linkDao.getTagsWithCount();
-                linkDao.close();
 
                 if (tagsWithCount.isEmpty()) {
                     mainHandler.post(() -> callback.onSuccess(new ArrayList<>(), new ArrayList<>()));
@@ -113,10 +120,57 @@ public class TagEmbeddingManager {
                     }
                 }
 
-                // If many tags are missing embeddings, compute them
+                // If tags are missing embeddings, compute them first
                 if (!missingTagIds.isEmpty()) {
-                    Log.d(TAG, "Missing embeddings for " + missingTagIds.size() + " tags");
-                    // For now, we'll skip tags without embeddings (they'll be filtered out)
+                    Log.d(TAG, "Missing embeddings for " + missingTagIds.size() + " tags, computing now...");
+
+                    // Collect missing tag names in same order as missingTagIds
+                    List<String> missingTagNames = new ArrayList<>();
+                    for (Long tagId : missingTagIds) {
+                        String name = tagIdToName.get(tagId);
+                        if (name != null) {
+                            missingTagNames.add(name);
+                        }
+                    }
+
+                    // Load model and compute embeddings for missing tags
+                    CountDownLatch latch = new CountDownLatch(1);
+                    final boolean[] computeSuccess = {true};
+
+                    // Get indices of missing tags in original arrays
+                    Map<Long, Integer> tagIdToIndex = new HashMap<>();
+                    for (int i = 0; i < n; i++) {
+                        tagIdToIndex.put(tagIds.get(i), i);
+                    }
+
+                    embeddingService.loadModel(new EmbeddingService.LoadCallback() {
+                        @Override
+                        public void onSuccess() {
+                            computeNextEmbedding(0, missingTagIds, missingTagNames, embeddings, tagIdToIndex, () -> {
+                                latch.countDown();
+                            });
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            Log.e(TAG, "Failed to load model: " + error);
+                            computeSuccess[0] = false;
+                            latch.countDown();
+                        }
+                    });
+
+                    try {
+                        latch.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        mainHandler.post(() -> callback.onError("Computing embeddings interrupted"));
+                        return;
+                    }
+
+                    if (!computeSuccess[0]) {
+                        mainHandler.post(() -> callback.onError("Failed to compute embeddings"));
+                        return;
+                    }
                 }
 
                 // Build final lists of tags with valid embeddings
@@ -134,13 +188,16 @@ public class TagEmbeddingManager {
 
                 if (validTagIds.isEmpty()) {
                     // No valid embeddings, return original order
+                    Log.w(TAG, "No valid embeddings found for any tag, returning original order");
                     mainHandler.post(() -> callback.onSuccess(tagIds, tagNames));
                     return;
                 }
 
+                Log.d(TAG, "Tags with valid embeddings: " + validTagIds.size() + " out of " + n);
+
                 // 3. Compute NxN similarity matrix
                 int m = validTagIds.size();
-                float[][] similarityMatrix = computeSimilarityMatrix(validEmbeddings);
+                float[][] similarityMatrix = computeSimilarityMatrix(validEmbeddings, validTagNames);
 
                 // 4. Run greedy hierarchical clustering sort
                 List<Integer> sortedIndices = greedyClusterSort(similarityMatrix);
@@ -160,6 +217,8 @@ public class TagEmbeddingManager {
             } catch (Exception e) {
                 Log.e(TAG, "Error sorting tags by similarity", e);
                 mainHandler.post(() -> callback.onError("Failed to sort tags: " + e.getMessage()));
+            } finally {
+                linkDao.close();
             }
         });
     }
@@ -170,7 +229,7 @@ public class TagEmbeddingManager {
      * @param embeddings List of embedding vectors
      * @return NxN similarity matrix where matrix[i][j] is similarity between i and j
      */
-    private float[][] computeSimilarityMatrix(List<float[]> embeddings) {
+    private float[][] computeSimilarityMatrix(List<float[]> embeddings, List<String> tagNames) {
         int n = embeddings.size();
         float[][] matrix = new float[n][n];
 
@@ -179,7 +238,14 @@ public class TagEmbeddingManager {
                 if (i == j) {
                     matrix[i][j] = 1.0f; // Self-similarity is 1
                 } else if (j > i) {
-                    float sim = EmbeddingService.computeCosineSimilarity(embeddings.get(i), embeddings.get(j));
+                    float embeddingSim = EmbeddingService.computeCosineSimilarity(embeddings.get(i), embeddings.get(j));
+                    float lexicalSim = lexicalSimilarity(tagNames.get(i), tagNames.get(j));
+
+                    // Current model uses simplified tokenization, so blend lexical signals to stabilize CN tags.
+                    float lexicalWeight = hasCjk(tagNames.get(i)) || hasCjk(tagNames.get(j)) ? 0.65f : 0.35f;
+                    float sim = clamp01((1.0f - lexicalWeight) * normalizeCosine(embeddingSim) + lexicalWeight * lexicalSim);
+                    sim = clamp01(sim + getCustomPairBoost(tagNames.get(i), tagNames.get(j)));
+
                     matrix[i][j] = sim;
                     matrix[j][i] = sim; // Symmetric
                 }
@@ -194,7 +260,7 @@ public class TagEmbeddingManager {
      *
      * Algorithm:
      * 1. Find centroid (mean vector) of all embeddings, select tag closest to centroid as first
-     * 2. Greedily add tags with lowest max-similarity to already-selected tags (maintains diversity)
+    * 2. Greedily append the most similar remaining tag to the current cluster chain.
      *
      * @param similarityMatrix NxN similarity matrix
      * @return List of indices in sorted order
@@ -242,18 +308,22 @@ public class TagEmbeddingManager {
 
         while (!remaining.isEmpty()) {
             int best = -1;
-            float bestMaxSim = Float.MAX_VALUE;
+            float bestScore = -Float.MAX_VALUE;
+            int lastSelected = selected.get(selected.size() - 1);
 
-            // For each remaining tag, find its max similarity to selected tags
             for (int candidate : remaining) {
-                float maxSim = 0;
-                for (int selectedIdx : selected) {
-                    maxSim = Math.max(maxSim, similarityMatrix[candidate][selectedIdx]);
-                }
+                float localSim = similarityMatrix[candidate][lastSelected];
 
-                // Select tag with lowest max-similarity (most diverse placement)
-                if (maxSim < bestMaxSim) {
-                    bestMaxSim = maxSim;
+                // Mild global term to avoid short-sighted jumps when local ties happen.
+                float sumSim = 0f;
+                for (int selectedIdx : selected) {
+                    sumSim += similarityMatrix[candidate][selectedIdx];
+                }
+                float avgSelectedSim = sumSim / selected.size();
+                float score = localSim * 0.8f + avgSelectedSim * 0.2f;
+
+                if (score > bestScore) {
+                    bestScore = score;
                     best = candidate;
                 }
             }
@@ -268,6 +338,133 @@ public class TagEmbeddingManager {
         }
 
         return selected;
+    }
+
+    private float normalizeCosine(float cosine) {
+        return clamp01((cosine + 1.0f) * 0.5f);
+    }
+
+    private float clamp01(float value) {
+        if (value < 0f) {
+            return 0f;
+        }
+        if (value > 1f) {
+            return 1f;
+        }
+        return value;
+    }
+
+    private boolean hasCjk(String s) {
+        if (s == null || s.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            Character.UnicodeBlock block = Character.UnicodeBlock.of(s.charAt(i));
+            if (block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
+                    || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private float lexicalSimilarity(String a, String b) {
+        if (a == null || b == null) {
+            return 0f;
+        }
+
+        String na = normalizeTag(a);
+        String nb = normalizeTag(b);
+        if (na.isEmpty() || nb.isEmpty()) {
+            return 0f;
+        }
+        if (na.equals(nb)) {
+            return 1f;
+        }
+
+        Set<String> ca = toCodepointTokens(na);
+        Set<String> cb = toCodepointTokens(nb);
+        float charJaccard = jaccard(ca, cb);
+
+        Set<String> ba = toBigrams(na);
+        Set<String> bb = toBigrams(nb);
+        float bigramJaccard = jaccard(ba, bb);
+
+        return clamp01(charJaccard * 0.35f + bigramJaccard * 0.65f);
+    }
+
+    private String normalizeTag(String s) {
+        return s.toLowerCase(Locale.ROOT).trim();
+    }
+
+    private Map<String, Float> loadCustomPairBoosts() {
+        List<TagSimilarityOverrideStore.Rule> rules = TagSimilarityOverrideStore.loadRules(context);
+        Map<String, Float> boosts = TagSimilarityOverrideStore.toBoostMap(rules);
+        Log.i(TAG, "Loaded custom tag pair boosts: " + boosts.size());
+        return boosts;
+    }
+
+    private float getCustomPairBoost(String a, String b) {
+        if (customPairBoosts.isEmpty()) {
+            return 0f;
+        }
+        Float boost = customPairBoosts.get(TagSimilarityOverrideStore.pairKey(a, b));
+        if (boost == null) {
+            return 0f;
+        }
+        return Math.max(0f, boost);
+    }
+
+    private Set<String> toCodepointTokens(String s) {
+        Set<String> tokens = new HashSet<>();
+        for (int i = 0; i < s.length(); ) {
+            int cp = s.codePointAt(i);
+            tokens.add(new String(Character.toChars(cp)));
+            i += Character.charCount(cp);
+        }
+        return tokens;
+    }
+
+    private Set<String> toBigrams(String s) {
+        List<String> cps = new ArrayList<>();
+        for (int i = 0; i < s.length(); ) {
+            int cp = s.codePointAt(i);
+            cps.add(new String(Character.toChars(cp)));
+            i += Character.charCount(cp);
+        }
+
+        if (cps.size() <= 1) {
+            return new HashSet<>(cps);
+        }
+
+        Set<String> bigrams = new HashSet<>();
+        for (int i = 0; i < cps.size() - 1; i++) {
+            bigrams.add(cps.get(i) + cps.get(i + 1));
+        }
+        return bigrams;
+    }
+
+    private float jaccard(Set<String> a, Set<String> b) {
+        if (a.isEmpty() && b.isEmpty()) {
+            return 1f;
+        }
+
+        int intersection = 0;
+        Set<String> smaller = a.size() <= b.size() ? a : b;
+        Set<String> larger = a.size() <= b.size() ? b : a;
+        for (String token : smaller) {
+            if (larger.contains(token)) {
+                intersection++;
+            }
+        }
+
+        int union = a.size() + b.size() - intersection;
+        if (union <= 0) {
+            return 0f;
+        }
+        return (float) intersection / union;
     }
 
     /**
@@ -299,6 +496,48 @@ public class TagEmbeddingManager {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error computing embedding for new tag", e);
+            }
+        });
+    }
+
+    /**
+     * Recursively compute embeddings for missing tags.
+     */
+    private void computeNextEmbedding(int index, List<Long> missingTagIds, List<String> missingTagNames,
+                                      List<float[]> embeddings, Map<Long, Integer> tagIdToIndex, Runnable onComplete) {
+        if (index >= missingTagIds.size()) {
+            onComplete.run();
+            return;
+        }
+
+        long tagId = missingTagIds.get(index);
+        String tagName = missingTagNames.get(index);
+
+        embeddingService.encode(tagName, new EmbeddingService.EncodeCallback() {
+            @Override
+            public void onSuccess(@androidx.annotation.NonNull float[] embedding) {
+                // Save to database
+                embeddingDao.open();
+                embeddingDao.saveEmbedding(tagId, embedding);
+                embeddingDao.close();
+
+                // Cache in memory
+                embeddingCache.put(tagId, embedding);
+
+                // Update embeddings array at correct index
+                Integer idx = tagIdToIndex.get(tagId);
+                if (idx != null && idx < embeddings.size()) {
+                    embeddings.set(idx, embedding);
+                }
+
+                Log.d(TAG, "Computed embedding for tag: " + tagName + " (" + (index + 1) + "/" + missingTagIds.size() + ")");
+                computeNextEmbedding(index + 1, missingTagIds, missingTagNames, embeddings, tagIdToIndex, onComplete);
+            }
+
+            @Override
+            public void onError(@androidx.annotation.NonNull String error) {
+                Log.e(TAG, "Failed to encode tag '" + tagName + "': " + error);
+                computeNextEmbedding(index + 1, missingTagIds, missingTagNames, embeddings, tagIdToIndex, onComplete);
             }
         });
     }
