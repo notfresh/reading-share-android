@@ -67,6 +67,45 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- 同步设置区域 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="同步设置"
+            android:textSize="18sp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"/>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="同步密钥">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/sync_secret_key_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textPassword"
+                android:maxLines="1" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <Button
+            android:id="@+id/button_sync"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="开始同步"
+            android:layout_marginTop="16dp"/>
+
+        <TextView
+            android:id="@+id/sync_status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:layout_marginTop="8dp"
+            android:textColor="#808080"/>
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

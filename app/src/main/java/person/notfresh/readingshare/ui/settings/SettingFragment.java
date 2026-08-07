@@ -45,6 +45,8 @@ import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
 import com.google.android.material.textfield.TextInputEditText;
 
+import person.notfresh.readingshare.sync.SimpleSyncManager;
+
 public class SettingFragment extends Fragment {
 
     private static final int REQUEST_CODE_IMPORT_FILE = 1; // 改为通用文件导入
@@ -54,6 +56,9 @@ public class SettingFragment extends Fragment {
     private Spinner recentTagsWindowSpinner;
     private LinkDao linkDao; // 声明 LinkDao
     private TextInputEditText serverUrlInput;
+    private TextInputEditText syncSecretKeyInput;
+    private SimpleSyncManager syncManager;
+    private android.widget.TextView syncStatusText;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -63,6 +68,9 @@ public class SettingFragment extends Fragment {
         // 初始化 LinkDao
         linkDao = new LinkDao(requireContext());
         linkDao.open();
+
+        // 初始化同步管理器
+        syncManager = new SimpleSyncManager(requireContext());
 
         defaultTabSpinner = root.findViewById(R.id.default_tab_spinner);
 
@@ -178,6 +186,40 @@ public class SettingFragment extends Fragment {
             }
         });
 
+        // 初始化同步密钥输入框
+        syncSecretKeyInput = root.findViewById(R.id.sync_secret_key_input);
+        syncStatusText = root.findViewById(R.id.sync_status_text);
+
+        // 加载保存的密钥
+        String savedKey = syncManager.getSecretKey();
+        syncSecretKeyInput.setText(savedKey);
+
+        // 监听密钥输入框焦点变化
+        syncSecretKeyInput.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                String newKey = syncSecretKeyInput.getText().toString().trim();
+                String serverUrl = serverUrlInput.getText().toString().trim();
+                if (!newKey.isEmpty() && !serverUrl.isEmpty()) {
+                    syncManager.saveConfig(serverUrl, newKey);
+                }
+            }
+        });
+
+        // 同步按钮点击事件
+        root.findViewById(R.id.button_sync).setOnClickListener(v -> {
+            // 先保存当前配置
+            String serverUrl = serverUrlInput.getText().toString().trim();
+            String secretKey = syncSecretKeyInput.getText().toString().trim();
+
+            if (serverUrl.isEmpty() || secretKey.isEmpty()) {
+                syncStatusText.setText("请填写服务器地址和同步密钥");
+                return;
+            }
+
+            syncManager.saveConfig(serverUrl, secretKey);
+            performSync();
+        });
+
         // 阅读模式设置（normal / smooth）
         RadioGroup readingModeGroup = root.findViewById(R.id.reading_mode_group);
         RadioButton normalRb = root.findViewById(R.id.reading_mode_normal);
@@ -267,6 +309,30 @@ public class SettingFragment extends Fragment {
         if (linkDao != null) {
             linkDao.close(); // 关闭数据库连接
         }
+        if (syncManager != null) {
+            syncManager.close();
+        }
+    }
+
+    /**
+     * 执行同步操作
+     */
+    private void performSync() {
+        syncStatusText.setText("正在同步...");
+
+        new Thread(() -> {
+            SimpleSyncManager.SyncResult result = syncManager.sync();
+
+            requireActivity().runOnUiThread(() -> {
+                if (result.success) {
+                    String status = String.format("同步成功: 上传 %d 条, 下载 %d 条",
+                        result.uploadedCount, result.downloadedCount);
+                    syncStatusText.setText(status);
+                } else {
+                    syncStatusText.setText("同步失败: " + result.message);
+                }
+            });
+        }).start();
     }
 
     // 添加导入文件的方法（支持 CSV 和 JSON）
