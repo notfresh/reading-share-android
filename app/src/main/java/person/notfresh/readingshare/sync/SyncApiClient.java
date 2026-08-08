@@ -119,6 +119,9 @@ public class SyncApiClient {
                     ? serverUrl.substring(0, serverUrl.length() - 1)
                     : serverUrl;
             URL url = new URL(normalizedServerUrl + "/api/sync");
+            Log.d(TAG, "同步请求 URL: " + url);
+            Log.d(TAG, "请求体: " + requestJson);
+
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
@@ -127,11 +130,13 @@ public class SyncApiClient {
             connection.setReadTimeout(30000);
 
             boolean encrypt = shouldEncrypt();
+            Log.d(TAG, "shouldEncrypt: " + encrypt);
             String bodyJson = requestJson;
             if (encrypt) {
                 String encryptedToken = encryptAES(AUTH_TOKEN);
                 String encryptedBody = encryptAES(requestJson);
                 if (encryptedToken == null || encryptedBody == null) {
+                    Log.e(TAG, "加密失败: encryptedToken=" + encryptedToken + ", encryptedBody=" + encryptedBody);
                     return null;
                 }
 
@@ -145,10 +150,13 @@ public class SyncApiClient {
                 connection.setRequestProperty("Authorization", "Bearer " + AUTH_TOKEN);
             }
 
+            Log.d(TAG, "发送请求...");
             try (OutputStream output = connection.getOutputStream()) {
                 byte[] input = bodyJson.getBytes(StandardCharsets.UTF_8);
                 output.write(input);
+                output.flush();
             }
+            Log.d(TAG, "请求已发送，等待响应...");
 
             int responseCode = connection.getResponseCode();
             Log.d(TAG, "同步响应码: " + responseCode);
@@ -158,6 +166,7 @@ public class SyncApiClient {
             }
 
             String response = readResponse(connection);
+            Log.d(TAG, "响应体: " + response);
             return encrypt ? decryptResponse(response) : response;
         } catch (Exception e) {
             Log.e(TAG, "同步请求失败", e);
