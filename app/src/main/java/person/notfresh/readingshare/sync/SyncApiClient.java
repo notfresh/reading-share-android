@@ -31,14 +31,18 @@ public class SyncApiClient {
     }
 
     public boolean shouldEncrypt() {
-        try {
-            String host = new URL(serverUrl).getHost();
-            return !(host.equals("localhost")
-                    || host.equals("127.0.0.1")
-                    || host.startsWith("192.168."));
-        } catch (Exception e) {
-            return true;
-        }
+        // TODO: 临时返回 false 方便测试，生产环境需要启用
+        return false;
+
+        // 原来的局域网判断逻辑：
+        // try {
+        //     String host = new URL(serverUrl).getHost();
+        //     return !(host.equals("localhost")
+        //             || host.equals("127.0.0.1")
+        //             || host.startsWith("192.168."));
+        // } catch (Exception e) {
+        //     return true;
+        // }
     }
 
     private byte[] deriveKey(String password) {
