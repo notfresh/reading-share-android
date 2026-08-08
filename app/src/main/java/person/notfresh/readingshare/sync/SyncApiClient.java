@@ -131,6 +131,8 @@ public class SyncApiClient {
 
             boolean encrypt = shouldEncrypt();
             Log.d(TAG, "shouldEncrypt: " + encrypt);
+            String authHeader = encrypt ? encryptAES(AUTH_TOKEN) : AUTH_TOKEN;
+            Log.d(TAG, "Authorization 头: Bearer " + authHeader);
             String bodyJson = requestJson;
             if (encrypt) {
                 String encryptedToken = encryptAES(AUTH_TOKEN);
@@ -147,7 +149,7 @@ public class SyncApiClient {
                 body.put("encrypted", encrypted);
                 bodyJson = body.toString();
             } else {
-                connection.setRequestProperty("Authorization", "Bearer " + AUTH_TOKEN);
+                connection.setRequestProperty("Authorization", "Bearer " + authHeader);
             }
 
             Log.d(TAG, "发送请求...");
