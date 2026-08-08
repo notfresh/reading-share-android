@@ -157,9 +157,8 @@ public class SyncApiClient {
                 body.put("encrypted", encrypted);
                 bodyJson = body.toString();
             } else {
-                // 不加密：明文发送
-                Log.d(TAG, "Authorization 头 (明文): Bearer " + AUTH_TOKEN);
-                connection.setRequestProperty("Authorization", "Bearer " + AUTH_TOKEN);
+                // 不加密：不发送 Authorization 头
+                Log.d(TAG, "本地/局域网，不发送 Authorization 头");
             }
 
             Log.d(TAG, "发送请求...");
