@@ -132,30 +132,35 @@ public class SyncApiClient {
             boolean encrypt = shouldEncrypt();
             Log.d(TAG, "shouldEncrypt: " + encrypt);
 
-            // Authorization 头始终用密钥加密（即使body不加密）
-            String encryptedToken = encryptAES(AUTH_TOKEN);
-            if (encryptedToken == null) {
-                Log.e(TAG, "加密 Authorization 头失败");
-                return null;
-            }
-            Log.d(TAG, "Authorization 头: Bearer " + encryptedToken);
-            connection.setRequestProperty("Authorization", "Bearer " + encryptedToken);
-
             String bodyJson = requestJson;
+
+            // 根据 shouldEncrypt 决定是否加密
             if (encrypt) {
+                // 加密 Authorization 头
+                String encryptedToken = encryptAES(AUTH_TOKEN);
+                if (encryptedToken == null) {
+                    Log.e(TAG, "加密 Authorization 头失败");
+                    return null;
+                }
+                Log.d(TAG, "Authorization 头 (加密): Bearer " + encryptedToken);
+                connection.setRequestProperty("Authorization", "Bearer " + encryptedToken);
+
+                // 加密请求体
                 String encryptedBody = encryptAES(requestJson);
                 if (encryptedBody == null) {
                     Log.e(TAG, "加密请求体失败");
                     return null;
                 }
-
                 JSONObject encrypted = new JSONObject();
                 encrypted.put("data", encryptedBody);
                 JSONObject body = new JSONObject();
                 body.put("encrypted", encrypted);
                 bodyJson = body.toString();
+            } else {
+                // 不加密：明文发送
+                Log.d(TAG, "Authorization 头 (明文): Bearer " + AUTH_TOKEN);
+                connection.setRequestProperty("Authorization", "Bearer " + AUTH_TOKEN);
             }
-            // else: 不加密时直接发送原始 JSON
 
             Log.d(TAG, "发送请求...");
             try (OutputStream output = connection.getOutputStream()) {
