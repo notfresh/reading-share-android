@@ -131,26 +131,31 @@ public class SyncApiClient {
 
             boolean encrypt = shouldEncrypt();
             Log.d(TAG, "shouldEncrypt: " + encrypt);
-            String authHeader = encrypt ? encryptAES(AUTH_TOKEN) : AUTH_TOKEN;
-            Log.d(TAG, "Authorization 头: Bearer " + authHeader);
+
+            // Authorization 头始终用密钥加密（即使body不加密）
+            String encryptedToken = encryptAES(AUTH_TOKEN);
+            if (encryptedToken == null) {
+                Log.e(TAG, "加密 Authorization 头失败");
+                return null;
+            }
+            Log.d(TAG, "Authorization 头: Bearer " + encryptedToken);
+            connection.setRequestProperty("Authorization", "Bearer " + encryptedToken);
+
             String bodyJson = requestJson;
             if (encrypt) {
-                String encryptedToken = encryptAES(AUTH_TOKEN);
                 String encryptedBody = encryptAES(requestJson);
-                if (encryptedToken == null || encryptedBody == null) {
-                    Log.e(TAG, "加密失败: encryptedToken=" + encryptedToken + ", encryptedBody=" + encryptedBody);
+                if (encryptedBody == null) {
+                    Log.e(TAG, "加密请求体失败");
                     return null;
                 }
 
-                connection.setRequestProperty("Authorization", "Bearer " + encryptedToken);
                 JSONObject encrypted = new JSONObject();
                 encrypted.put("data", encryptedBody);
                 JSONObject body = new JSONObject();
                 body.put("encrypted", encrypted);
                 bodyJson = body.toString();
-            } else {
-                connection.setRequestProperty("Authorization", "Bearer " + authHeader);
             }
+            // else: 不加密时直接发送原始 JSON
 
             Log.d(TAG, "发送请求...");
             try (OutputStream output = connection.getOutputStream()) {
