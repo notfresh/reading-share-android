@@ -52,11 +52,18 @@
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"/>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="用于同步链接数据"
+            android:textColor="#808080"
+            android:layout_marginBottom="8dp"/>
+
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="它需要提供必要接口满足app的请求，详情见帮助描述">
+            android:hint="服务器地址">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/server_url_input"
