@@ -32,6 +32,8 @@ import person.notfresh.readingshare.ui.subject.CreateSubjectDialog;
 import person.notfresh.readingshare.ui.subject.SubjectDetailActivity;
 import person.notfresh.readingshare.util.ImageUtil;
 import person.notfresh.readingshare.util.ShortcutUtil;
+import person.notfresh.readingshare.core.storage.KeyValueStorage;
+import person.notfresh.readingshare.util.android.SharedPreferencesStorage;
 
 /**
  * 主题列表页Fragment
@@ -47,11 +49,15 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
     private boolean isSortMode = false;
     private ItemTouchHelper itemTouchHelper;
     private MenuItem sortMenuItem;
+    private SubjectEntryManager subjectEntryManager;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+        // 初始化 SubjectEntryManager
+        KeyValueStorage storage = new SharedPreferencesStorage(requireContext(), "subject_entry_prefs");
+        subjectEntryManager = new SubjectEntryManager(storage);
     }
 
     @Override
@@ -68,6 +74,9 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
             return true;
         } else if (item.getItemId() == R.id.action_sort_subjects) {
             toggleSortMode();
+            return true;
+        } else if (item.getItemId() == R.id.action_subject_entry_settings) {
+            showEntrySettingsDialog();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -106,6 +115,32 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
             Toast.makeText(requireContext(), "主题创建成功", Toast.LENGTH_SHORT).show();
         });
         dialog.show(getParentFragmentManager(), "CreateSubjectDialog");
+    }
+
+    private void showEntrySettingsDialog() {
+        SubjectEntrySettingsDialog dialog = new SubjectEntrySettingsDialog(requireContext());
+        dialog.setOnSettingsSavedListener(() -> {
+            // 设置保存后，重新检查入口逻辑
+            checkAndNavigateToEntry();
+        });
+        dialog.show();
+    }
+
+    private void checkAndNavigateToEntry() {
+        Long targetSubjectId = subjectEntryManager.getDefaultEntryTarget();
+        if (targetSubjectId != null && targetSubjectId > 0) {
+            // 跳转到主题详情
+            Intent intent = new Intent(requireContext(), SubjectDetailActivity.class);
+            intent.putExtra(SubjectDetailActivity.EXTRA_SUBJECT_ID, targetSubjectId);
+            startActivity(intent);
+        }
+        // 否则显示主题列表（默认行为）
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        checkAndNavigateToEntry();
     }
 
     @Override

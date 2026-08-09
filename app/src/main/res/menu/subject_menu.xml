@@ -11,5 +11,10 @@
         android:icon="@android:drawable/ic_menu_sort_by_size"
         android:title="排序"
         app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_subject_entry_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="设置"
+        app:showAsAction="ifRoom" />
 </menu>
 
