@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/nav_home">
+
+    <fragment
+        android:id="@+id/nav_home"
+        android:name="person.notfresh.readingshare.ui.home.HomeFragment"
+        android:label="@string/menu_home"
+        tools:layout="@layout/fragment_home" />
+
+
+    <fragment
+        android:id="@+id/nav_slideshow"
+        android:name="person.notfresh.readingshare.ui.settings.SettingFragment"
+        android:label="@string/menu_settings"
+        tools:layout="@layout/fragment_slideshow" />
+
+    <fragment
+        android:id="@+id/nav_rss"
+        android:name="person.notfresh.readingshare.ui.rss.RSSFragment"
+        android:label="@string/menu_rss"
+        tools:layout="@layout/fragment_rss" />
+
+    <fragment
+        android:id="@+id/nav_statistics"
+        android:name="person.notfresh.readingshare.ui.statistics.StatisticsFragment"
+        android:label="统计"
+        tools:layout="@layout/fragment_statistics" />
+
+    <fragment
+        android:id="@+id/nav_archive"
+        android:name="person.notfresh.readingshare.ui.archive.ArchiveFragment"
+        android:label="@string/menu_archive"
+        tools:layout="@layout/fragment_archive" />
+
+    <fragment
+        android:id="@+id/nav_documents"
+        android:name="person.notfresh.readingshare.ui.document.DocumentFragment"
+        android:label="@string/menu_documents"
+        tools:layout="@layout/fragment_document" />
+
+    <fragment
+        android:id="@+id/nav_subject"
+        android:name="person.notfresh.readingshare.ui.subject.SubjectFragment"
+        android:label="@string/menu_subject"
+        tools:layout="@layout/fragment_subject" />
+
+    <action
+        android:id="@+id/action_nav_home_to_nav_statistics"
+        app:destination="@id/nav_statistics" />
+
+    <action
+        android:id="@+id/action_nav_statistics_to_nav_home"
+        app:destination="@id/nav_home"
+        app:popUpTo="@id/nav_home"
+        app:popUpToInclusive="true" />
+</navigation>

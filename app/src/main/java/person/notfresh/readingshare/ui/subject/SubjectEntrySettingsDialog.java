@@ -166,10 +166,11 @@ public class SubjectEntrySettingsDialog extends Dialog {
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
         if (subjectDao != null) {
             subjectDao.close();
+            subjectDao = null;
         }
     }
 }

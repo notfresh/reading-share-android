@@ -38,6 +38,7 @@ import person.notfresh.readingshare.model.LinkItem;
 public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.SubjectItemViewHolder> {
     List<SubjectItem> items = new ArrayList<>(); // package-private for drag-and-drop access
     private OnSubjectItemClickListener listener;
+    private OnSubjectItemEditListener editListener;
     private OnSubjectItemActionListener actionListener;
     private Context context;
     private LinkDao linkDao;
@@ -46,6 +47,10 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
 
     public interface OnSubjectItemClickListener {
         void onSubjectItemClick(SubjectItem item);
+    }
+
+    public interface OnSubjectItemEditListener {
+        void onSubjectItemEdit(SubjectItem item);
     }
 
     public interface OnSubjectItemActionListener {
@@ -66,6 +71,10 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
 
     public void setOnSubjectItemClickListener(OnSubjectItemClickListener listener) {
         this.listener = listener;
+    }
+
+    public void setOnSubjectItemEditListener(OnSubjectItemEditListener editListener) {
+        this.editListener = editListener;
     }
 
     public void setOnSubjectItemActionListener(OnSubjectItemActionListener listener) {
@@ -203,8 +212,8 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
                     }
                     return true;
                 case 2: // 编辑
-                    if (listener != null) {
-                        listener.onSubjectItemClick(item);
+                    if (editListener != null) {
+                        editListener.onSubjectItemEdit(item);
                     }
                     return true;
                 case 3: // 删除

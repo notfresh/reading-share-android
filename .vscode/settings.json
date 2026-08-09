@@ -4,5 +4,6 @@
             "filePath": "dev.md",
             "group": "Default"
         }
-    ]
+    ],
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

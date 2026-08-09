@@ -1,0 +1,59 @@
+<h2>主题模块设置对话框</h2>
+<p class="subtitle">点击标题栏设置按钮后弹出的配置界面</p>
+
+<div class="mockup" style="margin-top: 16px;">
+  <div class="mockup-header">设置对话框预览</div>
+  <div class="mockup-body" style="padding: 16px; background: #f5f5f5;">
+    <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 320px; margin: 0 auto;">
+      <h3 style="margin: 0 0 16px 0; font-size: 18px;">主题模块设置</h3>
+
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; font-weight: 500; margin-bottom: 8px;">进入时默认显示</label>
+        <div style="display: flex; gap: 8px;">
+          <button style="flex: 1; padding: 10px; border: 1px solid #ddd; background: #f5f5f5; border-radius: 6px; font-size: 13px;">主题列表</button>
+          <button style="flex: 1; padding: 10px; border: 2px solid #2196F3; background: #E3F2FD; color: #1976D2; border-radius: 6px; font-size: 13px; font-weight: 500;">主题详情</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; font-weight: 500; margin-bottom: 8px;">记忆的主题</label>
+        <select style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: white;">
+          <option>📚 阅读清单 - 上次查看</option>
+          <option>💼 工作项目</option>
+          <option>🎯 目标追踪</option>
+          <option>+ 选择其他主题...</option>
+        </select>
+        <p style="font-size: 12px; color: #666; margin-top: 6px;">保存后，进入主题模块将自动打开此主题</p>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button style="padding: 8px 16px; border: none; background: #f5f5f5; border-radius: 6px; font-size: 14px;">取消</button>
+        <button style="padding: 8px 16px; border: none; background: #2196F3; color: white; border-radius: 6px; font-size: 14px; font-weight: 500;">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>架构设计思路</h3>
+  <p class="subtitle">核心逻辑与视图分离</p>
+
+  <div class="pros-cons" style="margin-top: 12px;">
+    <div class="pros">
+      <h4>✅ 优点</h4>
+      <ul>
+        <li>可独立测试核心逻辑</li>
+        <li>便于后续扩展功能</li>
+        <li>代码更清晰易懂</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>📋 方案</h4>
+      <ul>
+        <li>创建 SubjectEntryManager 类</li>
+        <li>负责记忆/恢复逻辑</li>
+        <li>通过接口与UI层通信</li>
+      </ul>
+    </div>
+  </div>
+</div>

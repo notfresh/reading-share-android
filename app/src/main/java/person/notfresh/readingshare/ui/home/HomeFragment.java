@@ -339,9 +339,6 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             linkDao.open();
             Log.d(TAG, "onCreateView: LinkDao opened successfully");
 
-            // 初始化标签嵌入管理器
-            tagEmbeddingManager = new TagEmbeddingManager(requireContext());
-
             Log.d(TAG, "onCreateView: initializing RecyclerView and Adapter");
             RecyclerView recyclerView = binding.recyclerView;
             if (recyclerView == null) {
@@ -1065,6 +1062,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void performAutoSort() {
         Toast.makeText(requireContext(), "正在计算标签相似度...", Toast.LENGTH_SHORT).show();
 
+        // 懒加载：首次使用时才创建 TagEmbeddingManager
+        if (tagEmbeddingManager == null) {
+            tagEmbeddingManager = new TagEmbeddingManager(requireContext());
+        }
+
         tagEmbeddingManager.sortTagsBySimilarity(new TagEmbeddingManager.SortCallback() {
             @Override
             public void onSuccess(java.util.List<Long> sortedTagIds, java.util.List<String> sortedTagNames) {
@@ -1090,6 +1092,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         Log.d("HomeFragment", "Setting sorted items to adapter, count=" + sortedItems.size());
                         tagsAdapter.setTags(sortedItems);
                         Log.d("HomeFragment", "After setTags, adapter has " + tagsAdapter.getTags().size() + " tags");
+                        // 持久化自动排序结果到数据库
+                        saveTagOrderToDatabase();
                     } else {
                         Log.w("HomeFragment", "sortedItems is empty, sortedTagIds size=" + sortedTagIds.size() + ", currentTags size=" + currentTags.size());
                     }

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(git rm *)",
+      "Bash(awk 'NR==104 || NR==112 || NR==116 || NR==171 || NR==173 || NR==182 {print NR\": \"length\\($0\\)\" chars\"}' \"c:/projects/duxiang-pack/duxiang-android/docs/superpowers/rz/03-代码鉴别材料/源程序代码-前30页.md\")",
+      "Bash(./gradlew :app:testDebugUnitTest --tests \"person.notfresh.readingshare.util.SearchQueryParserTest\")",
+      "Bash(./gradlew :app:testDebugUnitTest --tests \"person.notfresh.readingshare.util.SearchQueryParserTest.testParse_twoTerms_defaultAnd\" --info)",
+      "Bash(./gradlew :app:dependencies --configuration releaseRuntimeClasspath)"
+    ]
+  }
+}

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    
+    <!-- 标签管理菜单项（从tags_menu.xml合并，默认隐藏） -->
+    <item
+        android:id="@+id/action_add_tag"
+        android:icon="@drawable/ic_add"
+        android:title="添加标签"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_sort_tags"
+        android:icon="@android:drawable/ic_menu_sort_by_size"
+        android:title="排序"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_exit_sort"
+        android:icon="@drawable/ic_close"
+        android:title="完成排序"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_auto_sort"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="自动排序"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_similarity_config"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="相关度配置"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <!-- 洗牌模式菜单项 -->
+    <item
+        android:id="@+id/action_shuffle"
+        android:icon="@android:drawable/ic_menu_rotate"
+        android:title="洗牌"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_exit_shuffle"
+        android:icon="@drawable/ic_close"
+        android:title="退出洗牌"
+        android:visible="false"
+        app:showAsAction="always" />
+    
+    <!-- 选择模式菜单项（原有） -->
+    <item
+        android:id="@+id/action_close_selection"
+        android:icon="@drawable/ic_close"
+        android:title="退出选择"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_select_all"
+        android:icon="@drawable/ic_select_all"
+        android:title="全选"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_share"
+        android:icon="@drawable/ic_share"
+        android:title="分享"
+        android:visible="false"
+        app:showAsAction="always">
+        <menu>
+            <item
+                android:id="@+id/action_share_text"
+                android:title="分享文本" />
+            <item
+                android:id="@+id/action_share_json"
+                android:title="分享JSON" />
+            <item
+                android:id="@+id/action_share_csv"
+                android:title="分享CSV" />
+            <item
+                android:id="@+id/action_add_to_subject"
+                android:title="添加到主题" />
+        </menu>
+    </item>
+    <item
+        android:id="@+id/action_enter_selection"
+        android:title="多选"
+        android:visible="true"
+        app:showAsAction="always|withText"/>
+    
+    <!-- 统计菜单项（原有） -->
+    <item
+        android:id="@+id/action_statistics"
+        android:icon="@drawable/ic_statistics"
+        android:title="@string/add_statistics"
+        app:showAsAction="always"/>
+    
+    <item
+        android:id="@+id/action_statistics_read"
+        android:icon="@drawable/ic_gallery"
+        android:title="@string/read_statistics"
+        android:visible="false" />
+</menu> 

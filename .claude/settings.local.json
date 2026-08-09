@@ -4,7 +4,8 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(./gradlew :app:compileDebugJavaWithJavac)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Read(//c/Users/zhengxu/.claude/plugins/cache/superpowers-zx/superpowers/5.1.0/skills/subagent-driven-development/**)"
     ]
   }
 }
