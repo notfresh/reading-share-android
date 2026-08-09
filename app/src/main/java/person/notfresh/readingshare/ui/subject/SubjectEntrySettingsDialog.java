@@ -166,7 +166,7 @@ public class SubjectEntrySettingsDialog extends Dialog {
     }
 
     @Override
-    protected void onDetachedFromWindow() {
+    public void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         if (subjectDao != null) {
             subjectDao.close();

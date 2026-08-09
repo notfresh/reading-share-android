@@ -70,6 +70,7 @@ public class SubjectEntryManagerTest {
 
         // 验证：应该正确保存
         assertEquals(789, storage.getLong(SubjectEntryManager.KEY_LAST_SUBJECT_ID, 0));
+        assertEquals(Long.valueOf(789), manager.getLastViewedSubjectId());
     }
 
     @Test

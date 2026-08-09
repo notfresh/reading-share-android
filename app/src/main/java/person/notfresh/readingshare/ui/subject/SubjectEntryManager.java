@@ -63,6 +63,11 @@ public class SubjectEntryManager {
         }
     }
 
+    public Long getLastViewedSubjectId() {
+        long subjectId = storage.getLong(KEY_LAST_SUBJECT_ID, -1);
+        return subjectId > 0 ? subjectId : null;
+    }
+
     /**
      * 获取入口偏好
      */
