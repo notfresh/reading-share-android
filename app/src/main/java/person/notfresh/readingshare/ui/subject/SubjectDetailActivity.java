@@ -39,6 +39,9 @@ public class SubjectDetailActivity extends AppCompatActivity implements
         SubjectItemAdapter.OnSubjectItemActionListener {
     private static final String TAG = "SubjectDetailActivity";
     public static final String EXTRA_SUBJECT_ID = "subject_id";
+    public static final String EXTRA_SOURCE = "source";
+    public static final int SOURCE_LIST = 1;      // 从列表进入
+    public static final int SOURCE_DIRECT = 2;    // 直接进入（记忆/快捷方式）
 
     private RecyclerView recyclerView;
     private android.widget.TextView textEmpty;
@@ -47,6 +50,7 @@ public class SubjectDetailActivity extends AppCompatActivity implements
     private LinkDao linkDao;
     private Subject subject;
     private long subjectId;
+    private int source;
     private ItemTouchHelper itemTouchHelper;
     private List<SubjectItem> currentSubjectItems; // 保存当前主题项列表用于构建 context_ids
     private SubjectEntryManager subjectEntryManager;
@@ -64,11 +68,19 @@ public class SubjectDetailActivity extends AppCompatActivity implements
             return;
         }
 
+        // 获取入口来源
+        source = getIntent().getIntExtra(EXTRA_SOURCE, SOURCE_DIRECT);
+
         // 设置Toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            if (source == SOURCE_LIST) {
+                // 从列表进入，显示返回箭头
+                getSupportActionBar().setHomeAsUpIndicator(android.R.drawable.ic_menu_revert);
+            }
+            // 从直接进入，不设置则显示默认汉堡图标
         }
 
         subjectDao = new SubjectDao(this);
@@ -132,10 +144,19 @@ public class SubjectDetailActivity extends AppCompatActivity implements
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            finish();
+            if (source == SOURCE_LIST) {
+                // 从列表进入，直接关闭返回
+                finish();
+            } else {
+                // 直接进入，按默认行为
+                onBackPressed();
+            }
             return true;
         } else if (item.getItemId() == R.id.action_add_item) {
             showAddSubjectItemDialog();
+            return true;
+        } else if (item.getItemId() == R.id.action_show_subject_list) {
+            showSubjectListDialog();
             return true;
         } else if (item.getItemId() == R.id.action_subject_settings) {
             showSubjectSettingsDialog();
@@ -152,6 +173,24 @@ public class SubjectDetailActivity extends AppCompatActivity implements
             Toast.makeText(this, "主题项添加成功", Toast.LENGTH_SHORT).show();
         });
         dialog.show(getSupportFragmentManager(), "AddSubjectItemDialog");
+    }
+
+    private void showSubjectListDialog() {
+        SelectSubjectDialog dialog = SelectSubjectDialog.newInstance(null);
+        dialog.setOnSubjectSelectedListener((selectedSubjectId, linkIds) -> {
+            // 更新记忆主题
+            subjectEntryManager.setMemorySubjectId(selectedSubjectId);
+
+            // 跳转到选中的主题
+            Intent intent = new Intent(this, SubjectDetailActivity.class);
+            intent.putExtra(EXTRA_SUBJECT_ID, selectedSubjectId);
+            intent.putExtra(EXTRA_SOURCE, SOURCE_DIRECT);
+            startActivity(intent);
+
+            // 关闭当前页面
+            finish();
+        });
+        dialog.show(getSupportFragmentManager(), "SelectSubjectDialog");
     }
 
     private void loadSubjectItems() {

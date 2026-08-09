@@ -132,6 +132,7 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
             // 跳转到主题详情
             Intent intent = new Intent(requireContext(), SubjectDetailActivity.class);
             intent.putExtra(SubjectDetailActivity.EXTRA_SUBJECT_ID, targetSubjectId);
+            intent.putExtra(SubjectDetailActivity.EXTRA_SOURCE, SubjectDetailActivity.SOURCE_DIRECT);
             startActivity(intent);
         }
         // 否则显示主题列表（默认行为）
@@ -266,6 +267,7 @@ public class SubjectFragment extends Fragment implements SubjectAdapter.OnSubjec
     public void onSubjectClick(Subject subject) {
         Intent intent = new Intent(requireContext(), SubjectDetailActivity.class);
         intent.putExtra(SubjectDetailActivity.EXTRA_SUBJECT_ID, subject.getId());
+        intent.putExtra(SubjectDetailActivity.EXTRA_SOURCE, SubjectDetailActivity.SOURCE_LIST);
         startActivity(intent);
     }
 

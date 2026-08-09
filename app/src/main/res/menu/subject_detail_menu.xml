@@ -7,6 +7,11 @@
         android:title="添加主题项"
         app:showAsAction="ifRoom" />
     <item
+        android:id="@+id/action_show_subject_list"
+        android:icon="@android:drawable/ic_menu_sort_by_size"
+        android:title="查看列表"
+        app:showAsAction="ifRoom" />
+    <item
         android:id="@+id/action_subject_settings"
         android:icon="@android:drawable/ic_menu_manage"
         android:title="设置"
