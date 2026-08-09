@@ -27,12 +27,15 @@ import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.ui.subject.AddSubjectItemDialog;
 import person.notfresh.readingshare.ui.subject.SubjectArchivedItemsDialog;
+import person.notfresh.readingshare.core.storage.KeyValueStorage;
+import person.notfresh.readingshare.util.android.SharedPreferencesStorage;
 
 /**
  * 主题详情页Activity
  */
-public class SubjectDetailActivity extends AppCompatActivity implements 
+public class SubjectDetailActivity extends AppCompatActivity implements
         SubjectItemAdapter.OnSubjectItemClickListener,
+        SubjectItemAdapter.OnSubjectItemEditListener,
         SubjectItemAdapter.OnSubjectItemActionListener {
     private static final String TAG = "SubjectDetailActivity";
     public static final String EXTRA_SUBJECT_ID = "subject_id";
@@ -46,6 +49,7 @@ public class SubjectDetailActivity extends AppCompatActivity implements
     private long subjectId;
     private ItemTouchHelper itemTouchHelper;
     private List<SubjectItem> currentSubjectItems; // 保存当前主题项列表用于构建 context_ids
+    private SubjectEntryManager subjectEntryManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,6 +93,7 @@ public class SubjectDetailActivity extends AppCompatActivity implements
         textEmpty = findViewById(R.id.text_empty);
         adapter = new SubjectItemAdapter(this);
         adapter.setOnSubjectItemClickListener(this);
+        adapter.setOnSubjectItemEditListener(this);
         adapter.setOnSubjectItemActionListener(this);
         recyclerView.setAdapter(adapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -97,6 +102,11 @@ public class SubjectDetailActivity extends AppCompatActivity implements
         setupDragAndDrop();
 
         loadSubjectItems();
+
+        // 初始化 SubjectEntryManager 并保存当前查看的主题
+        KeyValueStorage storage = new SharedPreferencesStorage(this, "subject_entry_prefs");
+        subjectEntryManager = new SubjectEntryManager(storage);
+        subjectEntryManager.saveLastViewedSubject(subjectId);
     }
 
     @Override
@@ -176,6 +186,12 @@ public class SubjectDetailActivity extends AppCompatActivity implements
             // 没有链接，显示编辑对话框
             showEditSubjectItemDialog(item);
         }
+    }
+
+    @Override
+    public void onSubjectItemEdit(SubjectItem item) {
+        // 编辑操作：直接显示编辑对话框
+        showEditSubjectItemDialog(item);
     }
 
     /**
