@@ -134,6 +134,7 @@ public class MainActivity extends AppCompatActivity {
                 int id = item.getItemId();
                 drawer.closeDrawer(GravityCompat.START);
 
+                // 延迟导航，确保抽屉关闭动画完成
                 new Handler().postDelayed(() -> {
                     try {
                         if (id == R.id.nav_home) {

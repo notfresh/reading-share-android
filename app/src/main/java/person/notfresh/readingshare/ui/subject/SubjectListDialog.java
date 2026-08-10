@@ -39,6 +39,7 @@ public class SubjectListDialog extends DialogFragment implements SubjectAdapter.
     private boolean sortMode;
     private OnSubjectSelectedListener selectedListener;
     private OnSubjectDeletedListener deletedListener;
+    private OnDismissListener dismissListener;
 
     public interface OnSubjectSelectedListener {
         void onSubjectSelected(long subjectId);
@@ -46,6 +47,10 @@ public class SubjectListDialog extends DialogFragment implements SubjectAdapter.
 
     public interface OnSubjectDeletedListener {
         void onSubjectDeleted(long subjectId);
+    }
+
+    public interface OnDismissListener {
+        void onDismiss();
     }
 
     public static SubjectListDialog newInstance(long selectedSubjectId) {
@@ -62,6 +67,10 @@ public class SubjectListDialog extends DialogFragment implements SubjectAdapter.
 
     public void setOnSubjectDeletedListener(OnSubjectDeletedListener listener) {
         deletedListener = listener;
+    }
+
+    public void setOnDismissListener(OnDismissListener listener) {
+        dismissListener = listener;
     }
 
     @Override
@@ -142,8 +151,8 @@ public class SubjectListDialog extends DialogFragment implements SubjectAdapter.
     @Override
     public void onDismiss(@NonNull android.content.DialogInterface dialog) {
         super.onDismiss(dialog);
-        if (getParentFragment() instanceof SubjectFragment) {
-            ((SubjectFragment) getParentFragment()).onSubjectListDismissed();
+        if (dismissListener != null) {
+            dismissListener.onDismiss();
         }
     }
 

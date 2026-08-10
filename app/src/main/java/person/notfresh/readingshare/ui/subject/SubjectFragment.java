@@ -123,6 +123,7 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
         if (listDialogShown || !isAdded()) return;
         listDialogShown = true;
         SubjectListDialog dialog = SubjectListDialog.newInstance(subject == null ? -1 : subject.getId());
+        dialog.setOnDismissListener(this::onSubjectListDismissed);
         dialog.setOnSubjectSelectedListener(id -> { listDialogShown = false; loadSubject(id); });
         dialog.setOnSubjectDeletedListener(id -> {
             if (subject != null && subject.getId() == id) {
