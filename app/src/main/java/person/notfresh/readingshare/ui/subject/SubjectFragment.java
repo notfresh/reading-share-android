@@ -66,7 +66,6 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
         recyclerView.setAdapter(adapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         setupDragAndDrop();
-        openRememberedSubjectOrList();
         return root;
     }
 
