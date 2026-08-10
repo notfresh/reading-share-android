@@ -33,6 +33,7 @@ import com.google.android.flexbox.FlexWrap;
 import com.google.android.material.snackbar.Snackbar;
 
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.adapter.LinksAdapter;
 import person.notfresh.readingshare.adapter.SearchHistoryAdapter;
 import person.notfresh.readingshare.adapter.TagsAdapter;
@@ -277,6 +278,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             // 打开阅读量统计页面
             Intent intent = new Intent(getActivity(), ClickStatisticsActivity.class);
             startActivity(intent);
+            return true;
+        } else if (id == R.id.action_go_subject) {
+            ((MainActivity) requireActivity()).navigateTo(R.id.nav_subject);
             return true;
         } else if (id == R.id.action_add_tag) {
             // 添加标签（从TagsFragment合并）

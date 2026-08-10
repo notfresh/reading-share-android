@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.WebViewActivity;
 import person.notfresh.readingshare.adapter.SubjectItemAdapter;
 import person.notfresh.readingshare.core.model.Subject;
@@ -81,6 +82,10 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
     }
 
     @Override public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.action_go_home) {
+            ((MainActivity) requireActivity()).navigateTo(R.id.nav_home);
+            return true;
+        }
         if (item.getItemId() == R.id.action_add_item) { showAddSubjectItemDialog(); return true; }
         if (item.getItemId() == R.id.action_show_subject_list) { showSubjectListDialog(); return true; }
         if (item.getItemId() == R.id.action_subject_settings) { showSubjectSettingsDialog(); return true; }

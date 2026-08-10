@@ -136,24 +136,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // 延迟导航，确保抽屉关闭动画完成
                 new Handler().postDelayed(() -> {
-                    try {
-                        if (id == R.id.nav_home) {
-                            navController.navigate(R.id.nav_home);
-                        } else if (id == R.id.nav_rss) {
-                            navController.navigate(R.id.nav_rss);
-                        } else if (id == R.id.nav_slideshow) {
-                            navController.navigate(R.id.nav_slideshow);
-                        } else if (id == R.id.nav_archive) {
-                            navController.navigate(R.id.nav_archive);
-                        } else if (id == R.id.nav_documents) {
-                            navController.navigate(R.id.nav_documents);
-                        } else if (id == R.id.nav_subject) {
-                            navController.navigate(R.id.nav_subject);
-                        }
-                    } catch (Exception e) {
-                        Log.e("MainActivity", "Navigation failed", e);
-                        Toast.makeText(this, "导航失败", Toast.LENGTH_SHORT).show();
-                    }
+                    navigateTo(id);
                 }, 250);
 
                 return true;
@@ -195,6 +178,15 @@ public class MainActivity extends AppCompatActivity {
             Log.e("MainActivity", "onCreate failed", e);
             Toast.makeText(this, "应用启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
             finish();
+        }
+    }
+
+    public void navigateTo(int destinationId) {
+        try {
+            navController.navigate(destinationId);
+        } catch (Exception e) {
+            Log.e("MainActivity", "Navigation failed", e);
+            Toast.makeText(this, "导航失败", Toast.LENGTH_SHORT).show();
         }
     }
     
