@@ -248,6 +248,7 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
     @NonNull
     @Override
     public SubjectItemViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        android.util.Log.d("SubjectItemAdapter", "onCreateViewHolder");
         View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_subject_item, parent, false);
         return new SubjectItemViewHolder(view);
@@ -255,6 +256,7 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
 
     @Override
     public void onBindViewHolder(@NonNull SubjectItemViewHolder holder, int position) {
+        android.util.Log.d("SubjectItemAdapter", "onBindViewHolder pos=" + position + ", images=" + (items.get(position).getImages() != null ? items.get(position).getImages().size() : "null"));
         SubjectItem item = items.get(position);
         holder.bind(item);
     }
@@ -321,9 +323,10 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
 
             // 长按显示操作菜单
             itemView.setOnLongClickListener(v -> {
+                android.util.Log.d("SubjectItemAdapter", "itemView onLongClick");
                 int position = getAdapterPosition();
                 if (position == RecyclerView.NO_POSITION) return false;
-                
+
                 SubjectItem item = items.get(position);
                 showActionMenu(v, item);
                 return true;
@@ -404,18 +407,10 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
     }
 
     /**
-     * 根据ID获取LinkItem（临时方法，应该移到LinkDao）
+     * 根据ID获取LinkItem(委托给 LinkDao 的主键查询实现)。
      */
     private LinkItem getLinkById(long linkId) {
-        // TODO: 这个方法应该移到LinkDao中
-        // 临时实现：通过查询所有链接来查找
-        List<LinkItem> allLinks = linkDao.getAllLinks();
-        for (LinkItem link : allLinks) {
-            if (link.getId() == linkId) {
-                return link;
-            }
-        }
-        return null;
+        return linkDao.getLinkById(linkId);
     }
 
     /**
@@ -489,6 +484,17 @@ public class SubjectItemAdapter extends RecyclerView.Adapter<SubjectItemAdapter.
                     if (position != RecyclerView.NO_POSITION && parentItem != null && parentItem.getImages() != null) {
                         showImagePreview(parentItem.getImages(), position);
                     }
+                });
+
+                // 长按图片时弹出操作菜单（ImageView 因设置了 OnClickListener 而消费触摸事件，
+                // 所以这里需要自己处理长按，不能依赖外层 itemView 的长按监听器）
+                imageView.setOnLongClickListener(v -> {
+                    android.util.Log.d("SubjectItemAdapter", "ImageView onLongClick, parentItem=" + parentItem);
+                    if (parentItem != null) {
+                        showActionMenu(v, parentItem);
+                        return true;
+                    }
+                    return false;
                 });
             }
 
