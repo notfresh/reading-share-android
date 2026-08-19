@@ -145,7 +145,7 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
         }
         Subject picked = all.get(new java.util.Random().nextInt(all.size()));
         loadSubject(picked.getId(), false);
-        Toast.makeText(requireContext(), "随机选择:" + picked.getName(), Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), "随机选择:" + picked.getTitle(), Toast.LENGTH_SHORT).show();
     }
 
     private void showSubjectListDialog() {
