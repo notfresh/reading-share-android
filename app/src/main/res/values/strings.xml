@@ -18,8 +18,8 @@
         <string name="menu_settings">设置</string>
 
     <string-array name="default_tabs_array">
-        <item>链接</item>
         <item>主题</item>
+        <item>链接</item>
         <item>RSS</item>
         <item>随机</item>
     </string-array>
