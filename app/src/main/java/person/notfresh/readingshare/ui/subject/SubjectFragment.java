@@ -91,6 +91,7 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
         }
         if (item.getItemId() == R.id.action_add_item) { showAddSubjectItemDialog(); return true; }
         if (item.getItemId() == R.id.action_show_subject_list) { showSubjectListDialog(); return true; }
+        if (item.getItemId() == R.id.action_random_subject) { pickRandomSubject(); return true; }
         if (item.getItemId() == R.id.action_subject_settings) { showSubjectSettingsDialog(); return true; }
         return super.onOptionsItemSelected(item);
     }
@@ -110,6 +111,10 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
     }
 
     private boolean loadSubject(long id) {
+        return loadSubject(id, true);
+    }
+
+    private boolean loadSubject(long id, boolean rememberLastViewed) {
         Subject loaded = subjectDao.getSubjectById(id);
         if (loaded == null) {
             subject = null;
@@ -122,8 +127,25 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
         adapter.setItems(currentItems);
         updateEmptyState(currentItems);
         updateToolbarTitle(loaded);
-        entryManager.saveLastViewedSubject(id);
+        if (rememberLastViewed) {
+            entryManager.saveLastViewedSubject(id);
+        }
         return true;
+    }
+
+    /**
+     * 随机选择一个主题并切换过去,不污染「记忆上次主题」的语义。
+     */
+    private void pickRandomSubject() {
+        if (subjectDao == null) return;
+        List<Subject> all = subjectDao.getAllSubjects();
+        if (all == null || all.isEmpty()) {
+            Toast.makeText(requireContext(), "暂无可用主题", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Subject picked = all.get(new java.util.Random().nextInt(all.size()));
+        loadSubject(picked.getId(), false);
+        Toast.makeText(requireContext(), "随机选择:" + picked.getName(), Toast.LENGTH_SHORT).show();
     }
 
     private void showSubjectListDialog() {

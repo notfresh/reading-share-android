@@ -12,6 +12,11 @@
         android:title="查看列表"
         app:showAsAction="always" />
     <item
+        android:id="@+id/action_random_subject"
+        android:icon="@android:drawable/ic_menu_rotate"
+        android:title="随机切主题"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/action_subject_settings"
         android:icon="@android:drawable/ic_menu_manage"
         android:title="设置"
