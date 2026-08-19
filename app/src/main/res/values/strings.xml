@@ -8,7 +8,7 @@
     <string name="nav_header_desc">导航头部</string>
     <string name="action_settings">设置</string>
 
-    <string name="menu_home">首页</string>
+    <string name="menu_home">链接</string>
     <string name="menu_gallery">标签</string>
     <string name="menu_rss">RSS</string>
     <string name="menu_archive">归档</string>
@@ -18,7 +18,7 @@
         <string name="menu_settings">设置</string>
 
     <string-array name="default_tabs_array">
-        <item>首页</item>
+        <item>链接</item>
         <item>主题</item>
         <item>RSS</item>
         <item>随机</item>
