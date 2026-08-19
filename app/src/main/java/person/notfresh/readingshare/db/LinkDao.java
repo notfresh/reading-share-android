@@ -31,20 +31,42 @@ public class LinkDao {
     private SQLiteDatabase database;
     private static final String TAG = "LinkDao";
 
+    /**
+     * 新构造:由 DbConnection 注入共享 SQLiteDatabase。
+     * open()/close() 变为空实现,调用方仍可保留以兼容旧代码,但不再真正开关连接。
+     */
+    public LinkDao(SQLiteDatabase database) {
+        this.database = database;
+    }
+
+    /** @deprecated 推荐用 DbConnection 注入连接。新构造。 */
+    @Deprecated
     public LinkDao(Context context) {
         dbHelper = new LinkDbHelper(context);
     }
 
+    /** @deprecated 推荐用 DbConnection 注入连接。归档库可走 DbConnection.helperFor(name)。 */
+    @Deprecated
     public LinkDao(Context context, String databaseName) {
         dbHelper = new LinkDbHelper(context, databaseName);
     }
 
+    /**
+     * 兼容旧调用:若构造时注入了 database 则直接拿到;否则走 dbHelper。
+     * 启动期连接由 DbConnection 持有,本方法调用开销几乎为零。
+     */
     public void open() {
-        database = dbHelper.getWritableDatabase();
+        if (database == null && dbHelper != null) {
+            database = dbHelper.getWritableDatabase();
+        }
     }
 
+    /** 兼容旧调用。共享连接模式下什么都不做(连接由 DbConnection 管理)。 */
     public void close() {
-        dbHelper.close();
+        if (dbHelper != null) {
+            dbHelper.close();
+        }
+        // 共享 database 不关
     }
 
     public long insertLink(LinkItem item) {
@@ -98,7 +120,7 @@ public class LinkDao {
      */
     public boolean deleteLink(long linkId) {
         Log.d("LinkDao", "删除链接ID: " + linkId);
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        SQLiteDatabase db = database;
         boolean success = false;
         
         db.beginTransaction();
@@ -141,7 +163,7 @@ public class LinkDao {
     }
 
     public void togglePinStatus(long linkId) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        SQLiteDatabase db = database;
         Log.d("LinkDao", "开始切换置顶状态, linkId: " + linkId);
 
         Cursor cursor = db.query(LinkDbHelper.TABLE_LINKS, new String[]{"is_pinned"},
@@ -171,7 +193,7 @@ public class LinkDao {
     }
 
     public void updateClickCount(long id, int count) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        SQLiteDatabase db = database;
         db.beginTransaction();
         try {
             ContentValues values = new ContentValues();
@@ -327,7 +349,7 @@ public class LinkDao {
 
     public List<LinkItem> getPinnedLinks() {
         List<LinkItem> pinnedLinks = new ArrayList<>();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        SQLiteDatabase db = database;
 
         Log.d("LinkDao", "获取置顶链接");
         Cursor cursor = db.query(LinkDbHelper.TABLE_LINKS, null, "is_pinned = 1", null,
@@ -456,7 +478,7 @@ public class LinkDao {
      * @param tag 要删除的标签名
      */
     public void deleteTag(String tag) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        SQLiteDatabase db = database;
         db.beginTransaction();
         
         try {
@@ -509,7 +531,7 @@ public class LinkDao {
      * @param tag 要删除的标签名
      */
     public void deleteTagWithLinks(String tag) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        SQLiteDatabase db = database;
         db.beginTransaction();
         
         try {
@@ -746,7 +768,7 @@ public class LinkDao {
      */
     public Map<String, Integer> getTagsWithCount() {
         Map<String, Integer> tagCountMap = new LinkedHashMap<>();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        SQLiteDatabase db = database;
         
         // 1. 获取配置的排序
         List<Long> orderedTagIds = getTagOrder();

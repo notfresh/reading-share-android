@@ -54,6 +54,7 @@ import android.widget.TextView;
 import android.widget.LinearLayout;
 import com.google.android.flexbox.FlexboxLayout;
 
+import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.CrawlUtil;
@@ -663,9 +664,8 @@ public class WebViewActivity extends AppCompatActivity {
         final long[] linkId = {-1};
 
         new Thread(() -> {
-            LinkDao dao = new LinkDao(WebViewActivity.this);
+            LinkDao dao = new LinkDao(DbConnection.get(WebViewActivity.this).writable());
             try {
-                dao.open();
                 if (dao.urlExists(url)) {
                     linkExists[0] = true;
                     List<LinkItem> allLinks = dao.getAllLinks();
@@ -679,7 +679,7 @@ public class WebViewActivity extends AppCompatActivity {
                 }
             } catch (Exception ignored) {
             } finally {
-                try { dao.close(); } catch (Exception ignored) {}
+                // 共享 DbConnection 连接,不关闭
             }
 
             runOnUiThread(() -> {
@@ -753,9 +753,8 @@ public class WebViewActivity extends AppCompatActivity {
 
     private void saveTagsToLink(String url, List<String> tags) {
         new Thread(() -> {
-            LinkDao dao = new LinkDao(WebViewActivity.this);
+            LinkDao dao = new LinkDao(DbConnection.get(WebViewActivity.this).writable());
             try {
-                dao.open();
                 LinkItem item;
 
                 if (dao.urlExists(url)) {
@@ -790,7 +789,7 @@ public class WebViewActivity extends AppCompatActivity {
                 runOnUiThread(() -> Toast.makeText(WebViewActivity.this,
                         "保存标签失败", Toast.LENGTH_SHORT).show());
             } finally {
-                try { dao.close(); } catch (Exception ignored) {}
+                // 共享 DbConnection 连接,不关闭
             }
         }).start();
     }
@@ -1099,11 +1098,10 @@ public class WebViewActivity extends AppCompatActivity {
         isNavigating = true;
         long targetId = contextIds[index];
         new Thread(() -> {
-            LinkDao dao = new LinkDao(this);
+            LinkDao dao = new LinkDao(DbConnection.get(WebViewActivity.this).writable());
             String url = null;
             String title = null;
             try {
-                dao.open();
                 person.notfresh.readingshare.model.LinkItem item = dao.getLinkById(targetId);
                 if (item != null) {
                     url = item.getUrl();
@@ -1112,7 +1110,7 @@ public class WebViewActivity extends AppCompatActivity {
             } catch (Exception e) {
                 Log.w("WebViewActivity", "loadByContextIndex lookup failed: " + e.getMessage());
             } finally {
-                try { dao.close(); } catch (Exception ignored) {}
+                // 共享 DbConnection 连接,不关闭
             }
             final String finalUrl = url;
             final String finalTitle = title;

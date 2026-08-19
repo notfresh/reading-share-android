@@ -1,6 +1,7 @@
 package person.notfresh.readingshare.ui.subject;
 
 import android.content.Intent;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -29,6 +30,7 @@ import person.notfresh.readingshare.core.model.SubjectItem;
 import person.notfresh.readingshare.core.model.SubjectUtil;
 import person.notfresh.readingshare.core.storage.KeyValueStorage;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.android.SharedPreferencesStorage;
@@ -56,9 +58,10 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
         View root = inflater.inflate(R.layout.fragment_subject, container, false);
         recyclerView = root.findViewById(R.id.recycler_view);
         textEmpty = root.findViewById(R.id.text_empty);
-        subjectDao = new SubjectDao(requireContext());
+        SQLiteDatabase sharedDb = DbConnection.get(requireContext().getApplicationContext()).writable();
+        subjectDao = new SubjectDao(sharedDb);
         subjectDao.open();
-        linkDao = new LinkDao(requireContext());
+        linkDao = new LinkDao(sharedDb);
         linkDao.open();
         adapter = new SubjectItemAdapter(requireContext());
         adapter.setOnSubjectItemClickListener(this);
@@ -94,8 +97,7 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
 
     @Override public void onDestroyView() {
         if (adapter != null) adapter.close();
-        if (subjectDao != null) subjectDao.close();
-        if (linkDao != null) linkDao.close();
+        // subjectDao / linkDao 共享 DbConnection 连接,不关闭(由进程结束统一回收)
         adapter = null;
         subjectDao = null;
         linkDao = null;

@@ -39,6 +39,7 @@ import person.notfresh.readingshare.adapter.SearchHistoryAdapter;
 import person.notfresh.readingshare.adapter.TagsAdapter;
 import person.notfresh.readingshare.databinding.FragmentHomeBinding;
 import person.notfresh.readingshare.embedding.TagEmbeddingManager;
+import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SearchHistoryManager;
 import person.notfresh.readingshare.db.SubjectDao;
@@ -339,7 +340,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             }
 
             Log.d(TAG, "onCreateView: initializing LinkDao");
-            linkDao = new LinkDao(requireContext());
+            linkDao = new LinkDao(DbConnection.get(requireContext()).writable());
             linkDao.open();
             Log.d(TAG, "onCreateView: LinkDao opened successfully");
 
@@ -451,6 +452,86 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
     }
 
+      @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        // Log.d(TAG, "onViewCreated: start");
+        
+        // 在onViewCreated中直接加载所有链接，此时RecyclerView已经完成布局测量
+        // 初始化时直接加载所有链接，确保用户能立即看到内容
+        // if (linkDao != null && adapter != null) {
+        //     // Log.d(TAG, "onViewCreated: loading all links directly");
+        //     List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
+        //     Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
+            
+        //     // 计算总链接数
+        //     int totalLinks = pinnedLinks.size();
+        //     for (List<LinkItem> links : groupedLinks.values()) {
+        //         totalLinks += links.size();
+        //     }
+            
+        //     // Log.d(TAG, "onViewCreated: loaded links - pinned=" + pinnedLinks.size() 
+        //     //         + ", groups=" + groupedLinks.size() + ", total links=" + totalLinks);
+            
+        //     // 直接设置数据到adapter
+        //     adapter.setPinnedLinks(pinnedLinks);
+        //     adapter.setGroupedLinks(groupedLinks);
+        //     // Log.d(TAG, "onViewCreated: data set to adapter, itemCount=" + adapter.getItemCount());
+            
+        //     // 检查RecyclerView状态
+        //     RecyclerView recyclerView = binding.recyclerView;
+        //     if (recyclerView != null) {
+        //         // Log.d(TAG, "onViewCreated: RecyclerView state - visibility=" + recyclerView.getVisibility() 
+        //         //         + " (0=VISIBLE), width=" + recyclerView.getWidth() 
+        //         //         + ", height=" + recyclerView.getHeight()
+        //         //         + ", isShown=" + recyclerView.isShown()
+        //         //         + ", hasFixedSize=" + recyclerView.hasFixedSize());
+                
+        //         // 确保RecyclerView可见
+        //         if (recyclerView.getVisibility() != View.VISIBLE) {
+        //             // Log.w(TAG, "onViewCreated: RecyclerView is not visible, setting to VISIBLE");
+        //             recyclerView.setVisibility(View.VISIBLE);
+        //         }
+                
+        //         // 检查LayoutManager
+        //         RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
+        //         if (layoutManager != null) {
+        //             // Log.d(TAG, "onViewCreated: LayoutManager exists, itemCount=" + layoutManager.getItemCount());
+        //         } else {
+        //             // Log.e(TAG, "onViewCreated: LayoutManager is null!");
+        //         }
+                
+        //         // 强制刷新
+        //         recyclerView.post(() -> {
+        //             // Log.d(TAG, "onViewCreated: post - RecyclerView width=" + recyclerView.getWidth() 
+        //             //         + ", height=" + recyclerView.getHeight()
+        //             //         + ", adapter itemCount=" + (adapter != null ? adapter.getItemCount() : 0));
+        //             if (adapter != null) {
+        //                 adapter.notifyDataSetChanged();
+        //                 // Log.d(TAG, "onViewCreated: post - notifyDataSetChanged called");
+        //             }
+        //         });
+        //     } else {
+        //         // Log.e(TAG, "onViewCreated: RecyclerView is null!");
+        //     }
+        // } else {
+        //     // Log.e(TAG, "onViewCreated: linkDao or adapter is null!");
+        // }
+        
+        // // 检查是否有选定的日期，滚动到对应位置
+        // if (getArguments() != null) {
+        //     String selectedDate = getArguments().getString("selected_date");
+        //     if (selectedDate != null && binding != null) {
+        //         RecyclerView recyclerView = binding.recyclerView;
+        //         if (recyclerView != null) {
+        //             scrollToDate(recyclerView, selectedDate);
+        //         }
+        //     }
+        // }
+        
+        // Log.d(TAG, "onViewCreated: completed");
+    }
+    
     /**
      * 实际执行搜索 + 入历史 + 刷新下拉
      * 由 debounce 和点选历史项两种路径调用
@@ -581,86 +662,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         });
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        Log.d(TAG, "onViewCreated: start");
-        
-        // 在onViewCreated中直接加载所有链接，此时RecyclerView已经完成布局测量
-        // 初始化时直接加载所有链接，确保用户能立即看到内容
-        if (linkDao != null && adapter != null) {
-            Log.d(TAG, "onViewCreated: loading all links directly");
-            List<LinkItem> pinnedLinks = linkDao.getPinnedLinks();
-            Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
-            
-            // 计算总链接数
-            int totalLinks = pinnedLinks.size();
-            for (List<LinkItem> links : groupedLinks.values()) {
-                totalLinks += links.size();
-            }
-            
-            Log.d(TAG, "onViewCreated: loaded links - pinned=" + pinnedLinks.size() 
-                    + ", groups=" + groupedLinks.size() + ", total links=" + totalLinks);
-            
-            // 直接设置数据到adapter
-            adapter.setPinnedLinks(pinnedLinks);
-            adapter.setGroupedLinks(groupedLinks);
-            Log.d(TAG, "onViewCreated: data set to adapter, itemCount=" + adapter.getItemCount());
-            
-            // 检查RecyclerView状态
-            RecyclerView recyclerView = binding.recyclerView;
-            if (recyclerView != null) {
-                Log.d(TAG, "onViewCreated: RecyclerView state - visibility=" + recyclerView.getVisibility() 
-                        + " (0=VISIBLE), width=" + recyclerView.getWidth() 
-                        + ", height=" + recyclerView.getHeight()
-                        + ", isShown=" + recyclerView.isShown()
-                        + ", hasFixedSize=" + recyclerView.hasFixedSize());
-                
-                // 确保RecyclerView可见
-                if (recyclerView.getVisibility() != View.VISIBLE) {
-                    Log.w(TAG, "onViewCreated: RecyclerView is not visible, setting to VISIBLE");
-                    recyclerView.setVisibility(View.VISIBLE);
-                }
-                
-                // 检查LayoutManager
-                RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
-                if (layoutManager != null) {
-                    Log.d(TAG, "onViewCreated: LayoutManager exists, itemCount=" + layoutManager.getItemCount());
-                } else {
-                    Log.e(TAG, "onViewCreated: LayoutManager is null!");
-                }
-                
-                // 强制刷新
-                recyclerView.post(() -> {
-                    Log.d(TAG, "onViewCreated: post - RecyclerView width=" + recyclerView.getWidth() 
-                            + ", height=" + recyclerView.getHeight()
-                            + ", adapter itemCount=" + (adapter != null ? adapter.getItemCount() : 0));
-                    if (adapter != null) {
-                        adapter.notifyDataSetChanged();
-                        Log.d(TAG, "onViewCreated: post - notifyDataSetChanged called");
-                    }
-                });
-            } else {
-                Log.e(TAG, "onViewCreated: RecyclerView is null!");
-            }
-        } else {
-            Log.e(TAG, "onViewCreated: linkDao or adapter is null!");
-        }
-        
-        // 检查是否有选定的日期，滚动到对应位置
-        if (getArguments() != null) {
-            String selectedDate = getArguments().getString("selected_date");
-            if (selectedDate != null && binding != null) {
-                RecyclerView recyclerView = binding.recyclerView;
-                if (recyclerView != null) {
-                    scrollToDate(recyclerView, selectedDate);
-                }
-            }
-        }
-        
-        Log.d(TAG, "onViewCreated: completed");
-    }
-    
+  
     // ========== 标签管理：加载与初始化 ==========
     
     /**
@@ -834,10 +836,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         historyAdapter = null;
         searchClearButton = null;   // 新增
         binding = null;
-        if (linkDao != null) {
-            linkDao.close();
-            Log.d(TAG, "onDestroyView: LinkDao closed");
-        }
+        // linkDao 共享 DbConnection 连接,不关闭(由进程结束统一回收)
         Log.d(TAG, "onDestroyView: completed");
     }
 

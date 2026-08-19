@@ -21,22 +21,38 @@ import person.notfresh.readingshare.core.model.SubjectUtil;
 public class SubjectDao {
     private LinkDbHelper dbHelper;
     private SQLiteDatabase database;
-    private LinkDao linkDao;  // 用于检查 LinkItem 是否存在
     private static final String TAG = "SubjectDao";
 
+    /**
+     * 新构造:由 DbConnection 注入共享 SQLiteDatabase。
+     * open()/close() 变为空实现,调用方仍可保留以兼容旧代码,但不再真正开关连接。
+     */
+    public SubjectDao(SQLiteDatabase database) {
+        this.database = database;
+    }
+
+    /** @deprecated 推荐用 DbConnection 注入连接。 */
+    @Deprecated
     public SubjectDao(Context context) {
         dbHelper = new LinkDbHelper(context);
-        linkDao = new LinkDao(context);
     }
 
+    /**
+     * 兼容旧调用:若构造时注入了 database 则直接拿到;否则走 dbHelper。
+     * SubjectDao 不再隐式打开内部 LinkDao(历史代码本就只在 open()/close() 调到)。
+     */
     public void open() {
-        database = dbHelper.getWritableDatabase();
-        linkDao.open();
+        if (database == null && dbHelper != null) {
+            database = dbHelper.getWritableDatabase();
+        }
     }
 
+    /** 兼容旧调用。共享连接模式下什么都不做。 */
     public void close() {
-        linkDao.close();
-        dbHelper.close();
+        if (dbHelper != null) {
+            dbHelper.close();
+        }
+        // 共享 database 不关
     }
 
     // ==================== Subject CRUD ====================

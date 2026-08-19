@@ -31,6 +31,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
 import person.notfresh.readingshare.databinding.ActivityMainBinding;
+import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.ui.home.HomeFragment;
@@ -92,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
             binding = ActivityMainBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
 
-            linkDao = new LinkDao(this);
+            linkDao = new LinkDao(DbConnection.get(this).writable());
             linkDao.open();
 
             setSupportActionBar(binding.appBarMain.toolbar);
@@ -142,7 +143,8 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             });
 
-            checkClipboardPermission();
+            // 剪贴板监听延迟到 onResume,避免启动 500ms 后弹保存对话框打断用户
+            // checkClipboardPermission();
             
             // 设置FAB点击事件
             binding.appBarMain.fab.setOnClickListener(view -> {
@@ -216,9 +218,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (linkDao != null) {
-            linkDao.close();
-        }
+        // linkDao 共享 DbConnection 连接,不关闭(由进程结束统一回收)
     }
 
     @Override
@@ -269,7 +269,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             // 读取默认Tab设置并导航
             SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
-            int defaultTab = prefs.getInt("default_tab", 0); // 默认为0，即首页
+            int defaultTab = prefs.getInt("default_tab", 2); // 默认为2，即主题页(跳过HomeFragment启动)
             
             // 根据设置选择目标页面ID
             switch (defaultTab) {

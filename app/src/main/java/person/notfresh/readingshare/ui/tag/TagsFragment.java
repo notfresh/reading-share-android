@@ -43,6 +43,7 @@ import android.graphics.Typeface;
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.LinksAdapter;
 import person.notfresh.readingshare.adapter.TagsAdapter;
+import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.core.model.SubjectItem;
@@ -244,7 +245,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         arrowIndicator.setImageResource(R.drawable.ic_expand_less);
         arrowIndicator.setContentDescription("收起标签");
         
-        linkDao = new LinkDao(requireContext());
+        linkDao = new LinkDao(DbConnection.get(requireContext()).writable());
         linkDao.open();
 
         tagEmbeddingManager = new TagEmbeddingManager(requireContext());
@@ -337,9 +338,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (linkDao != null) {
-            linkDao.close();
-        }
+        // linkDao 共享 DbConnection 连接,不关闭(由进程结束统一回收)
         if (tagEmbeddingManager != null) {
             tagEmbeddingManager.checkAndUnload();
         }

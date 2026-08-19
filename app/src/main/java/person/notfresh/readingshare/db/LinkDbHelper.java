@@ -8,7 +8,7 @@ import android.util.Log;
 import person.notfresh.readingshare.embedding.TagEmbeddingDbHelper;
 
 public class LinkDbHelper extends SQLiteOpenHelper {
-    private static final String DEFAULT_DATABASE_NAME = "links.db";
+    public static final String DEFAULT_DATABASE_NAME = "links.db";
     private static String databaseName = "links.db";
     //private static final int DATABASE_VERSION = 4;
     // private static final int DATABASE_VERSION = 5; // 添加summary字段
