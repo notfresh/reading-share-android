@@ -269,27 +269,27 @@ public class MainActivity extends AppCompatActivity {
         } else {
             // 读取默认Tab设置并导航
             SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
-            int defaultTab = prefs.getInt("default_tab", 2); // 默认为2，即主题页(跳过HomeFragment启动)
+            int defaultTab = prefs.getInt("default_tab", 2); // 默认为2，即RSS页(索引修复后,主题对应case 1)
             
             // 根据设置选择目标页面ID
             switch (defaultTab) {
-                case 0: // 首页
+                case 0: // 链接
                     destinationId = R.id.nav_home;
                     break;
-                case 2: // 主题
+                case 1: // 主题
                     destinationId = R.id.nav_subject;
                     break;
-                case 3: // RSS
+                case 2: // RSS
                     destinationId = R.id.nav_rss;
                     break;
-                case 4: { // 随机：首页/主题/RSS
+                case 3: { // 随机：链接/主题/RSS
                     int r = (int) (Math.random() * 3);
                     destinationId = (r == 0)
                         ? R.id.nav_home
                         : (r == 1 ? R.id.nav_subject : R.id.nav_rss);
                     break;
                 }
-                default: // 默认首页（包括已废弃的case 1标签页）
+                default: // 默认链接（含已废弃的索引值）
                     destinationId = R.id.nav_home;
                     break;
             }
