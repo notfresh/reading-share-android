@@ -5,6 +5,11 @@
 
     <group android:checkableBehavior="single">
         <item
+            android:id="@+id/nav_subject"
+            android:icon="@drawable/ic_subject"
+            android:title="@string/menu_subject"
+            android:textAppearance="@style/NavigationDrawerText"/>
+        <item
             android:id="@+id/nav_home"
             android:icon="@drawable/ic_home"
             android:title="@string/menu_home"
@@ -17,7 +22,7 @@
         <item
             android:id="@+id/nav_rss"
             android:icon="@drawable/rss"
-            android:title="@string/menu_rss" 
+            android:title="@string/menu_rss"
             android:textAppearance="@style/NavigationDrawerText"/>
         <item
             android:id="@+id/nav_documents"
@@ -25,16 +30,9 @@
             android:title="@string/menu_documents"
             android:textAppearance="@style/NavigationDrawerText"/>
         <item
-            android:id="@+id/nav_subject"
-            android:icon="@drawable/ic_subject"
-            android:title="@string/menu_subject"
-            android:textAppearance="@style/NavigationDrawerText"/>
-        <item
             android:id="@+id/nav_slideshow"
             android:icon="@drawable/ic_settings"
             android:title="@string/menu_settings"
             android:textAppearance="@style/NavigationDrawerText"/>
-        
-        
     </group>
 </menu>
