@@ -165,4 +165,20 @@
 - 引入 session 管理器：支持更大上下文、跨页面跳转保持队列。
 - 提供“回到列表当前位置/目录”按钮：一键回到首页并定位原条目（需要额外的定位参数）。
 
+---
+
+## 补充：右侧悬浮上下箭头变体（2026-08-23）
+
+在原有底部横排"上一篇/下一篇"之外，新增了一组右侧悬浮、上下排列的圆形箭头按钮，作为可切换的替代 UI。
+
+- **复用面**：按钮的点击处理直接复用现有的 `navigateToPrevious()` / `navigateToNext()`，可见性切换复用 `initControlsIfNeeded()` 与 `showControlsTemporarily()`，触发自动隐藏的 Handler 也共用 `hideControlsRunnable`。
+- **新增面**：
+  - `activity_webview.xml` 内新增 `floating_nav_controls` FrameLayout，含两个 `ImageButton`（`button_floating_previous` / `button_floating_next`）。
+  - `WebViewActivity` 字段 `floatingNavControls` / `buttonFloatingPrevious` / `buttonFloatingNext`。
+  - 工具方法 `shouldShowBottomNav()` / `shouldShowFloatingNav()`，读取 `SharedPreferences("settings")` 中的 `nav_button_style`，默认值 `"both"`。
+- **用户配置**：设置页新增"翻页按钮显示方式"三选一 RadioGroup（底部横排 / 右侧悬浮 / 都显示），通过 `nav_button_style` key 持久化；切换后**下次**进入 `WebViewActivity` 生效。
+- **互操作边界**：菜单项"显示/隐藏导航控件"(`action_toggle_navigation` / `KEY_NAV_CONTROLS_HIDDEN`)只影响底部横排，与悬浮无关；悬浮始终按设置项与丝滑模式规则进退。
+- **设计文档**：`docs/superpowers/specs/2026-08-23-webview-floating-prev-next-design.md`
+- **实施计划**：`docs/superpowers/plans/2026-08-23-webview-floating-prev-next.md`
+
 
