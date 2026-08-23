@@ -25,6 +25,7 @@ import androidx.appcompat.widget.Toolbar;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.content.SharedPreferences;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
@@ -80,6 +81,9 @@ public class WebViewActivity extends AppCompatActivity {
     private FrameLayout navigationControls;
     private Button buttonPrevious;
     private Button buttonNext;
+    private FrameLayout floatingNavControls;
+    private ImageButton buttonFloatingPrevious;
+    private ImageButton buttonFloatingNext;
     private Handler controlsHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
     private static final int CONTROLS_AUTO_HIDE_MS = 3000;
@@ -989,15 +993,27 @@ public class WebViewActivity extends AppCompatActivity {
     private void setupNavigationControls() {
         try {
             navigationControls = findViewById(R.id.navigation_controls);
-            if (navigationControls == null) return;
-            buttonPrevious = navigationControls.findViewById(R.id.button_previous);
-            buttonNext = navigationControls.findViewById(R.id.button_next);
-            if (buttonPrevious != null) buttonPrevious.setOnClickListener(v -> navigateToPrevious());
-            if (buttonNext != null) buttonNext.setOnClickListener(v -> navigateToNext());
+            if (navigationControls != null) {
+                buttonPrevious = navigationControls.findViewById(R.id.button_previous);
+                buttonNext = navigationControls.findViewById(R.id.button_next);
+                if (buttonPrevious != null) buttonPrevious.setOnClickListener(v -> navigateToPrevious());
+                if (buttonNext != null) buttonNext.setOnClickListener(v -> navigateToNext());
+                navigationControls.setVisibility(hasValidNavigationContext() ? View.VISIBLE : View.GONE);
+            }
+
+            floatingNavControls = findViewById(R.id.floating_nav_controls);
+            if (floatingNavControls != null) {
+                buttonFloatingPrevious = floatingNavControls.findViewById(R.id.button_floating_previous);
+                buttonFloatingNext = floatingNavControls.findViewById(R.id.button_floating_next);
+                if (buttonFloatingPrevious != null) buttonFloatingPrevious.setOnClickListener(v -> navigateToPrevious());
+                if (buttonFloatingNext != null) buttonFloatingNext.setOnClickListener(v -> navigateToNext());
+                floatingNavControls.setVisibility(hasValidNavigationContext() ? View.VISIBLE : View.GONE);
+            }
+
             hideControlsRunnable = () -> runOnUiThread(() -> {
                 if (navigationControls != null) navigationControls.setVisibility(View.GONE);
+                if (floatingNavControls != null) floatingNavControls.setVisibility(View.GONE);
             });
-            navigationControls.setVisibility(hasValidNavigationContext() ? View.VISIBLE : View.GONE);
         } catch (Exception e) {
             Log.w("WebViewActivity", "setupNavigationControls failed: " + e.getMessage());
         }
@@ -1064,6 +1080,18 @@ public class WebViewActivity extends AppCompatActivity {
         } catch (Exception ignored) {
             return false;
         }
+    }
+
+    private boolean shouldShowBottomNav() {
+        String style = getSharedPreferences("settings", MODE_PRIVATE)
+                .getString("nav_button_style", "both");
+        return "bottom".equals(style) || "both".equals(style);
+    }
+
+    private boolean shouldShowFloatingNav() {
+        String style = getSharedPreferences("settings", MODE_PRIVATE)
+                .getString("nav_button_style", "both");
+        return "floating".equals(style) || "both".equals(style);
     }
 
     private void attachControlRevealTouchListener() {
