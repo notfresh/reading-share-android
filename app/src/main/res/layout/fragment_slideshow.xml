@@ -145,6 +145,41 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="翻页按钮显示方式"
+            android:textSize="18sp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/nav_button_style_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="8dp">
+
+            <RadioButton
+                android:id="@+id/nav_button_style_bottom"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="底部横排（仅上一篇/下一篇）" />
+
+            <RadioButton
+                android:id="@+id/nav_button_style_floating"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="右侧悬浮（仅上下箭头）" />
+
+            <RadioButton
+                android:id="@+id/nav_button_style_both"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="都显示（默认）" />
+
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="外部链接打开模式"
             android:textSize="18sp"
             android:layout_marginTop="24dp"
