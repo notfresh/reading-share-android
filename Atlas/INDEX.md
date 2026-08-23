@@ -1,6 +1,6 @@
 # Project Knowledge Index
 
-> 最后更新: 2026-08-19 · 共 2 项探索
+> 最后更新: 2026-08-19 · 共 2 项探索 · 基于 tag `v1.5-dbperf` (commit `db18a1b`)
 
 ## 杂项 (Misc)
 - [SubjectFragment 加载流程](subject-fragment-load-flow.md) — 进入主题标签时的视图创建、数据加载、记忆恢复与销毁释放全过程

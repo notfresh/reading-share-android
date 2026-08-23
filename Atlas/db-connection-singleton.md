@@ -2,6 +2,15 @@
 
 > 一句话总结: 通过进程级单例 + Application 预热,把启动期 SQLite `getWritableDatabase()` 调用从 3 次压到 1 次,消除 `openOrCreateDatabase` 重复 IO + `onCreate` / `onUpgrade` 重复触发的隐患。
 
+## 版本锚点
+
+- **Commit**: `db18a1b`(`perf(startup): 启动期 SQLite getWritableDatabase 从 3 次降到 1 次`)
+- **Tag**: `v1.5-dbperf`(annotated)
+- **优化前基线**: `9080432`(`feat(drawer): reorder nav_subject above nav_home in side menu`)
+- **diff 范围**: 14 个文件, +556 / -124
+  - 新增: `Atlas/db-connection-singleton.md`、`Atlas/INDEX.md`、`Atlas/subject-fragment-load-flow.md`、`App.java`、`DbConnection.java`
+  - 修改: `AndroidManifest.xml`、`MainActivity.java`、`WebViewActivity.java`、`HomeFragment.java`、`SubjectFragment.java`、`TagsFragment.java`、`LinkDao.java`、`LinkDbHelper.java`、`SubjectDao.java`
+
 ## 背景
 
 排查"打开 → 跳主题页慢"的过程中,逐步定位到 SQLite 连接被反复打开的问题。本文档记录完整发现过程和原理,供后续类似性能问题参考。

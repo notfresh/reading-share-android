@@ -274,4 +274,55 @@ public class ExportUtil {
         }
         return value;
     }
+
+    /**
+     * 将应用的 SQLite 数据库文件 (links.db) 复制到 cacheDir/exports/，
+     * 返回复制后的目标文件，供后续分享使用。
+     *
+     * @param context Android Context，用于解析源 db 路径与目标 cache 目录
+     * @return 复制后的目标文件
+     * @throws IOException 当源数据库文件不存在或读写失败时抛出
+     */
+    public static File exportDatabaseFile(Context context) throws IOException {
+        if (context == null) {
+            throw new IllegalArgumentException("context 不能为空");
+        }
+        File src = context.getDatabasePath("links.db");
+        if (!src.exists()) {
+            throw new IOException("数据库尚未初始化: " + src.getAbsolutePath());
+        }
+
+        File exportsDir = new File(context.getCacheDir(), "exports");
+        if (!exportsDir.exists() && !exportsDir.mkdirs()) {
+            throw new IOException("无法创建导出目录: " + exportsDir.getAbsolutePath());
+        }
+
+        String fileName = "links_" + getCurrentTime() + ".db";
+        File dst = new File(exportsDir, fileName);
+        copyFile(src, dst);
+        return dst;
+    }
+
+    /**
+     * 把源文件按字节复制到目标文件，使用 8KB 缓冲区。
+     * 目标已存在时会被覆盖；源不存在时抛 IOException。
+     *
+     * 拆出来作为 public 是为了让单元测试能在没有 Context 的情况下直接覆盖。
+     */
+    public static void copyFile(File src, File dst) throws IOException {
+        if (src == null || !src.exists()) {
+            throw new IOException("源文件不存在: " + (src == null ? "null" : src.getAbsolutePath()));
+        }
+        if (dst == null) {
+            throw new IllegalArgumentException("dst 不能为空");
+        }
+        byte[] buffer = new byte[8192];
+        try (java.io.FileInputStream in = new java.io.FileInputStream(src);
+             java.io.FileOutputStream out = new java.io.FileOutputStream(dst)) {
+            int n;
+            while ((n = in.read(buffer)) != -1) {
+                out.write(buffer, 0, n);
+            }
+        }
+    }
 } 
