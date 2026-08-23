@@ -1022,9 +1022,8 @@ public class WebViewActivity extends AppCompatActivity {
     private void initControlsIfNeeded() {
         if (navigationControls == null) setupNavigationControls();
         if (!hasValidNavigationContext()) {
-            if (navigationControls != null) {
-                navigationControls.setVisibility(View.GONE);
-            }
+            if (navigationControls != null) navigationControls.setVisibility(View.GONE);
+            if (floatingNavControls != null) floatingNavControls.setVisibility(View.GONE);
             return;
         }
         // 读取用户手动隐藏的状态
@@ -1032,29 +1031,58 @@ public class WebViewActivity extends AppCompatActivity {
         navigationControlsManuallyHidden = prefs.getBoolean(KEY_NAV_CONTROLS_HIDDEN, false);
 
         boolean smoothMode = isSmoothReadingMode();
-        if (navigationControls != null) {
-            if (!smoothMode) {
-                // 普通模式：完全不显示导航控件
-                navigationControls.setVisibility(View.GONE);
-            } else if (navigationControlsManuallyHidden) {
-                // 丝滑模式但用户手动隐藏了，保持隐藏
-                navigationControls.setVisibility(View.GONE);
-            } else {
-                // 丝滑模式：默认显示，3秒后自动隐藏
-                navigationControls.setVisibility(View.VISIBLE);
+        boolean showBottom = shouldShowBottomNav();
+        boolean showFloating = shouldShowFloatingNav();
+
+        if (navigationControls != null && !showBottom) {
+            navigationControls.setVisibility(View.GONE);
+        }
+        if (floatingNavControls != null && !showFloating) {
+            floatingNavControls.setVisibility(View.GONE);
+        }
+        if (!smoothMode) {
+            // 普通模式：完全不显示导航控件
+            if (navigationControls != null) navigationControls.setVisibility(View.GONE);
+            if (floatingNavControls != null) floatingNavControls.setVisibility(View.GONE);
+            return;
+        }
+        if (navigationControlsManuallyHidden) {
+            // 丝滑模式但用户手动隐藏了底部横排，悬浮按原规则显示
+            if (navigationControls != null) navigationControls.setVisibility(View.GONE);
+            if (showFloating && floatingNavControls != null) {
+                floatingNavControls.setVisibility(View.VISIBLE);
                 controlsHandler.removeCallbacks(hideControlsRunnable);
                 controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
             }
+            return;
         }
+        // 丝滑模式且未手动隐藏：底部横排与悬浮按设置项显示，3秒后自动隐藏
+        if (showBottom && navigationControls != null) {
+            navigationControls.setVisibility(View.VISIBLE);
+        }
+        if (showFloating && floatingNavControls != null) {
+            floatingNavControls.setVisibility(View.VISIBLE);
+        }
+        controlsHandler.removeCallbacks(hideControlsRunnable);
+        controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
     }
 
     private void showControlsTemporarily() {
-        if (navigationControls == null || !hasValidNavigationContext()) return;
-        // 如果用户手动隐藏了，不再自动显示
+        if (!hasValidNavigationContext()) return;
         if (navigationControlsManuallyHidden) return;
-        navigationControls.setVisibility(View.VISIBLE);
-        controlsHandler.removeCallbacks(hideControlsRunnable);
-        controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
+        boolean anyShown = false;
+        if (shouldShowBottomNav() && navigationControls != null) {
+            navigationControls.setVisibility(View.VISIBLE);
+            anyShown = true;
+        }
+        if (shouldShowFloatingNav() && floatingNavControls != null) {
+            floatingNavControls.setVisibility(View.VISIBLE);
+            anyShown = true;
+        }
+        if (anyShown) {
+            controlsHandler.removeCallbacks(hideControlsRunnable);
+            controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
+        }
     }
 
     private void toggleNavigationControls() {
