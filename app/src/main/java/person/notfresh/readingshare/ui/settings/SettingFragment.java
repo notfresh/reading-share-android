@@ -242,6 +242,33 @@ public class SettingFragment extends Fragment {
             editor.apply();
         });
 
+        // 翻页按钮显示方式设置（bottom / floating / both）
+        RadioGroup navButtonStyleGroup = root.findViewById(R.id.nav_button_style_group);
+        RadioButton bottomRb = root.findViewById(R.id.nav_button_style_bottom);
+        RadioButton floatingRb = root.findViewById(R.id.nav_button_style_floating);
+        RadioButton bothRb = root.findViewById(R.id.nav_button_style_both);
+
+        String navButtonStyle = globalPrefs.getString("nav_button_style", "both");
+        if ("bottom".equals(navButtonStyle)) {
+            bottomRb.setChecked(true);
+        } else if ("floating".equals(navButtonStyle)) {
+            floatingRb.setChecked(true);
+        } else {
+            bothRb.setChecked(true);
+        }
+
+        navButtonStyleGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            SharedPreferences.Editor editor = globalPrefs.edit();
+            if (checkedId == R.id.nav_button_style_bottom) {
+                editor.putString("nav_button_style", "bottom");
+            } else if (checkedId == R.id.nav_button_style_floating) {
+                editor.putString("nav_button_style", "floating");
+            } else {
+                editor.putString("nav_button_style", "both");
+            }
+            editor.apply();
+        });
+
         // 外部链接打开模式设置
         RadioGroup externalLinkModeGroup = root.findViewById(R.id.external_link_mode_group);
         RadioButton confirmRb = root.findViewById(R.id.external_link_mode_confirm);
