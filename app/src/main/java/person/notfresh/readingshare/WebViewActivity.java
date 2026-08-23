@@ -1086,6 +1086,8 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private void toggleNavigationControls() {
+        // 设置项为 FLOATING 时,底部横排永久 GONE,菜单项 action_toggle_navigation 变成 no-op
+        if (shouldShowFloatingNav() && !shouldShowBottomNav()) return;
         if (navigationControls == null || !hasValidNavigationContext()) return;
         navigationControlsManuallyHidden = !navigationControlsManuallyHidden;
         // 保存状态到 SharedPreferences
