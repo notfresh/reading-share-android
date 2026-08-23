@@ -58,6 +58,43 @@
                     android:backgroundTint="@android:color/darker_gray"/>
             </LinearLayout>
         </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/floating_nav_controls"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right|center_vertical"
+                android:orientation="vertical"
+                android:layout_marginEnd="12dp"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/button_floating_previous"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/floating_arrow_bg"
+                    android:src="@drawable/ic_expand_less"
+                    android:contentDescription="上一篇"
+                    android:scaleType="centerInside" />
+
+                <ImageButton
+                    android:id="@+id/button_floating_next"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/floating_arrow_bg"
+                    android:src="@drawable/ic_expand_more"
+                    android:contentDescription="下一篇"
+                    android:scaleType="centerInside" />
+            </LinearLayout>
+        </FrameLayout>
     </FrameLayout>
 
 </LinearLayout>
