@@ -181,4 +181,22 @@
 - **设计文档**：`docs/superpowers/specs/2026-08-23-webview-floating-prev-next-design.md`
 - **实施计划**：`docs/superpowers/plans/2026-08-23-webview-floating-prev-next.md`
 
+---
+
+## 补充：悬浮随机跳转变体（2026-08-23）
+
+在 2026-08-23 完成的悬浮上下箭头变体之上，再新增一个独立的"随机跳转"圆形按钮，点击后从当前 `context_ids` 中随机选一个不等于 `currentIndex` 的条目跳转。
+
+- **复用面**：随机算法产生 target index 后，直接调用现有 `loadByContextIndex(int)`，自带 `isNavigating` 守护与 Toast 错误处理。随机按钮是 `floating_nav_controls` 容器的子节点，可见性自动继承容器（无需新增任何 setVisibility 调用）。
+- **新增面**：
+  - `drawable/ic_random.xml`（shuffle 矢量图标，white，24dp viewport）。
+  - `activity_webview.xml` 内新增 `button_floating_random` ImageButton（`marginTop="24dp"` 形成与上下组 24dp 视觉留白，凸显独立）。
+  - WebViewActivity 字段 `buttonFloatingRandom` / `random(java.util.Random)`，新方法 `navigateToRandom()`。
+- **设计边界**：
+  - `contextIds.length <= 1` 时 Toast "无可随机条目"，不响应。
+  - 快速连点由 `loadByContextIndex` 内部的 `isNavigating` 守卫处理。
+  - 没有新增设置项；随机按钮属于悬浮组，沿用 `nav_button_style`。
+- **设计文档**：`docs/superpowers/specs/2026-08-23-webview-random-jump-design.md`
+- **实施计划**：`docs/superpowers/plans/2026-08-23-webview-random-jump.md`
+
 
