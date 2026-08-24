@@ -84,6 +84,8 @@ public class WebViewActivity extends AppCompatActivity {
     private FrameLayout floatingNavControls;
     private ImageButton buttonFloatingPrevious;
     private ImageButton buttonFloatingNext;
+    private ImageButton buttonFloatingRandom;
+    private java.util.Random random = new java.util.Random();
     private Handler controlsHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
     private static final int CONTROLS_AUTO_HIDE_MS = 3000;
@@ -1005,8 +1007,10 @@ public class WebViewActivity extends AppCompatActivity {
             if (floatingNavControls != null) {
                 buttonFloatingPrevious = floatingNavControls.findViewById(R.id.button_floating_previous);
                 buttonFloatingNext = floatingNavControls.findViewById(R.id.button_floating_next);
+                buttonFloatingRandom = floatingNavControls.findViewById(R.id.button_floating_random);
                 if (buttonFloatingPrevious != null) buttonFloatingPrevious.setOnClickListener(v -> navigateToPrevious());
                 if (buttonFloatingNext != null) buttonFloatingNext.setOnClickListener(v -> navigateToNext());
+                if (buttonFloatingRandom != null) buttonFloatingRandom.setOnClickListener(v -> navigateToRandom());
                 floatingNavControls.setVisibility(hasValidNavigationContext() ? View.VISIBLE : View.GONE);
             }
 
@@ -1142,6 +1146,21 @@ public class WebViewActivity extends AppCompatActivity {
         if (!hasValidNavigationContext() || isNavigating) return;
         int previousIndex = (currentIndex - 1 + contextIds.length) % contextIds.length;
         loadByContextIndex(previousIndex);
+    }
+
+    private void navigateToRandom() {
+        if (!hasValidNavigationContext() || isNavigating) return;
+        int length = contextIds.length;
+        if (length <= 1) {
+            // 只有一条或没有,无法随机
+            Toast.makeText(this, "无可随机条目", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int targetIndex;
+        do {
+            targetIndex = random.nextInt(length);
+        } while (targetIndex == currentIndex);
+        loadByContextIndex(targetIndex);
     }
 
     private void navigateToNext() {
