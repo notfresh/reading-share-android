@@ -89,23 +89,21 @@
                     android:id="@+id/button_floating_next"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
+                    android:layout_marginBottom="24dp"
                     android:background="@drawable/floating_arrow_bg"
                     android:src="@drawable/ic_expand_more"
                     android:contentDescription="下一篇"
                     android:scaleType="centerInside" />
-            </LinearLayout>
 
-            <ImageButton
-                android:id="@+id/button_floating_random"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="right|center_vertical"
-                android:layout_marginTop="24dp"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/floating_arrow_bg"
-                android:src="@drawable/ic_random"
-                android:contentDescription="随机跳转"
-                android:scaleType="centerInside" />
+                <ImageButton
+                    android:id="@+id/button_floating_random"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/floating_arrow_bg"
+                    android:src="@drawable/ic_random"
+                    android:contentDescription="随机跳转"
+                    android:scaleType="centerInside" />
+            </LinearLayout>
         </FrameLayout>
     </FrameLayout>
 
