@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -85,7 +86,7 @@ public class WebViewActivity extends AppCompatActivity {
     private ImageButton buttonFloatingPrevious;
     private ImageButton buttonFloatingNext;
     private ImageButton buttonFloatingRandom;
-    private java.util.Random random = new java.util.Random();
+    private Random random = new Random();
     private Handler controlsHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
     private static final int CONTROLS_AUTO_HIDE_MS = 3000;
@@ -1151,11 +1152,6 @@ public class WebViewActivity extends AppCompatActivity {
     private void navigateToRandom() {
         if (!hasValidNavigationContext() || isNavigating) return;
         int length = contextIds.length;
-        if (length <= 1) {
-            // 只有一条或没有,无法随机
-            Toast.makeText(this, "无可随机条目", Toast.LENGTH_SHORT).show();
-            return;
-        }
         int targetIndex;
         do {
             targetIndex = random.nextInt(length);
