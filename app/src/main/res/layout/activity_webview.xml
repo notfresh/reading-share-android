@@ -89,7 +89,7 @@
                     android:id="@+id/button_floating_next"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:layout_marginBottom="24dp"
+                    android:layout_marginBottom="48dp"
                     android:background="@drawable/floating_arrow_bg"
                     android:src="@drawable/ic_expand_more"
                     android:contentDescription="下一篇"
