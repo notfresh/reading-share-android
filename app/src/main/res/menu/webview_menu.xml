@@ -43,7 +43,7 @@
         android:id="@+id/action_toggle_external_block"
         android:title="@string/toggle_external_block"
         android:icon="@drawable/ic_external_block"
-        app:showAsAction="ifRoom"/>
+        app:showAsAction="always"/>
 
     <item
         android:id="@+id/action_add_tag"
