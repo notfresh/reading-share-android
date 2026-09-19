@@ -227,8 +227,17 @@ public class WebViewActivity extends AppCompatActivity {
         if (webView.canGoBack()) {
             webView.goBack();
         } else {
-            super.onBackPressed();
+            returnToMainAndRemoveTask();
         }
+    }
+
+    private void returnToMainAndRemoveTask() {
+        Intent mainIntent = new Intent(this, MainActivity.class);
+        mainIntent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        mainIntent.putExtra("navigate_to", "home");
+        startActivity(mainIntent);
+        // WebView 是独立 document task，普通退出时必须移除任务卡片，不能回手机桌面。
+        finishAndRemoveTask();
     }
 
     @Override
