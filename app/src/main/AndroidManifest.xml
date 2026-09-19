@@ -67,6 +67,10 @@
             android:label="@string/read_statistics"
             android:theme="@style/Theme.MyApplication.NoActionBar" />
         <activity
+            android:name=".LinksHistoryActivity"
+            android:label="浏览历史"
+            android:theme="@style/Theme.MyApplication.NoActionBar" />
+        <activity
             android:name=".ui.home.TagSimilarityConfigActivity"
             android:label="相关度配置"
             android:theme="@style/Theme.MyApplication.NoActionBar" />

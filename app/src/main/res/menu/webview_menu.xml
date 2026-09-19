@@ -56,6 +56,11 @@
         app:showAsAction="always"/>
 
     <item
+        android:id="@+id/action_link_history"
+        android:title="@string/link_history"
+        app:showAsAction="never"/>
+
+    <item
         android:id="@+id/action_collapse_to_mini"
         android:title="折叠"
         android:icon="@android:drawable/ic_menu_revert"

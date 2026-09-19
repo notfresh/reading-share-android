@@ -36,6 +36,7 @@ import java.util.List;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.MainActivity;
+import person.notfresh.readingshare.LinksHistoryActivity;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SearchHistoryManager;
@@ -180,6 +181,9 @@ public class SettingFragment extends Fragment {
                 ((MainActivity) requireActivity()).updateMailFabVisibility();
             }
         });
+
+        root.findViewById(R.id.button_link_history).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), LinksHistoryActivity.class)));
 
         // 监听输入框内容变化
         serverUrlInput.setOnFocusChangeListener((v, hasFocus) -> {

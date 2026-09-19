@@ -68,6 +68,7 @@
     <string name="toggle_external_block">切换外部链接拦截模式</string>
     <string name="add_tag">添加标签</string>
     <string name="edit_title">修改标题</string>
+    <string name="link_history">浏览历史</string>
 
     <!-- 搜索历史下拉 -->
     <string name="search_history_empty">暂无搜索历史</string>

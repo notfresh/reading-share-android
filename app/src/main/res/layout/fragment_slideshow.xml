@@ -31,6 +31,13 @@
             android:text="显示邮件入口" />
 
         <Button
+            android:id="@+id/button_link_history"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="浏览历史" />
+
+        <Button
             android:id="@+id/button_export"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

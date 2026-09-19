@@ -25,6 +25,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.model.LinkHistoryItem;
 
 public class LinkDao {
     private LinkDbHelper dbHelper;
@@ -115,6 +116,26 @@ public class LinkDao {
         return exists;
     }
 
+    public String getLinkTitleByUrl(String url) {
+        Cursor cursor = database.query(
+                LinkDbHelper.TABLE_LINKS,
+                new String[]{LinkDbHelper.COLUMN_TITLE},
+                LinkDbHelper.COLUMN_URL + " = ?",
+                new String[]{url},
+                null,
+                null,
+                null,
+                "1");
+        try {
+            if (cursor.moveToFirst()) {
+                return cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
+            }
+            return null;
+        } finally {
+            cursor.close();
+        }
+    }
+
     /**
      * 删除一个链接及其所有相关标签关联
      */
@@ -203,6 +224,50 @@ public class LinkDao {
         } finally {
             db.endTransaction();
         }
+    }
+
+    public long insertLinkHistory(String title, String url, long visitedAt) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_TITLE, title);
+        values.put(LinkDbHelper.COLUMN_URL, url);
+        values.put(LinkDbHelper.COLUMN_VISITED_AT, visitedAt);
+        return database.insert(LinkDbHelper.TABLE_LINKS_HISTORY, null, values);
+    }
+
+    public List<LinkHistoryItem> getAllLinkHistory() {
+        List<LinkHistoryItem> history = new ArrayList<>();
+        Cursor cursor = database.query(
+                LinkDbHelper.TABLE_LINKS_HISTORY,
+                null,
+                null,
+                null,
+                null,
+                null,
+                LinkDbHelper.COLUMN_VISITED_AT + " DESC"
+        );
+        try {
+            while (cursor.moveToNext()) {
+                history.add(new LinkHistoryItem(
+                        cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ID)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL)),
+                        cursor.getLong(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_VISITED_AT))));
+            }
+        } finally {
+            cursor.close();
+        }
+        return history;
+    }
+
+    public boolean deleteLinkHistory(long id) {
+        return database.delete(
+                LinkDbHelper.TABLE_LINKS_HISTORY,
+                LinkDbHelper.COLUMN_ID + " = ?",
+                new String[]{String.valueOf(id)}) > 0;
+    }
+
+    public int clearLinkHistory() {
+        return database.delete(LinkDbHelper.TABLE_LINKS_HISTORY, null, null);
     }
 
     public void _________(){}

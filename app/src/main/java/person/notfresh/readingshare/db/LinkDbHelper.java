@@ -15,8 +15,9 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     //private static final int DATABASE_VERSION = 10; // 添加文档表
     //private static final int DATABASE_VERSION = 11; // 添加主题表
 
-    private static final int DATABASE_VERSION = 15; // 标签嵌入向量表
+    private static final int DATABASE_VERSION = 16; // 浏览历史表
     public static final String TABLE_LINKS = "links";
+    public static final String TABLE_LINKS_HISTORY = "links_history";
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_TITLE = "title";
     public static final String COLUMN_URL = "url";
@@ -26,6 +27,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public static final String COLUMN_TARGET_ACTIVITY = "target_activity";
     public static final String COLUMN_REMARK = "remark";
     public static final String COLUMN_SUMMARY = "summary";
+    public static final String COLUMN_VISITED_AT = "visited_at";
 
     // 标签表
     public static final String TABLE_TAGS = "tags";
@@ -101,6 +103,13 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                     COLUMN_SUMMARY + " TEXT, " +
                     "is_pinned INTEGER DEFAULT 0, " +
                     "click_count INTEGER DEFAULT 0)";
+
+                private static final String SQL_CREATE_LINKS_HISTORY =
+                    "CREATE TABLE " + TABLE_LINKS_HISTORY + " (" +
+                        COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        COLUMN_TITLE + " TEXT, " +
+                        COLUMN_URL + " TEXT NOT NULL, " +
+                        COLUMN_VISITED_AT + " INTEGER NOT NULL)";
 
     private static final String SQL_CREATE_TAGS =
             "CREATE TABLE " + TABLE_TAGS + " (" +
@@ -214,6 +223,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
             
             // 创建现有的表
             db.execSQL(SQL_CREATE_LINKS);
+            db.execSQL(SQL_CREATE_LINKS_HISTORY);
             db.execSQL(SQL_CREATE_TAGS);
             db.execSQL(SQL_CREATE_LINK_TAGS);
             
@@ -289,6 +299,11 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                 // 版本15：添加标签嵌入向量表
                 db.execSQL(TagEmbeddingDbHelper.SQL_CREATE_TABLE);
                 Log.d("LinkDbHelper", "Created tag_embeddings table");
+            }
+
+            if (oldVersion < 16) {
+                db.execSQL(SQL_CREATE_LINKS_HISTORY);
+                Log.d("LinkDbHelper", "Created links_history table");
             }
 
             if (oldVersion < 9) {

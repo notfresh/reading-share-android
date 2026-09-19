@@ -5,6 +5,7 @@ import static person.notfresh.readingshare.WebViewManager.*;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -77,6 +78,7 @@ public class WebViewActivity extends AppCompatActivity {
     private AudioFocusRequest audioFocusRequest;
     private boolean preserveCache = false;
     private String pageTitleCache = "";
+    private boolean historyRecordedForPageLoad;
     private boolean isExternalOpen = false; // 是否从外部打开
     private long[] contextIds;
     private int currentIndex;
@@ -141,6 +143,7 @@ public class WebViewActivity extends AppCompatActivity {
                 currentUrl = data.toString();
             }
         }
+        Log.d("WVHistoryTrace", "Activity originalUrl=" + currentUrl);
         
         if (currentUrl == null || currentUrl.isEmpty()) {
             Toast.makeText(this, "无效的URL", Toast.LENGTH_SHORT).show();
@@ -458,6 +461,9 @@ public class WebViewActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.action_edit_title) {
             showEditTitleDialog();
             return true;
+        } else if (item.getItemId() == R.id.action_link_history) {
+            startActivity(new Intent(this, LinksHistoryActivity.class));
+            return true;
         } else if (item.getItemId() == R.id.action_collapse_to_mini) {
             collapseToMiniPlayer();
             return true;
@@ -546,6 +552,16 @@ public class WebViewActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                if (view == webView) {
+                    historyRecordedForPageLoad = false;
+                    Log.d("WVHistoryTrace", "onPageStarted url=" + url
+                            + ", currentUrl=" + currentUrl);
+                }
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 Log.d("WVUrlTrace", "shouldOverrideUrlLoading(String) url=" + url);
                 return handleUrlOverride(view, url, true);
@@ -565,6 +581,9 @@ public class WebViewActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                Log.d("WVHistoryTrace", "onPageFinished url=" + url
+                        + ", currentUrl=" + currentUrl);
+                recordLinkHistory(view, url);
                 try {
                     String t = view.getTitle();
                     if (t != null && !t.trim().isEmpty()) {
@@ -658,6 +677,65 @@ public class WebViewActivity extends AppCompatActivity {
                     "})()", null);
             }
         });
+    }
+
+    private void recordLinkHistory(WebView view, String url) {
+        if (view != webView || url == null || url.trim().isEmpty()
+                || "about:blank".equalsIgnoreCase(url.trim())) {
+            return;
+        }
+        if (historyRecordedForPageLoad) {
+            return;
+        }
+        historyRecordedForPageLoad = true;
+
+        String webTitle = view.getTitle();
+        String cachedTitle = pageTitleCache;
+        String originalUrl = currentUrl;
+        final String finalUrl = url.trim();
+        new Thread(() -> {
+            try {
+                LinkDao dao = new LinkDao(DbConnection.get(WebViewActivity.this).writable());
+                String title = null;
+                if (isXshlinkUrl(originalUrl)) {
+                    Log.d("WVHistoryTrace", "lookup local title by originalUrl=" + originalUrl);
+                    title = dao.getLinkTitleByUrl(originalUrl);
+                }
+                if (title == null || title.trim().isEmpty()) {
+                    Log.d("WVHistoryTrace", "lookup local title by finalUrl=" + finalUrl);
+                    title = dao.getLinkTitleByUrl(finalUrl);
+                }
+                if (title == null || title.trim().isEmpty()) {
+                    title = webTitle;
+                }
+                if (title == null || title.trim().isEmpty()) {
+                    title = cachedTitle;
+                }
+                if (title == null || title.trim().isEmpty()) {
+                    title = finalUrl;
+                }
+                dao.insertLinkHistory(title.trim(), finalUrl, System.currentTimeMillis());
+            } catch (Exception e) {
+                Log.e("WebViewActivity", "记录浏览历史失败", e);
+            }
+        }).start();
+    }
+
+    private boolean isXshlinkUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return false;
+        }
+        String host = Uri.parse(url.trim()).getHost();
+        if (host == null) {
+            return false;
+        }
+        String normalizedHost = host.toLowerCase(java.util.Locale.ROOT);
+        return "xhslink.cn".equals(normalizedHost)
+            || normalizedHost.endsWith(".xhslink.cn")
+            || "xshlink.cn".equals(normalizedHost)
+            || normalizedHost.endsWith(".xshlink.cn")
+            || "xhslink.com".equals(normalizedHost)
+            || normalizedHost.endsWith(".xhslink.com");
     }
 
     private boolean handleUrlOverride(WebView view, String url, boolean isMainFrame) {
