@@ -14,26 +14,23 @@ import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
+import android.view.WindowManager;
+
 public class WebViewBackgroundService extends Service {
     private static final String TAG = "WebViewBgService";
     private static final int NOTIFICATION_ID = 1;
     private static final String CHANNEL_ID = "WebViewAudioChannel";
     public static final String ACTION_PLAY_PAUSE = "person.notfresh.readingshare.PLAY_PAUSE";
     public static final String ACTION_STOP = "person.notfresh.readingshare.STOP";
+    public static final String ACTION_SHOW_MINI = "person.notfresh.readingshare.SHOW_MINI";
+    public static final String ACTION_HIDE_MINI = "person.notfresh.readingshare.HIDE_MINI";
 
     private PowerManager.WakeLock serviceLock;
-    private String currentUrl;
     private boolean isPaused = false;
+    private FloatingMiniPlayerView mMiniView;
 
-    // 同进程静态回调，直接调用 Activity 的方法，不经过广播或 IPC
-    public interface MediaCallback {
-        void onPlayRequested();
-        void onPauseRequested();
-        void onStopRequested();
-    }
-    private static MediaCallback sMediaCallback;
-    public static void setMediaCallback(MediaCallback callback) {
-        sMediaCallback = callback;
+    public static boolean hasCollapsedSession() {
+        return CollapsedPlaybackSession.getInstance().isActive();
     }
 
     @Override
@@ -58,34 +55,49 @@ public class WebViewBackgroundService extends Service {
             String action = intent.getAction();
             if (ACTION_PLAY_PAUSE.equals(action)) {
                 isPaused = !isPaused;
-                Log.d(TAG, "Play/Pause 按钮点击, isPaused=" + isPaused + ", callback=" + (sMediaCallback != null));
-                if (sMediaCallback != null) {
+                CollapsedPlaybackSession.PlaybackController controller =
+                        CollapsedPlaybackSession.getInstance().getOwnerController();
+                Log.d(TAG, "Play/Pause 按钮点击, isPaused=" + isPaused + ", controller=" + (controller != null));
+                if (controller != null) {
                     if (isPaused) {
-                        sMediaCallback.onPauseRequested();
+                        controller.pause();
                     } else {
-                        sMediaCallback.onPlayRequested();
+                        controller.play();
                     }
                 }
                 // 刷新通知
                 startForeground(NOTIFICATION_ID, buildNotification());
                 return START_STICKY;
             } else if (ACTION_STOP.equals(action)) {
-                Log.d(TAG, "Stop 按钮点击, callback=" + (sMediaCallback != null));
-                if (sMediaCallback != null) {
-                    sMediaCallback.onStopRequested();
+                CollapsedPlaybackSession.PlaybackController controller =
+                        CollapsedPlaybackSession.getInstance().getOwnerController();
+                Log.d(TAG, "Stop 按钮点击, controller=" + (controller != null));
+                if (controller != null) {
+                    controller.stop();
                 }
+                CollapsedPlaybackSession.getInstance().clear();
                 stopForeground(true);
                 stopSelf();
                 return START_NOT_STICKY;
+            } else if (ACTION_SHOW_MINI.equals(action)) {
+                String url = CollapsedPlaybackSession.getInstance().getOwnerUrl();
+                Log.d(TAG, "SHOW_MINI action, url=" + url);
+                if (url != null) {
+                    showMiniPlayer(url);
+                }
+                // 不 return,继续走到 startForeground 让通知显示
+            } else if (ACTION_HIDE_MINI.equals(action)) {
+                Log.d(TAG, "HIDE_MINI action");
+                WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+                if (mMiniView != null) {
+                    mMiniView.detachFrom(wm);
+                    mMiniView = null;
+                }
+                // 不 return,继续走到 startForeground
             }
         }
 
-        // 正常启动
-        if (intent != null) {
-            String url = intent.getStringExtra("current_url");
-            if (url != null) currentUrl = url;
-            isPaused = false;
-        }
+        isPaused = false;
 
         startForeground(NOTIFICATION_ID, buildNotification());
         return START_STICKY;
@@ -94,8 +106,9 @@ public class WebViewBackgroundService extends Service {
     private Notification buildNotification() {
         // 点击通知返回应用
         Intent notificationIntent = new Intent(this, WebViewActivity.class);
-        if (currentUrl != null && !currentUrl.isEmpty()) {
-            notificationIntent.putExtra("url", currentUrl);
+        String ownerUrl = CollapsedPlaybackSession.getInstance().getOwnerUrl();
+        if (ownerUrl != null && !ownerUrl.isEmpty()) {
+            notificationIntent.putExtra("url", ownerUrl);
         }
         PendingIntent contentIntent = PendingIntent.getActivity(
                 this, 0, notificationIntent,
@@ -133,6 +146,60 @@ public class WebViewBackgroundService extends Service {
                 .build();
     }
 
+    private void showMiniPlayer(String url) {
+        Log.d(TAG, "showMiniPlayer url=" + url);
+        WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+        if (wm == null) {
+            Log.e(TAG, "WindowManager 为空,无法显示 mini");
+            return;
+        }
+        if (mMiniView != null && mMiniView.getParent() != null) {
+            mMiniView.detachFrom(wm);
+        }
+        mMiniView = new FloatingMiniPlayerView(this, v -> handleMiniClick());
+        mMiniView.attachTo(wm);
+        Log.d(TAG, "showMiniPlayer 完成, mMiniView.getParent()=" + (mMiniView == null ? "null" : mMiniView.getParent()));
+    }
+
+    private void handleMiniClick() {
+        CollapsedPlaybackSession session = CollapsedPlaybackSession.getInstance();
+        int ownerTaskId = session.getOwnerTaskId();
+        String ownerUrl = session.getOwnerUrl();
+        Log.d(TAG, "mini 被点击,展开 WebView, taskId=" + ownerTaskId);
+        // 先卸载 mini
+        WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+        if (mMiniView != null) {
+            mMiniView.detachFrom(wm);
+            mMiniView = null;
+        }
+        // 折叠的 WebViewActivity 在后台 task 中存活,直接拉回前台,原样恢复,音频不断.
+        boolean restored = false;
+        if (ownerTaskId != -1) {
+            try {
+                android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    am.moveTaskToFront(ownerTaskId, 0);
+                    restored = true;
+                    Log.d(TAG, "已 moveTaskToFront taskId=" + ownerTaskId);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "moveTaskToFront 失败", e);
+            }
+        }
+        // 兜底:task 已被系统回收,重新打开页面(会重新加载,音频需手动重播)
+        if (!restored && ownerUrl != null && !ownerUrl.isEmpty()) {
+            Intent expandIntent = new Intent(this, WebViewActivity.class);
+            expandIntent.putExtra("url", ownerUrl);
+            expandIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                startActivity(expandIntent);
+            } catch (Exception e) {
+                Log.e(TAG, "展开 WebViewActivity 失败", e);
+            }
+        }
+        // Service 继续运行(保活音频),由 WebViewActivity onResume 停止
+    }
+
     private void createNotificationChannel() {
         // 在Android 8.0及以上版本，需要创建通知通道
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -155,6 +222,13 @@ public class WebViewBackgroundService extends Service {
 
     @Override
     public void onDestroy() {
+        Log.d(TAG, "onDestroy 被调用, mMiniView=" + mMiniView + ", serviceLock held=" + (serviceLock != null && serviceLock.isHeld()));
+        Log.d(TAG, "onDestroy stacktrace", new Throwable("trace"));
+        if (mMiniView != null) {
+            WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+            mMiniView.detachFrom(wm);
+            mMiniView = null;
+        }
         if (serviceLock != null && serviceLock.isHeld()) {
             serviceLock.release();
         }

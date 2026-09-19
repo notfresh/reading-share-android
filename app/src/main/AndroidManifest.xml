@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <uses-sdk tools:overrideLibrary="androidx.media" />
 
@@ -56,7 +57,7 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.MyApplication.NoActionBar"
             android:supportsPictureInPicture="true"
-            android:launchMode="singleTask"/>
+            android:documentLaunchMode="always"/>
         <activity
             android:name=".UserProfileActivity"
             android:label="个人信息"

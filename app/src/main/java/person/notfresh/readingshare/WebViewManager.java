@@ -23,8 +23,9 @@ public class WebViewManager {
     
     /**
      * 存储WebView实例
+     * @param pauseMedia true 时注入脚本暂停所有媒体（"存档返回"场景）；false 时保留音频（折叠场景）
      */
-    public void storeWebView(String url, WebView webView) {
+    public void storeWebView(String url, WebView webView, boolean pauseMedia) {
         // 限制最大缓存数量为5个，避免内存问题
         if (cachedWebViews.size() >= 5) {
             // 如果已经有5个缓存，移除最早加入的
@@ -34,17 +35,26 @@ public class WebViewManager {
                 oldWebView.destroy();
             }
         }
-        
-        // 注入一个脚本，清理可能导致问题的媒体会话
-        webView.evaluateJavascript(
-            "try {" +
-            "  var mediaElements = document.querySelectorAll('audio,video');" +
-            "  for(var i=0; i<mediaElements.length; i++) {" +
-            "    mediaElements[i].pause();" +
-            "  }" +
-            "} catch(e) { console.log(e); }", null);
-        
+
+        if (pauseMedia) {
+            // 注入一个脚本，清理可能导致问题的媒体会话
+            webView.evaluateJavascript(
+                "try {" +
+                "  var mediaElements = document.querySelectorAll('audio,video');" +
+                "  for(var i=0; i<mediaElements.length; i++) {" +
+                "    mediaElements[i].pause();" +
+                "  }" +
+                "} catch(e) { console.log(e); }", null);
+        }
+
         cachedWebViews.put(url, webView);
+    }
+
+    /**
+     * 存储WebView实例（默认暂停媒体，向后兼容旧调用方）
+     */
+    public void storeWebView(String url, WebView webView) {
+        storeWebView(url, webView, true);
     }
     
     /**
