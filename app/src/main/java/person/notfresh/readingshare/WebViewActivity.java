@@ -706,18 +706,18 @@ public class WebViewActivity extends AppCompatActivity {
     private void toggleExternalBlockMode() {
         SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
         int currentMode = prefs.getInt("external_link_mode", 2);
-        // 三种模式循环：2(拦截) -> 0(弹窗) -> 1(直接跳转) -> 2(拦截)
+        // 三种模式循环：0(弹窗) -> 2(拦截) -> 1(直接跳转) -> 0(弹窗)
         int newMode;
         String message;
-        if (currentMode == 2) {
-            newMode = 0;
-            message = "已切换为：弹窗确认";
-        } else if (currentMode == 0) {
+        if (currentMode == 0) {
+            newMode = 2;
+            message = "已切换为：拦截所有外部链接";
+        } else if (currentMode == 2) {
             newMode = 1;
             message = "已切换为：直接跳转";
         } else {
-            newMode = 2;
-            message = "已切换为：拦截所有外部链接";
+            newMode = 0;
+            message = "已切换为：弹窗确认";
         }
         prefs.edit().putInt("external_link_mode", newMode).apply();
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
