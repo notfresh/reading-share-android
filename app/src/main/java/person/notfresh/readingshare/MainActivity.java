@@ -269,20 +269,20 @@ public class MainActivity extends AppCompatActivity {
         } else {
             // 读取默认Tab设置并导航
             SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
-            int defaultTab = prefs.getInt("default_tab", 0); // 默认为0，即主题页（首项已与侧边栏顺序对齐）
+            int defaultTab = prefs.getInt("default_tab", 0); // 0=主题, 2=链接, 3=RSS, 4=随机
             
             // 根据设置选择目标页面ID
             switch (defaultTab) {
                 case 0: // 主题
                     destinationId = R.id.nav_subject;
                     break;
-                case 1: // 链接
+                case 2: // 链接
                     destinationId = R.id.nav_home;
                     break;
-                case 2: // RSS
+                case 3: // RSS
                     destinationId = R.id.nav_rss;
                     break;
-                case 3: { // 随机：主题/链接/RSS
+                case 4: { // 随机：主题/链接/RSS
                     int r = (int) (Math.random() * 3);
                     destinationId = (r == 0)
                         ? R.id.nav_subject
