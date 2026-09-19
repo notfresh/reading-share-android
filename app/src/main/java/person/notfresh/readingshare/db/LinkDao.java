@@ -150,11 +150,11 @@ public class LinkDao {
         return success;
     }
 
-    public void updateLinkTitle(String url, String newTitle) {
+    public int updateLinkTitle(String url, String newTitle) {
         ContentValues values = new ContentValues();
         values.put(LinkDbHelper.COLUMN_TITLE, newTitle);
 
-        database.update(
+        return database.update(
                 LinkDbHelper.TABLE_LINKS,
                 values,
                 LinkDbHelper.COLUMN_URL + " = ?",

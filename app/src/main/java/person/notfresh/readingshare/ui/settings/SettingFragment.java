@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SearchHistoryManager;
@@ -170,6 +171,15 @@ public class SettingFragment extends Fragment {
         SharedPreferences globalPrefs = requireActivity().getSharedPreferences("settings", Context.MODE_PRIVATE);
         String savedUrl = globalPrefs.getString("server_url", DEFAULT_SERVER_URL);
         serverUrlInput.setText(savedUrl);
+
+        CheckBox showMailFabCheckbox = root.findViewById(R.id.show_mail_fab_checkbox);
+        showMailFabCheckbox.setChecked(globalPrefs.getBoolean("show_mail_fab", false));
+        showMailFabCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            globalPrefs.edit().putBoolean("show_mail_fab", isChecked).apply();
+            if (requireActivity() instanceof MainActivity) {
+                ((MainActivity) requireActivity()).updateMailFabVisibility();
+            }
+        });
 
         // 监听输入框内容变化
         serverUrlInput.setOnFocusChangeListener((v, hasFocus) -> {

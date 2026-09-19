@@ -51,6 +51,11 @@
         app:showAsAction="always"/>
 
     <item
+        android:id="@+id/action_edit_title"
+        android:title="@string/edit_title"
+        app:showAsAction="always"/>
+
+    <item
         android:id="@+id/action_collapse_to_mini"
         android:title="折叠"
         android:icon="@android:drawable/ic_menu_revert"

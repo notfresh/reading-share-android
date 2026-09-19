@@ -175,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, "打开邮件应用失败", Toast.LENGTH_SHORT).show();
                 }
             });
+            updateMailFabVisibility();
             
         } catch (Exception e) {
             Log.e("MainActivity", "onCreate failed", e);
@@ -213,6 +214,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateNavHeader();
+        updateMailFabVisibility();
+    }
+
+    public void updateMailFabVisibility() {
+        if (binding != null && binding.appBarMain != null && binding.appBarMain.fab != null) {
+            boolean showMailFab = getSharedPreferences("settings", MODE_PRIVATE)
+                    .getBoolean("show_mail_fab", false);
+            binding.appBarMain.fab.setVisibility(showMailFab ? View.VISIBLE : View.GONE);
+        }
     }
 
     @Override

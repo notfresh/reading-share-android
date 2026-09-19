@@ -455,6 +455,9 @@ public class WebViewActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.action_add_tag) {
             showAddTagDialog();
             return true;
+        } else if (item.getItemId() == R.id.action_edit_title) {
+            showEditTitleDialog();
+            return true;
         } else if (item.getItemId() == R.id.action_collapse_to_mini) {
             collapseToMiniPlayer();
             return true;
@@ -721,6 +724,62 @@ public class WebViewActivity extends AppCompatActivity {
         }
         prefs.edit().putInt("external_link_mode", newMode).apply();
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    private void showEditTitleDialog() {
+        if (webView == null) {
+            Toast.makeText(this, "页面未加载", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String url = webView.getUrl();
+        if (url == null || url.isEmpty()) {
+            Toast.makeText(this, "无法获取页面URL", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String originalUrl = currentUrl;
+
+        EditText input = new EditText(this);
+        String currentTitle = pageTitleCache != null && !pageTitleCache.isEmpty()
+                ? pageTitleCache : webView.getTitle();
+        input.setText(currentTitle != null ? currentTitle : "");
+        input.setSelectAllOnFocus(true);
+
+        new AlertDialog.Builder(this)
+                .setTitle("修改标题")
+                .setView(input)
+                .setPositiveButton("确定", (dialog, which) -> {
+                    String newTitle = input.getText().toString().trim();
+                    if (newTitle.isEmpty()) {
+                        Toast.makeText(this, "标题不能为空", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    new Thread(() -> {
+                        try {
+                            LinkDao dao = new LinkDao(DbConnection.get(WebViewActivity.this).writable());
+                            int updatedRows = dao.updateLinkTitle(url, newTitle);
+                            if (updatedRows == 0 && originalUrl != null && !originalUrl.equals(url)) {
+                                updatedRows = dao.updateLinkTitle(originalUrl, newTitle);
+                            }
+                            final int result = updatedRows;
+                            runOnUiThread(() -> {
+                                if (result > 0) {
+                                    pageTitleCache = newTitle;
+                                    Toast.makeText(WebViewActivity.this,
+                                            "标题已更新", Toast.LENGTH_SHORT).show();
+                                } else {
+                                    Toast.makeText(WebViewActivity.this,
+                                            "当前页面未保存为链接", Toast.LENGTH_SHORT).show();
+                                }
+                            });
+                        } catch (Exception e) {
+                            Log.e("WebViewActivity", "更新标题失败", e);
+                            runOnUiThread(() -> Toast.makeText(WebViewActivity.this,
+                                    "标题更新失败", Toast.LENGTH_SHORT).show());
+                        }
+                    }).start();
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private void showAddTagDialog() {
