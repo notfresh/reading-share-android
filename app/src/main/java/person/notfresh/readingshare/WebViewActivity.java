@@ -143,7 +143,6 @@ public class WebViewActivity extends AppCompatActivity {
                 currentUrl = data.toString();
             }
         }
-        Log.d("WVHistoryTrace", "Activity originalUrl=" + currentUrl);
         
         if (currentUrl == null || currentUrl.isEmpty()) {
             Toast.makeText(this, "无效的URL", Toast.LENGTH_SHORT).show();
@@ -556,8 +555,6 @@ public class WebViewActivity extends AppCompatActivity {
                 super.onPageStarted(view, url, favicon);
                 if (view == webView) {
                     historyRecordedForPageLoad = false;
-                    Log.d("WVHistoryTrace", "onPageStarted url=" + url
-                            + ", currentUrl=" + currentUrl);
                 }
             }
 
@@ -581,8 +578,6 @@ public class WebViewActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                Log.d("WVHistoryTrace", "onPageFinished url=" + url
-                        + ", currentUrl=" + currentUrl);
                 recordLinkHistory(view, url);
                 try {
                     String t = view.getTitle();
@@ -698,11 +693,9 @@ public class WebViewActivity extends AppCompatActivity {
                 LinkDao dao = new LinkDao(DbConnection.get(WebViewActivity.this).writable());
                 String title = null;
                 if (isXshlinkUrl(originalUrl)) {
-                    Log.d("WVHistoryTrace", "lookup local title by originalUrl=" + originalUrl);
                     title = dao.getLinkTitleByUrl(originalUrl);
                 }
                 if (title == null || title.trim().isEmpty()) {
-                    Log.d("WVHistoryTrace", "lookup local title by finalUrl=" + finalUrl);
                     title = dao.getLinkTitleByUrl(finalUrl);
                 }
                 if (title == null || title.trim().isEmpty()) {
