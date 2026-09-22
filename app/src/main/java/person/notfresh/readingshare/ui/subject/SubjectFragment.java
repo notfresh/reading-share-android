@@ -32,7 +32,9 @@ import person.notfresh.readingshare.core.storage.KeyValueStorage;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.SubjectDao;
+import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.util.android.SharedPreferencesStorage;
 
 public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSubjectItemClickListener,
@@ -253,6 +255,9 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
             return;
         }
         linkDao.insertLink(link);
+        EventLogClient.get().create("links",
+                String.valueOf(link.getId()),
+                LinkJson.toJsonString(link));
         Toast.makeText(requireContext(), "链接已收录到主页", Toast.LENGTH_SHORT).show();
     }
 

@@ -41,7 +41,9 @@ import android.content.ComponentName;
 import java.util.stream.Collectors;
 
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.model.LinkJson;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.flexbox.FlexboxLayout;
 import person.notfresh.readingshare.db.LinkDao;
@@ -362,6 +364,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         item.addTag(tagName);
         notifyDataSetChanged();
         linkDao.updateLinkTags(item);
+        EventLogClient.get().update("links",
+                String.valueOf(item.getId()),
+                LinkJson.toJsonString(item));
     }
 
     public void archiveOneItem(LinkItem item) {
@@ -380,13 +385,19 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
         notifyDataSetChanged();
         linkDao.updateLinkTags(item);
-        
+        EventLogClient.get().update("links",
+                String.valueOf(item.getId()),
+                LinkJson.toJsonString(item));
+
         // 保存最近使用的标签
         RecentTagsManager.addRecentTags(context, tagNames);
     }
 
     public void updateLinkTags(LinkItem item) {
         linkDao.updateLinkTags(item);
+        EventLogClient.get().update("links",
+                String.valueOf(item.getId()),
+                LinkJson.toJsonString(item));
     }
 
     // 提取真实URL的辅助方法
@@ -624,6 +635,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 case 4:
                     Log.d("LinksAdapter", "切换置顶被点击, linkId: " + item.getId() + ", 当前置顶状态: " + item.isPinned());
                     linkDao.togglePinStatus(item.getId());
+                    EventLogClient.get().update("links",
+                            String.valueOf(item.getId()),
+                            LinkJson.toJsonString(item));
                     // 通知 Fragment 刷新数据
                     if (listener != null) {
                         Log.d("LinksAdapter", "调用 onPinStatusChanged");
@@ -663,6 +677,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                                 if (summary != null && !summary.isEmpty()) {
                                     item.setSummary(summary);
                                     linkDao.updateSummary(item.getId(), summary);
+                                    EventLogClient.get().update("links",
+                                            String.valueOf(item.getId()),
+                                            LinkJson.toJsonString(item));
                                     notifyItemChanged(position);
                                     Toast.makeText(view.getContext(), "摘要获取成功", Toast.LENGTH_SHORT).show();
                                 } else {
@@ -1068,6 +1085,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             linkItem.incrementClickCount();
             Log.d("LinksAdapter", "Click count updated to: " + linkItem.getClickCount());
             linkDao.updateClickCount(linkItem.getId(), linkItem.getClickCount());
+            EventLogClient.get().update("links",
+                    String.valueOf(linkItem.getId()),
+                    LinkJson.toJsonString(linkItem));
 
             // 刷新当前项
             notifyItemChanged(position);
@@ -1141,6 +1161,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     public void updateLinkRemark(LinkItem item) {
         if (linkDao != null) {
             linkDao.updateLinkRemark(item.getId(), item.getRemark());
+            EventLogClient.get().update("links",
+                    String.valueOf(item.getId()),
+                    LinkJson.toJsonString(item));
         }
     }
 

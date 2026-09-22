@@ -33,7 +33,9 @@ import androidx.fragment.app.Fragment;
 import person.notfresh.readingshare.databinding.ActivityMainBinding;
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.ui.home.HomeFragment;
 import android.content.ClipboardManager;
 import android.content.ClipData;
@@ -600,6 +602,9 @@ public class MainActivity extends AppCompatActivity {
                         }
                         newLink.setTags(tagList);
                         linkDao.insertLink(newLink);
+                        EventLogClient.get().create("links",
+                                String.valueOf(newLink.getId()),
+                                LinkJson.toJsonString(newLink));
 
                         // 若在下拉框中选了某个主题，则添加到该主题
                         int subjectPos = subjectSpinner.getSelectedItemPosition();

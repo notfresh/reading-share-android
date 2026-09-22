@@ -75,6 +75,10 @@
             android:label="相关度配置"
             android:theme="@style/Theme.MyApplication.NoActionBar" />
         <activity
+            android:name=".EventLogActivity"
+            android:label="事件日志"
+            android:theme="@style/Theme.MyApplication.NoActionBar" />
+        <activity
             android:name=".ui.subject.SubjectDetailActivity"
             android:label="主题详情"
             android:theme="@style/Theme.MyApplication.NoActionBar"

@@ -24,7 +24,9 @@ import person.notfresh.readingshare.core.model.SubjectItem;
 import person.notfresh.readingshare.core.model.SubjectUtil;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SubjectDao;
+import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.ui.subject.AddSubjectItemDialog;
 import person.notfresh.readingshare.ui.subject.SubjectArchivedItemsDialog;
 import person.notfresh.readingshare.core.storage.KeyValueStorage;
@@ -374,6 +376,9 @@ public class SubjectDetailActivity extends AppCompatActivity implements
         if (!linkExists) {
             // 如果不存在，创建新链接
             linkDao.insertLink(linkItem);
+            EventLogClient.get().create("links",
+                    String.valueOf(linkItem.getId()),
+                    LinkJson.toJsonString(linkItem));
             Toast.makeText(this, "链接已收录到主页", Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(this, "链接已存在于主页", Toast.LENGTH_SHORT).show();

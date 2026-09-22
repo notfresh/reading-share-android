@@ -58,6 +58,13 @@
             android:text="从CSV导入分享链接"
             android:layout_marginTop="8dp"/>
 
+        <Button
+            android:id="@+id/button_event_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="事件日志" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

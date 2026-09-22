@@ -37,8 +37,11 @@ import java.util.List;
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.LinksHistoryActivity;
+import person.notfresh.readingshare.EventLogActivity;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.db.SearchHistoryManager;
 import com.google.android.material.snackbar.Snackbar;
 import person.notfresh.readingshare.util.ExportUtil;
@@ -184,6 +187,9 @@ public class SettingFragment extends Fragment {
 
         root.findViewById(R.id.button_link_history).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), LinksHistoryActivity.class)));
+
+        root.findViewById(R.id.button_event_log).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), EventLogActivity.class)));
 
         // 监听输入框内容变化
         serverUrlInput.setOnFocusChangeListener((v, hasFocus) -> {
@@ -464,6 +470,9 @@ public class SettingFragment extends Fragment {
         for (LinkItem item : itemsToImport) {
             try {
                 linkDao.insertLink(item);
+                EventLogClient.get().create("links",
+                        String.valueOf(item.getId()),
+                        LinkJson.toJsonString(item));
                 importedCount++;
             } catch (Exception e) {
                 // 忽略插入失败的情况
