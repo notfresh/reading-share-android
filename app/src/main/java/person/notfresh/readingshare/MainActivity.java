@@ -77,6 +77,8 @@ import java.io.File;
 import person.notfresh.readingshare.util.SubjectUtil;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.core.model.Subject;
+import person.notfresh.readingshare.links.strategy.LinkProcessStrategy;
+import person.notfresh.readingshare.links.strategy.LinkStrategies;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -667,6 +669,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void fetchTitleFromUrl(String url, EditText titleInput) {
+        // 策略拦截：命中 SKIP 策略的平台直接退出后台抓取，保留原始链接
+        java.util.Optional<LinkProcessStrategy> hit = LinkStrategies.match(url);
+        if (hit.isPresent() && hit.get().action() == LinkProcessStrategy.Action.SKIP) {
+            Log.d("FetchTitle", "Skipped by strategy: " + hit.get().getName() + " url=" + url);
+            return;
+        }
+
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Handler handler = new Handler(Looper.getMainLooper());
 
