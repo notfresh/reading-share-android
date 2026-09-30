@@ -59,10 +59,13 @@ import com.google.android.flexbox.FlexboxLayout;
 
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.external.ExternalLinkBlocklist;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
+import androidx.appcompat.content.res.AppCompatResources;
+import androidx.core.graphics.drawable.DrawableCompat;
 
 public class WebViewActivity extends AppCompatActivity {
     private WebView webView;
@@ -199,6 +202,10 @@ public class WebViewActivity extends AppCompatActivity {
         if (item == null) {
             Log.e("WebViewActivityMenu", "菜单项加载失败");
         }
+
+        // 拦截模式图标染色:红=拦截 / 白=跳转 / 灰=弹窗
+        applyExternalBlockIconTint(menu);
+
         return true;
     }
 
@@ -744,6 +751,12 @@ public class WebViewActivity extends AppCompatActivity {
             return false;
         }
 
+        // 全局黑名单命中 → 静默拦截,不走弹窗不走跳转
+        if (ExternalLinkBlocklist.contains(this, url)) {
+            Log.d("WVUrlTrace", "handleUrlOverride blocked by host blocklist: " + url);
+            return true;
+        }
+
         // if (!isMainFrame) {
         //     Log.d("WVUrlTrace", "handleUrlOverride early-return: url=" + url
         //             + ", isMainFrame=" + isMainFrame);
@@ -777,6 +790,29 @@ public class WebViewActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 根据当前拦截模式返回 toolbar 图标应染的颜色。
+     * 红=直接拦截 / 白=允许跳转 / 灰=弹窗确认
+     */
+    private int tintColorForMode(int mode) {
+        switch (mode) {
+            case 1: return ContextCompat.getColor(this, android.R.color.white); // 直接跳转
+            case 0: return ContextCompat.getColor(this, android.R.color.darker_gray); // 弹窗确认
+            default: return ContextCompat.getColor(this, android.R.color.holo_red_dark); // 拦截(2)
+        }
+    }
+
+    /** 给 toolbar 上的拦截模式菜单项染色,反映当前生效模式 */
+    private void applyExternalBlockIconTint(Menu menu) {
+        MenuItem item = menu.findItem(R.id.action_toggle_external_block);
+        if (item == null) return;
+        Drawable d = AppCompatResources.getDrawable(this, R.drawable.ic_external_block);
+        if (d == null) return;
+        d = DrawableCompat.wrap(d).mutate();
+        DrawableCompat.setTint(d, tintColorForMode(getExternalLinkMode()));
+        item.setIcon(d);
+    }
+
     private void toggleExternalBlockMode() {
         SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
         int currentMode = prefs.getInt("external_link_mode", 2);
@@ -795,6 +831,7 @@ public class WebViewActivity extends AppCompatActivity {
         }
         prefs.edit().putInt("external_link_mode", newMode).apply();
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        invalidateOptionsMenu(); // 让 toolbar 图标跟着刷新颜色
     }
 
     private void showEditTitleDialog() {
@@ -1011,6 +1048,13 @@ public class WebViewActivity extends AppCompatActivity {
                 .setTitle("打开外部应用")
                 .setMessage("网页正在尝试打开外部应用，是否继续？\n\n" + url)
                 .setNegativeButton("留在网页", null)
+                .setNeutralButton("拒绝并禁止弹窗", (dialog, which) -> {
+                    ExternalLinkBlocklist.block(this, url);
+                    String blockedKey = ExternalLinkBlocklist.keyOf(url);
+                    Log.d("WVUrlTrace", "ExternalLinkBlocklist block: " + blockedKey);
+                    Toast.makeText(this, "已加入黑名单:" + blockedKey + ",后续不再弹窗",
+                            Toast.LENGTH_SHORT).show();
+                })
                 .setPositiveButton("继续打开", (dialog, which) -> openExternalUri(url))
                 .show());
     }
