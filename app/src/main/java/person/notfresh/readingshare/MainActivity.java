@@ -604,6 +604,7 @@ public class MainActivity extends AppCompatActivity {
                         linkDao.insertLink(newLink);
                         EventLogClient.get().create("links",
                                 String.valueOf(newLink.getId()),
+                                newLink.getTimestamp(),
                                 LinkJson.toJsonString(newLink));
 
                         // 若在下拉框中选了某个主题，则添加到该主题

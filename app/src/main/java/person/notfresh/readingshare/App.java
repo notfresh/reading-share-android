@@ -43,10 +43,13 @@ public class App extends Application {
             try {
                 LinkDao linkDao = new LinkDao(db);
                 List<LinkItem> all = linkDao.getAllLinks();
+                long now = System.currentTimeMillis();
+                String processTime = EventLogClient.formatIso8601(now);
                 for (LinkItem link : all) {
                     String entityId = String.valueOf(link.getId());
-                    String eventTime = EventLogClient.formatIso8601(link.getTimestamp());
-                    String processTime = eventTime;
+                    // event_time = 实体真实创建时间(本地时区)
+                    String eventTime = EventLogClient.formatLocalIso8601(link.getTimestamp());
+                    // process_time = 日志生成时刻(UTC),三者共享同一 processTime
                     String id = EventLogClient.computeId("links", deviceId,
                             eventTime, entityId, EventAction.CREATE.name());
                     EventLogClient.get().store().append(new EventRecord(

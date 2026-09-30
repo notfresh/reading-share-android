@@ -934,7 +934,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public void onDeleteLink(LinkItem link) {
         linkDao.deleteLink(link.getId());
-        EventLogClient.get().delete("links", String.valueOf(link.getId()));
+        EventLogClient.get().delete("links", String.valueOf(link.getId()),
+                System.currentTimeMillis());
         // 刷新列表
         loadTags(); // 使用已有的 loadTags() 方法重新加载标签和链接
         restoreSelections();
@@ -954,6 +955,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         snap.setTitle(newTitle);
         EventLogClient.get().update("links",
                 String.valueOf(oldLink.getId()),
+                System.currentTimeMillis(),
                 LinkJson.toJsonString(snap));
         // 重新加载当前标签的链接
         loadTags();
@@ -995,6 +997,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linkDao.updateLinkTags(item);
         EventLogClient.get().update("links",
                 String.valueOf(item.getId()),
+                item.getTimestamp(),
                 LinkJson.toJsonString(item));
         // 重新加载标签和链接
         loadTags();
@@ -1305,7 +1308,8 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 // 批量删除并刷新（直接从适配器移除，避免重新查询数据库）
                 for (LinkItem item : selectedItems) {
                     linkDao.deleteLink(item.getId());
-                    EventLogClient.get().delete("links", String.valueOf(item.getId()));
+                    EventLogClient.get().delete("links", String.valueOf(item.getId()),
+                            System.currentTimeMillis());
                     linksAdapter.removeLinkItem(item);
                 }
                 Toast.makeText(requireContext(), "已删除已分享的链接", Toast.LENGTH_SHORT).show();

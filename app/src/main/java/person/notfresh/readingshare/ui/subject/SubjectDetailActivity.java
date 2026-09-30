@@ -378,6 +378,7 @@ public class SubjectDetailActivity extends AppCompatActivity implements
             linkDao.insertLink(linkItem);
             EventLogClient.get().create("links",
                     String.valueOf(linkItem.getId()),
+                    linkItem.getTimestamp(),
                     LinkJson.toJsonString(linkItem));
             Toast.makeText(this, "链接已收录到主页", Toast.LENGTH_SHORT).show();
         } else {

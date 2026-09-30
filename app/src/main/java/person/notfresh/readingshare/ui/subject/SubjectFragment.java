@@ -257,6 +257,7 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
         linkDao.insertLink(link);
         EventLogClient.get().create("links",
                 String.valueOf(link.getId()),
+                link.getTimestamp(),
                 LinkJson.toJsonString(link));
         Toast.makeText(requireContext(), "链接已收录到主页", Toast.LENGTH_SHORT).show();
     }

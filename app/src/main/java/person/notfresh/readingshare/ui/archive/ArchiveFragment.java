@@ -200,7 +200,8 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
     public void onDeleteLink(LinkItem link) {
         // linkDao.deleteLink(link.getUrl());
         linkDao.deleteLink(link.getId());
-        EventLogClient.get().delete("links", String.valueOf(link.getId()));
+        EventLogClient.get().delete("links", String.valueOf(link.getId()),
+                System.currentTimeMillis());
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);
@@ -213,6 +214,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         snap.setTitle(newTitle);
         EventLogClient.get().update("links",
                 String.valueOf(oldLink.getId()),
+                System.currentTimeMillis(),
                 LinkJson.toJsonString(snap));
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
@@ -229,6 +231,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         linkDao.addTagToLink(item.getId(), tag);
         EventLogClient.get().update("links",
                 String.valueOf(item.getId()),
+                item.getTimestamp(),
                 LinkJson.toJsonString(item));
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
@@ -247,6 +250,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         linkDao.updateLinkTags(item);
         EventLogClient.get().update("links",
                 String.valueOf(item.getId()),
+                item.getTimestamp(),
                 LinkJson.toJsonString(item));
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();

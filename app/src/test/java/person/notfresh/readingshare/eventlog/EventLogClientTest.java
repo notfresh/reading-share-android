@@ -7,10 +7,13 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -20,6 +23,7 @@ public class EventLogClientTest {
 
     private static final String DEVICE = "device-test-001";
     private static final long FIXED_MILLIS = 1_700_000_000_000L;
+    private static final long FIXED_EVENT_MILLIS = 1_650_000_000_000L;
 
     private FakeStore store;
     private EventLogClient.TimeSource fixedClock;
@@ -38,26 +42,35 @@ public class EventLogClientTest {
 
     @Test
     public void create_returns_record_with_expected_fields() {
-        EventRecord r = EventLogClient.get().create("links", "e1", "{\"a\":1}");
+        EventRecord r = EventLogClient.get().create("links", "e1",
+                FIXED_EVENT_MILLIS, "{\"a\":1}");
 
         assertEquals("links", r.getTopic());
         assertEquals("e1", r.getEntityId());
         assertEquals(EventAction.CREATE, r.getAction());
         assertEquals("{\"a\":1}", r.getData());
         assertEquals(DEVICE, r.getDeviceId());
-        assertEquals("2023-11-14T22:13:20.000Z", r.getEventTime());
-        assertEquals(r.getEventTime(), r.getProcessTime());
+        // event_time uses local timezone offset
+        String expectedEvent = EventLogClient.formatLocalIso8601(FIXED_EVENT_MILLIS);
+        assertEquals(expectedEvent, r.getEventTime());
+        // process_time uses UTC
+        String expectedProcess = EventLogClient.formatIso8601(FIXED_MILLIS);
+        assertEquals(expectedProcess, r.getProcessTime());
+        // event_time and process_time have different formats (local offset vs Z)
+        assertNotEquals(r.getEventTime(), r.getProcessTime());
         assertNotNull(r.getId());
         assertEquals(16, r.getId().length());
     }
 
     @Test
     public void update_and_delete_carry_correct_action() {
-        EventRecord u = EventLogClient.get().update("links", "e1", "{\"v\":2}");
+        EventRecord u = EventLogClient.get().update("links", "e1",
+                FIXED_EVENT_MILLIS, "{\"v\":2}");
         assertEquals(EventAction.UPDATE, u.getAction());
         assertEquals("{\"v\":2}", u.getData());
 
-        EventRecord d = EventLogClient.get().delete("links", "e1");
+        EventRecord d = EventLogClient.get().delete("links", "e1",
+                FIXED_MILLIS);
         assertEquals(EventAction.DELETE, d.getAction());
         assertNull(d.getData());
     }
@@ -98,15 +111,42 @@ public class EventLogClientTest {
     }
 
     @Test
-    public void eventTime_is_iso8601_utc_with_z_suffix() {
+    public void formatIso8601_utc_has_z_suffix() {
         String s = EventLogClient.formatIso8601(FIXED_MILLIS);
-        assertEquals("2023-11-14T22:13:20.000Z", s);
+        assertTrue("should end with Z, got " + s, s.endsWith("Z"));
+    }
+
+    @Test
+    public void formatLocalIso8601_has_offset_not_z() {
+        // Force a known timezone so the test is reproducible
+        TimeZone original = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+            String s = EventLogClient.formatLocalIso8601(FIXED_MILLIS);
+            assertTrue("should contain offset like +08:00, got " + s,
+                    s.matches(".*[+-]\\d{2}:\\d{2}$"));
+            assertTrue("should NOT end with Z, got " + s, !s.endsWith("Z"));
+        } finally {
+            TimeZone.setDefault(original);
+        }
+    }
+
+    @Test
+    public void eventTime_uses_caller_value_processTime_uses_clock_now() {
+        // Two calls with different eventTimeMillis but same store: event_time differs, process_time identical
+        EventRecord a = EventLogClient.get().create("links", "e1",
+                1_000_000L, "{}");
+        EventRecord b = EventLogClient.get().create("links", "e2",
+                2_000_000L, "{}");
+
+        assertNotEquals(a.getEventTime(), b.getEventTime());
+        assertEquals(a.getProcessTime(), b.getProcessTime());
     }
 
     @Test
     public void empty_topic_throws() {
         try {
-            EventLogClient.get().create("", "e1", "{}");
+            EventLogClient.get().create("", "e1", FIXED_MILLIS, "{}");
             fail("expected EventLogException");
         } catch (EventLogException expected) {
             assertEquals("topic is empty", expected.getMessage());
@@ -116,7 +156,7 @@ public class EventLogClientTest {
     @Test
     public void empty_entityId_throws() {
         try {
-            EventLogClient.get().create("links", "", "{}");
+            EventLogClient.get().create("links", "", FIXED_MILLIS, "{}");
             fail("expected EventLogException");
         } catch (EventLogException expected) {
             assertEquals("entityId is empty", expected.getMessage());
@@ -147,9 +187,9 @@ public class EventLogClientTest {
 
     @Test
     public void since_returns_repo_results() {
-        EventLogClient.get().create("links", "e1", "{}");
-        EventLogClient.get().update("links", "e1", "{\"v\":2}");
-        EventLogClient.get().create("other", "x", "{}");
+        EventLogClient.get().create("links", "e1", FIXED_MILLIS, "{}");
+        EventLogClient.get().update("links", "e1", FIXED_MILLIS, "{\"v\":2}");
+        EventLogClient.get().create("other", "x", FIXED_MILLIS, "{}");
 
         List<EventRecord> linkTail = EventLogClient.get().since("links", "");
         assertEquals(2, linkTail.size());
@@ -164,7 +204,7 @@ public class EventLogClientTest {
         EventLogClient.init(store, clock::get);
         for (int i = 0; i < 5; i++) {
             clock.addAndGet(1);
-            EventLogClient.get().create("links", "e" + i, "{}");
+            EventLogClient.get().create("links", "e" + i, FIXED_MILLIS, "{}");
         }
         List<EventRecord> page = EventLogClient.get().since("links", "", 3);
         assertEquals(3, page.size());
@@ -176,7 +216,7 @@ public class EventLogClientTest {
         EventLogClient.init(store, clock::get);
         for (int i = 0; i < 7; i++) {
             clock.addAndGet(1);
-            EventLogClient.get().create("links", "e" + i, "{}");
+            EventLogClient.get().create("links", "e" + i, FIXED_MILLIS, "{}");
         }
         List<EventRecord> collected = new ArrayList<>();
         String cursor = "";
@@ -184,7 +224,7 @@ public class EventLogClientTest {
             List<EventRecord> page = EventLogClient.get().since("links", cursor, 3);
             if (page.isEmpty()) break;
             collected.addAll(page);
-            cursor = page.get(page.size() - 1).getProcessTime();
+            cursor = page.get(page.size() - 1).getEventTime();
             if (page.size() < 3) break;
         }
         assertEquals(7, collected.size());
@@ -207,10 +247,12 @@ public class EventLogClientTest {
     public void latest_returns_most_recent_or_null() {
         assertNull(EventLogClient.get().latest("links"));
 
-        EventRecord c = EventLogClient.get().create("links", "e1", "{}");
+        EventRecord c = EventLogClient.get().create("links", "e1",
+                FIXED_MILLIS, "{}");
         assertEquals(c.getId(), EventLogClient.get().latest("links").getId());
 
-        EventRecord u = EventLogClient.get().update("links", "e1", "{\"v\":2}");
+        EventRecord u = EventLogClient.get().update("links", "e1",
+                FIXED_MILLIS, "{\"v\":2}");
         assertEquals(u.getId(), EventLogClient.get().latest("links").getId());
     }
 
@@ -228,23 +270,42 @@ public class EventLogClientTest {
         }
 
         @Override
-        public synchronized List<EventRecord> since(String topic, String sinceProcessTime) {
-            return since(topic, sinceProcessTime, Integer.MAX_VALUE);
+        public synchronized List<EventRecord> since(String topic, String sinceEventTime) {
+            return since(topic, sinceEventTime, Integer.MAX_VALUE);
         }
 
         @Override
-        public synchronized List<EventRecord> since(String topic, String sinceProcessTime, int limit) {
+        public synchronized List<EventRecord> since(String topic, String sinceEventTime, int limit) {
             if (limit <= 0) {
                 throw new EventLogException("limit must be positive, got " + limit);
             }
             List<EventRecord> out = new ArrayList<>();
             for (EventRecord r : byId.values()) {
                 if (!r.getTopic().equals(topic)) continue;
-                if (r.getProcessTime().compareTo(sinceProcessTime) > 0) {
+                if (r.getEventTime().compareTo(sinceEventTime) > 0) {
                     out.add(r);
                 }
             }
-            out.sort((a, b) -> a.getProcessTime().compareTo(b.getProcessTime()));
+            out.sort((a, b) -> a.getEventTime().compareTo(b.getEventTime()));
+            if (out.size() > limit) {
+                return new ArrayList<>(out.subList(0, limit));
+            }
+            return out;
+        }
+
+        @Override
+        public synchronized List<EventRecord> until(String topic, String untilEventTime, int limit) {
+            if (limit <= 0) {
+                throw new EventLogException("limit must be positive, got " + limit);
+            }
+            List<EventRecord> out = new ArrayList<>();
+            for (EventRecord r : byId.values()) {
+                if (!r.getTopic().equals(topic)) continue;
+                if (untilEventTime == null || r.getEventTime().compareTo(untilEventTime) < 0) {
+                    out.add(r);
+                }
+            }
+            out.sort((a, b) -> b.getEventTime().compareTo(a.getEventTime())); // DESC
             if (out.size() > limit) {
                 return new ArrayList<>(out.subList(0, limit));
             }
@@ -261,6 +322,20 @@ public class EventLogClientTest {
                 }
             }
             return best;
+        }
+
+        @Override
+        public int count(String topic) {
+            int c = 0;
+            for (EventRecord r : byId.values()) {
+                if (r.getTopic().equals(topic)) c++;
+            }
+            return c;
+        }
+
+        @Override
+        public synchronized void deleteAll() {
+            byId.clear();
         }
 
         @Override

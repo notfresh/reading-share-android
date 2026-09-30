@@ -177,6 +177,7 @@ public class SimpleSyncManager {
                     linkDao.insertLink(newLink);
                     EventLogClient.get().create("links",
                             String.valueOf(newLink.getId()),
+                            newLink.getTimestamp(),
                             LinkJson.toJsonString(newLink));
                     downloadedCount++;
                     Log.d(TAG, "创建新链接: " + title);

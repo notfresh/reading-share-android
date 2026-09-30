@@ -848,7 +848,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     public boolean deleteLink(Long linkId){
         Log.d("HomeFragment", "deleteLink: + link id " + linkId);
         linkDao.deleteLink(linkId);
-        EventLogClient.get().delete("links", String.valueOf(linkId));
+        EventLogClient.get().delete("links", String.valueOf(linkId),
+                System.currentTimeMillis());
         refreshLinksList();
         return true;
     }
@@ -859,7 +860,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
         // 删除数据库中的链接
         linkDao.deleteLink(link.getId());
-        EventLogClient.get().delete("links", String.valueOf(link.getId()));
+        EventLogClient.get().delete("links", String.valueOf(link.getId()),
+                System.currentTimeMillis());
 
         // 直接从适配器中移除，避免重新查询数据库
         boolean removed = adapter.removeLinkItem(link);
@@ -888,6 +890,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         snap.setTitle(newTitle);
         EventLogClient.get().update("links",
                 String.valueOf(oldLink.getId()),
+                System.currentTimeMillis(),
                 LinkJson.toJsonString(snap));
         // 退出洗牌模式（新增/删除链接后按时间排序显示）
         if (isShuffleMode) {
@@ -904,6 +907,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linkDao.addTagToLink(item.getId(), tag);
         EventLogClient.get().update("links",
                 String.valueOf(item.getId()),
+                item.getTimestamp(),
                 LinkJson.toJsonString(item));
         // 统一刷新：根据是否有标签筛选来决定刷新方式
         refreshLinksList();
@@ -923,6 +927,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linkDao.updateLinkTags(item);
         EventLogClient.get().update("links",
                 String.valueOf(item.getId()),
+                item.getTimestamp(),
                 LinkJson.toJsonString(item));
         // 统一刷新：根据是否有标签筛选来决定刷新方式
         refreshLinksList();
@@ -1228,7 +1233,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 // 批量删除并刷新（优化：直接从适配器移除，避免重新查询数据库）
                 for (LinkItem item : items) {
                     linkDao.deleteLink(item.getId());
-                    EventLogClient.get().delete("links", String.valueOf(item.getId()));
+                    EventLogClient.get().delete("links", String.valueOf(item.getId()),
+                            System.currentTimeMillis());
                     adapter.removeLinkItem(item);
                 }
                 // 刷新数据

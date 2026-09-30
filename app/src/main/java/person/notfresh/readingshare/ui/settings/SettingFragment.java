@@ -472,6 +472,7 @@ public class SettingFragment extends Fragment {
                 linkDao.insertLink(item);
                 EventLogClient.get().create("links",
                         String.valueOf(item.getId()),
+                        item.getTimestamp(),
                         LinkJson.toJsonString(item));
                 importedCount++;
             } catch (Exception e) {
