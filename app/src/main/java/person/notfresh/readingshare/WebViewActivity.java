@@ -60,7 +60,6 @@ import com.google.android.flexbox.FlexboxLayout;
 
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
-import person.notfresh.readingshare.external.ExternalLinkBlocklist;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
@@ -752,12 +751,6 @@ public class WebViewActivity extends AppCompatActivity {
             return false;
         }
 
-        // 全局黑名单命中 → 静默拦截,不走弹窗不走跳转
-        if (ExternalLinkBlocklist.contains(this, url)) {
-            Log.d("WVUrlTrace", "handleUrlOverride blocked by host blocklist: " + url);
-            return true;
-        }
-
         // if (!isMainFrame) {
         //     Log.d("WVUrlTrace", "handleUrlOverride early-return: url=" + url
         //             + ", isMainFrame=" + isMainFrame);
@@ -1049,13 +1042,6 @@ public class WebViewActivity extends AppCompatActivity {
                 .setTitle("打开外部应用")
                 .setMessage("网页正在尝试打开外部应用，是否继续？\n\n" + url)
                 .setNegativeButton("留在网页", null)
-                .setNeutralButton("拒绝并禁止弹窗", (dialog, which) -> {
-                    ExternalLinkBlocklist.block(this, url);
-                    String blockedKey = ExternalLinkBlocklist.keyOf(url);
-                    Log.d("WVUrlTrace", "ExternalLinkBlocklist block: " + blockedKey);
-                    Toast.makeText(this, "已加入黑名单:" + blockedKey + ",后续不再弹窗",
-                            Toast.LENGTH_SHORT).show();
-                })
                 .setPositiveButton("继续打开", (dialog, which) -> openExternalUri(url))
                 .show());
     }
