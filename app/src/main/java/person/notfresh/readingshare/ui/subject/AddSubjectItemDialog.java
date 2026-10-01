@@ -1,7 +1,5 @@
 package person.notfresh.readingshare.ui.subject;
 
-import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -18,9 +16,12 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import android.app.Dialog;
 
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -199,29 +200,24 @@ public class AddSubjectItemDialog extends DialogFragment {
     }
 
     private void showSelectLinkDialog() {
-        // 获取所有链接
-        List<LinkItem> allLinks = linkDao.getAllLinks();
-
-        if (allLinks.isEmpty()) {
-            Toast.makeText(requireContext(), "没有可用的链接", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // 创建链接列表对话框
-        String[] linkTitles = new String[allLinks.size()];
-        for (int i = 0; i < allLinks.size(); i++) {
-            linkTitles[i] = allLinks.get(i).getTitle() != null ? allLinks.get(i).getTitle() : allLinks.get(i).getUrl();
-        }
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle("选择链接")
-                .setItems(linkTitles, (dialog, which) -> {
-                    selectedLink = allLinks.get(which);
-                    textSelectedLink.setText(selectedLink.getTitle() != null ? selectedLink.getTitle() : selectedLink.getUrl());
-                    textSelectedLink.setVisibility(View.VISIBLE);
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        SelectLinkDialog dialog = SelectLinkDialog.newInstance(subjectId);
+        dialog.setOnLinkSelectedListener((linkId, title, url) -> {
+            // 回填到本 Dialog 的 UI（沿用方案 B：选链接不直接入库，回到这里继续填备注/图片）
+            // 复用既有字段，避免重复定义 LinkPickerViewModel
+            List<LinkItem> allLinks = linkDao.getAllLinks();
+            for (LinkItem l : allLinks) {
+                if (l.getId() == linkId) {
+                    selectedLink = l;
+                    break;
+                }
+            }
+            if (selectedLink != null) {
+                textSelectedLink.setText(selectedLink.getTitle() != null
+                        ? selectedLink.getTitle() : selectedLink.getUrl());
+                textSelectedLink.setVisibility(View.VISIBLE);
+            }
+        });
+        dialog.show(requireActivity().getSupportFragmentManager(), "SelectLinkDialog");
     }
 
     private void pickImage() {

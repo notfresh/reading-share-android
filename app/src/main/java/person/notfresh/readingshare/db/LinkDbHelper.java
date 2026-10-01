@@ -15,7 +15,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     //private static final int DATABASE_VERSION = 10; // 添加文档表
     //private static final int DATABASE_VERSION = 11; // 添加主题表
 
-    private static final int DATABASE_VERSION = 16; // 浏览历史表
+    private static final int DATABASE_VERSION = 17; // 浏览历史表 + 链接索引
     public static final String TABLE_LINKS = "links";
     public static final String TABLE_LINKS_HISTORY = "links_history";
     public static final String COLUMN_ID = "_id";
@@ -250,6 +250,12 @@ public class LinkDbHelper extends SQLiteOpenHelper {
             db.execSQL(TagEmbeddingDbHelper.SQL_CREATE_TABLE);
             Log.d("LinkDbHelper", "Created tag_embeddings table");
 
+            // 创建 links 表搜索/排序索引
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_title ON " + TABLE_LINKS + "(" + COLUMN_TITLE + ")");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_timestamp ON " + TABLE_LINKS + "(" + COLUMN_TIMESTAMP + " DESC)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_tags_name ON " + TABLE_TAGS + "(" + COLUMN_TAG_NAME + ")");
+            Log.d("LinkDbHelper", "Created search indexes");
+
             Log.d("LinkDbHelper", "Database tables created successfully");
         } catch (Exception e) {
             Log.e("LinkDbHelper", "Error creating database tables", e);
@@ -304,6 +310,14 @@ public class LinkDbHelper extends SQLiteOpenHelper {
             if (oldVersion < 16) {
                 db.execSQL(SQL_CREATE_LINKS_HISTORY);
                 Log.d("LinkDbHelper", "Created links_history table");
+            }
+
+            if (oldVersion < 17) {
+                // 版本17：添加搜索/排序索引（幂等，IF NOT EXISTS 保证重复跑不出错）
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_title ON " + TABLE_LINKS + "(" + COLUMN_TITLE + ")");
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_timestamp ON " + TABLE_LINKS + "(" + COLUMN_TIMESTAMP + " DESC)");
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_tags_name ON " + TABLE_TAGS + "(" + COLUMN_TAG_NAME + ")");
+                Log.d("LinkDbHelper", "Created search indexes");
             }
 
             if (oldVersion < 9) {

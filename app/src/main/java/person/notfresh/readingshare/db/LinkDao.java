@@ -8,24 +8,25 @@ import android.util.Log;
 import android.text.TextUtils;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.Locale;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Set;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.text.SimpleDateFormat;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkHistoryItem;
+import person.notfresh.readingshare.util.LinkSearchSpec;
 
 public class LinkDao {
     private LinkDbHelper dbHelper;
@@ -316,6 +317,97 @@ public class LinkDao {
         cursor.close();
 
         return links;
+    }
+
+    /**
+     * 分页获取链接（按 timestamp DESC）
+     * @param offset 起始偏移（从 0 开始）
+     * @param limit  本页条数
+     */
+    public List<LinkItem> getLinksPage(int offset, int limit) {
+        List<LinkItem> links = new ArrayList<>();
+        if (limit <= 0) return links;
+        Cursor cursor = database.query(
+                LinkDbHelper.TABLE_LINKS,
+                null, null, null, null, null,
+                LinkDbHelper.COLUMN_TIMESTAMP + " DESC",
+                String.valueOf(offset) + "," + String.valueOf(limit));
+        try {
+            if (cursor.moveToFirst()) {
+                do {
+                    links.add(createLinkItemFromCursor(cursor));
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            cursor.close();
+        }
+        return links;
+    }
+
+    /**
+     * 按 spec 搜索链接。所有 SQL 拼装逻辑收敛到 {@link #buildSearchQuery} 一处。
+     */
+    public List<LinkItem> searchLinks(LinkSearchSpec spec) {
+        if (spec == null || spec.isEmpty() || spec.limit() <= 0) {
+            return new ArrayList<>();
+        }
+        String sql = buildSearchQuery(spec);
+        List<String> args = buildSearchArgs(spec);
+        Cursor cursor = database.rawQuery(sql, args.toArray(new String[0]));
+        try {
+            List<LinkItem> links = new ArrayList<>();
+            if (cursor.moveToFirst()) {
+                do {
+                    links.add(createLinkItemFromCursor(cursor));
+                } while (cursor.moveToNext());
+            }
+            return links;
+        } finally {
+            cursor.close();
+        }
+    }
+
+    /** 唯一一处拼装搜索 SQL 的地方；新增 scope 时只需在这里加分支。 */
+    private String buildSearchQuery(LinkSearchSpec spec) {
+        String like = spec.likePattern();
+        switch (spec.scope()) {
+                case TITLE:
+                    return "SELECT * FROM " + LinkDbHelper.TABLE_LINKS +
+                            " WHERE " + LinkDbHelper.COLUMN_TITLE + " LIKE ?" +
+                            " ORDER BY " + LinkDbHelper.COLUMN_TIMESTAMP + " DESC LIMIT " + spec.limit();
+                case URL:
+                    return "SELECT * FROM " + LinkDbHelper.TABLE_LINKS +
+                            " WHERE " + LinkDbHelper.COLUMN_URL + " LIKE ?" +
+                            " ORDER BY " + LinkDbHelper.COLUMN_TIMESTAMP + " DESC LIMIT " + spec.limit();
+                case TAG:
+                    return "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l" +
+                            " JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID +
+                            " JOIN " + LinkDbHelper.TABLE_TAGS + " t ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID +
+                            " WHERE t." + LinkDbHelper.COLUMN_TAG_NAME + " LIKE ?" +
+                            " ORDER BY l." + LinkDbHelper.COLUMN_TIMESTAMP + " DESC LIMIT " + spec.limit();
+                case ALL:
+                default:
+                    return "SELECT DISTINCT l.* FROM " + LinkDbHelper.TABLE_LINKS + " l" +
+                            " LEFT JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID +
+                            " LEFT JOIN " + LinkDbHelper.TABLE_TAGS + " t ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID +
+                            " WHERE l." + LinkDbHelper.COLUMN_TITLE + " LIKE ?" +
+                            " OR l." + LinkDbHelper.COLUMN_URL + " LIKE ?" +
+                            " OR t." + LinkDbHelper.COLUMN_TAG_NAME + " LIKE ?" +
+                            " ORDER BY l." + LinkDbHelper.COLUMN_TIMESTAMP + " DESC LIMIT " + spec.limit();
+            }
+    }
+
+    private List<String> buildSearchArgs(LinkSearchSpec spec) {
+        String like = spec.likePattern();
+        switch (spec.scope()) {
+            case ALL:
+            default:
+                return java.util.Arrays.asList(like, like, like);
+            case TITLE:
+            case URL:
+            case TAG:
+                return java.util.Collections.singletonList(like);
+        }
     }
 
     // 获取按日期分组的链接
