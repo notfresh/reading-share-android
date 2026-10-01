@@ -828,6 +828,14 @@ public class WebViewActivity extends AppCompatActivity {
         invalidateOptionsMenu(); // 让 toolbar 图标跟着刷新颜色
     }
 
+    /** 直接 set 拦截模式到指定 mode(不走循环)。被弹窗「拒绝并禁止弹窗」调用 setExternalLinkMode(2)。 */
+    private void setExternalLinkMode(int mode) {
+        SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
+        prefs.edit().putInt("external_link_mode", mode).apply();
+        Toast.makeText(this, "已切换为:拦截所有外部链接", Toast.LENGTH_SHORT).show();
+        invalidateOptionsMenu();
+    }
+
     private void showEditTitleDialog() {
         if (webView == null) {
             Toast.makeText(this, "页面未加载", Toast.LENGTH_SHORT).show();
@@ -1043,9 +1051,8 @@ public class WebViewActivity extends AppCompatActivity {
                 .setMessage("网页正在尝试打开外部应用，是否继续？\n\n" + url)
                 .setNegativeButton("留在网页", null)
                 .setNeutralButton("拒绝并禁止弹窗", (dialog, which) -> {
-                    // 等价于顶部 toolbar 切换按钮:把 mode 切到「拦截所有」
-                    // 后续外部链接不再弹窗,直到用户手动再切回去
-                    toggleExternalBlockMode();
+                    // 独立方法:直接 set 到 mode=2(拦截所有),不走循环
+                    setExternalLinkMode(2);
                 })
                 .setPositiveButton("继续打开", (dialog, which) -> openExternalUri(url))
                 .show());
