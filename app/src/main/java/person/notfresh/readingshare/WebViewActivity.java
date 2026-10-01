@@ -1042,6 +1042,11 @@ public class WebViewActivity extends AppCompatActivity {
                 .setTitle("打开外部应用")
                 .setMessage("网页正在尝试打开外部应用，是否继续？\n\n" + url)
                 .setNegativeButton("留在网页", null)
+                .setNeutralButton("拒绝并禁止弹窗", (dialog, which) -> {
+                    // 等价于顶部 toolbar 切换按钮:把 mode 切到「拦截所有」
+                    // 后续外部链接不再弹窗,直到用户手动再切回去
+                    toggleExternalBlockMode();
+                })
                 .setPositiveButton("继续打开", (dialog, which) -> openExternalUri(url))
                 .show());
     }
