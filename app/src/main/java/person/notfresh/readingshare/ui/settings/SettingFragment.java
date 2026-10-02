@@ -194,16 +194,19 @@ public class SettingFragment extends Fragment {
         root.findViewById(R.id.button_event_log).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), EventLogActivity.class)));
 
-        // 监听输入框内容变化
-        serverUrlInput.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) {
-                String newUrl = serverUrlInput.getText().toString().trim();
-                if (newUrl.isEmpty()) {
-                    newUrl = DEFAULT_SERVER_URL;
-                    serverUrlInput.setText(newUrl);
-                }
-                // 写 simple_sync（eventlog 同步从这里读）
-                SimpleSyncManager.saveServerUrl(requireContext(), newUrl);
+        // 监听输入框内容变化 — 实时保存(每改一个字符就 apply 一次)。
+        // 顺序很重要:setText(savedUrl) 在 addTextChangedListener 之前调用,
+        // 避免"程序自己设值"被 watcher 当成"用户修改"白白触发一次保存。
+        // 空字符串跳过:保留 SP 里原有的 DEFAULT_SERVER_URL,避免用户清空 URL 后
+        // 下次启动同步炸。
+        serverUrlInput.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                String text = s.toString().trim();
+                if (text.isEmpty()) return; // 空跳过,不动 SP
+                SimpleSyncManager.saveServerUrl(requireContext(), text);
             }
         });
 
@@ -211,16 +214,19 @@ public class SettingFragment extends Fragment {
         syncSecretKeyInput = root.findViewById(R.id.sync_secret_key_input);
         syncStatusText = root.findViewById(R.id.sync_status_text);
 
-        // 加载保存的密钥
+        // 加载保存的密钥(同样:setText 在 watcher 注册之前)
         String savedKey = SimpleSyncManager.getSecretKey(requireContext());
         syncSecretKeyInput.setText(savedKey);
 
-        // 监听密钥输入框焦点变化
-        syncSecretKeyInput.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) {
-                String newKey = syncSecretKeyInput.getText().toString().trim();
-                // secret 与 URL 独立保存 — 互不依赖，避免"填了 secret 没填 URL 不保存"的 bug
-                SimpleSyncManager.saveSecretKey(requireContext(), newKey);
+        // 实时保存 secret — 不跳过空字符串(secret 没默认值,清空就是清空)。
+        // 必须 trim,防 commit 8ce1089 修的"换行污染 Authorization 头"bug。
+        syncSecretKeyInput.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                String text = s.toString().trim();
+                SimpleSyncManager.saveSecretKey(requireContext(), text);
             }
         });
 
