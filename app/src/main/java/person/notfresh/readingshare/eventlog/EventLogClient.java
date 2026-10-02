@@ -214,9 +214,11 @@ public final class EventLogClient {
             EventLogPuller.PullResult r;
             try {
                 r = puller.pull(topic, cursor, batchLimit);
-            } catch (EventLogException e) {
+            } catch (Exception e) {
+                // 捕获所有异常（不只是 EventLogException），确保 sync_log 一定写
+                // — 否则 pull 异常时 recent(1) 只显示 push 那条，pull 失败被吞掉看不见
                 allOk = false;
-                lastError = e.getMessage();
+                lastError = e.getClass().getSimpleName() + ": " + e.getMessage();
                 break;
             }
             if (!r.success) {
