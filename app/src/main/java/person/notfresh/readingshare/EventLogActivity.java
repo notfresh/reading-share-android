@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -68,6 +69,7 @@ public class EventLogActivity extends AppCompatActivity {
         loadMoreButton.setOnClickListener(v -> loadNextPage());
         clearButton.setOnClickListener(v -> confirmClear());
         syncButton.setOnClickListener(v -> triggerManualSync());
+        lastSyncText.setOnClickListener(v -> showSyncLogDialog());
         loadNextPage();
         refreshStatus();
         refreshLastSync();
@@ -140,6 +142,65 @@ public class EventLogActivity extends AppCompatActivity {
             } else {
                 sb.append(" · ").append(e.receivedCount).append(" 条");
             }
+        } else {
+            sb.append("失败");
+            if (e.errorMessage != null) {
+                sb.append(" · ").append(e.errorMessage);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** 弹窗:列出最近 50 条同步日志(PUSH/PULL 各一条都会显示) */
+    private void showSyncLogDialog() {
+        new Thread(() -> {
+            final List<SyncLogEntry> entries;
+            try {
+                entries = EventLogClient.get().syncLogStore().recent(50);
+            } catch (Exception e) {
+                runOnUiThread(() -> new AlertDialog.Builder(this)
+                        .setTitle("同步日志")
+                        .setMessage("读取失败: " + e.getMessage())
+                        .setPositiveButton("好", null)
+                        .show());
+                return;
+            }
+            runOnUiThread(() -> {
+                StringBuilder body = new StringBuilder();
+                if (entries == null || entries.isEmpty()) {
+                    body.append("暂无同步记录");
+                } else {
+                    for (int i = 0; i < entries.size(); i++) {
+                        if (i > 0) body.append("\n\n");
+                        body.append(formatSyncLogLine(entries.get(i)));
+                    }
+                }
+                TextView tv = new TextView(this);
+                tv.setText(body.toString());
+                tv.setTextSize(13);
+                tv.setPadding(48, 32, 48, 32);
+                tv.setTextIsSelectable(true);
+                ScrollView scroll = new ScrollView(this);
+                scroll.addView(tv);
+                new AlertDialog.Builder(this)
+                        .setTitle("同步日志 · 最近 " + (entries == null ? 0 : entries.size()) + " 条")
+                        .setView(scroll)
+                        .setPositiveButton("关闭", null)
+                        .show();
+            });
+        }).start();
+    }
+
+    /** 弹窗里的单行格式 — 时间 + 方向 + 成功/失败 + 条数/错误 */
+    private static String formatSyncLogLine(SyncLogEntry e) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(formatLocalTime(e.timestamp)).append("\n");
+        sb.append(e.direction == SyncLogEntry.Direction.PUSH ? "推送" : "拉取");
+        sb.append(" · ");
+        if (e.success) {
+            sb.append("成功");
+            int count = e.direction == SyncLogEntry.Direction.PUSH ? e.sentCount : e.receivedCount;
+            sb.append(" · ").append(count).append(" 条");
         } else {
             sb.append("失败");
             if (e.errorMessage != null) {
