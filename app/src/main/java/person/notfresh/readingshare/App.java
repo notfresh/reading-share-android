@@ -67,9 +67,13 @@ public class App extends Application {
             SyncLogStore syncLogStore = new SqliteSyncLogStore(db);
             EventLogPusher pusher = new HttpEventLogPusher(url, secret);
             EventLogPuller puller = new HttpEventLogPuller(url, secret);
-            EventLogClient.init(store, syncStore, pusher, puller, syncConfig, syncLogStore, linkApplier);
+            android.content.SharedPreferences bootstrapPrefs = getSharedPreferences(
+                    "eventlog_bootstrap_prefs", MODE_PRIVATE);
+            EventLogClient.init(store, syncStore, pusher, puller, syncConfig, syncLogStore, linkApplier, bootstrapPrefs);
         } else {
-            EventLogClient.init(store, linkApplier);
+            android.content.SharedPreferences bootstrapPrefs = getSharedPreferences(
+                    "eventlog_bootstrap_prefs", MODE_PRIVATE);
+            EventLogClient.init(store, linkApplier, bootstrapPrefs);
         }
         bootstrapEventLogIfNeeded(db, deviceId);
         if (syncWired) {

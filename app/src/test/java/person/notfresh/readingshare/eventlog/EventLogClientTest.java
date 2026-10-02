@@ -1,5 +1,7 @@
 package person.notfresh.readingshare.eventlog;
 
+import android.content.SharedPreferences;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -9,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -26,13 +29,15 @@ public class EventLogClientTest {
     private static final long FIXED_EVENT_MILLIS = 1_650_000_000_000L;
 
     private FakeStore store;
+    private FakeSharedPreferences fakePrefs;
     private EventLogClient.TimeSource fixedClock;
 
     @Before
     public void setUp() {
         store = new FakeStore(DEVICE);
+        fakePrefs = new FakeSharedPreferences();
         fixedClock = () -> FIXED_MILLIS;
-        EventLogClient.init(store, fixedClock);
+        EventLogClient.init(store, fixedClock, fakePrefs);
     }
 
     @After
@@ -201,7 +206,7 @@ public class EventLogClientTest {
     @Test
     public void since_with_limit_returns_at_most_n_records() {
         AtomicLong clock = new AtomicLong(FIXED_MILLIS);
-        EventLogClient.init(store, clock::get);
+        EventLogClient.init(store, clock::get, fakePrefs);
         for (int i = 0; i < 5; i++) {
             clock.addAndGet(1);
             EventLogClient.get().create("links", "e" + i, FIXED_MILLIS, "{}");
@@ -213,7 +218,7 @@ public class EventLogClientTest {
     @Test
     public void paging_walks_full_stream_in_order() {
         AtomicLong clock = new AtomicLong(FIXED_MILLIS);
-        EventLogClient.init(store, clock::get);
+        EventLogClient.init(store, clock::get, fakePrefs);
         for (int i = 0; i < 7; i++) {
             clock.addAndGet(1);
             EventLogClient.get().create("links", "e" + i, FIXED_MILLIS, "{}");
@@ -294,6 +299,19 @@ public class EventLogClientTest {
         }
 
         @Override
+        public synchronized List<EventRecord> sinceByProcessTime(String topic, String sinceProcessTime) {
+            List<EventRecord> out = new ArrayList<>();
+            for (EventRecord r : byId.values()) {
+                if (!r.getTopic().equals(topic)) continue;
+                if (r.getProcessTime().compareTo(sinceProcessTime) > 0) {
+                    out.add(r);
+                }
+            }
+            out.sort((a, b) -> a.getProcessTime().compareTo(b.getProcessTime())); // ASC
+            return out;
+        }
+
+        @Override
         public synchronized List<EventRecord> until(String topic, String untilEventTime, int limit) {
             if (limit <= 0) {
                 throw new EventLogException("limit must be positive, got " + limit);
@@ -306,6 +324,25 @@ public class EventLogClientTest {
                 }
             }
             out.sort((a, b) -> b.getEventTime().compareTo(a.getEventTime())); // DESC
+            if (out.size() > limit) {
+                return new ArrayList<>(out.subList(0, limit));
+            }
+            return out;
+        }
+
+        @Override
+        public synchronized List<EventRecord> untilByProcessTime(String topic, String untilProcessTime, int limit) {
+            if (limit <= 0) {
+                throw new EventLogException("limit must be positive, got " + limit);
+            }
+            List<EventRecord> out = new ArrayList<>();
+            for (EventRecord r : byId.values()) {
+                if (!r.getTopic().equals(topic)) continue;
+                if (untilProcessTime == null || r.getProcessTime().compareTo(untilProcessTime) < 0) {
+                    out.add(r);
+                }
+            }
+            out.sort((a, b) -> b.getProcessTime().compareTo(a.getProcessTime())); // DESC
             if (out.size() > limit) {
                 return new ArrayList<>(out.subList(0, limit));
             }
@@ -341,6 +378,63 @@ public class EventLogClientTest {
         @Override
         public String deviceId() {
             return deviceId;
+        }
+    }
+
+    /**
+     * 内存版 SharedPreferences — 测 EventLogClient 的 bootstrap 标志位持久化接口契约。
+     * 用 Map<String, Object> 存值;实现 Android 接口的全部 ~22 个方法,大部分抛
+     * UnsupportedOperationException(测试不调用)。
+     */
+    private static class FakeSharedPreferences implements SharedPreferences {
+        private final Map<String, Object> map = new HashMap<>();
+
+        @Override public Map<String, ?> getAll() { return new HashMap<>(map); }
+        @Override public String getString(String k, String d) {
+            Object v = map.get(k); return v instanceof String ? (String) v : d;
+        }
+        @Override public Set<String> getStringSet(String k, Set<String> d) {
+            Object v = map.get(k); return v instanceof Set ? (Set<String>) v : d;
+        }
+        @Override public int getInt(String k, int d) {
+            Object v = map.get(k); return v instanceof Integer ? (Integer) v : d;
+        }
+        @Override public long getLong(String k, long d) {
+            Object v = map.get(k); return v instanceof Long ? (Long) v : d;
+        }
+        @Override public float getFloat(String k, float d) {
+            Object v = map.get(k); return v instanceof Float ? (Float) v : d;
+        }
+        @Override public boolean getBoolean(String k, boolean d) {
+            Object v = map.get(k); return v instanceof Boolean ? (Boolean) v : d;
+        }
+        @Override public boolean contains(String k) { return map.containsKey(k); }
+        @Override public Editor edit() { return new FakeEditor(); }
+        @Override public void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener l) {}
+        @Override public void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener l) {}
+
+        private class FakeEditor implements Editor {
+            private final Map<String, Object> pending = new HashMap<>();
+            private boolean clearAll = false;
+
+            @Override public Editor putString(String k, String v) { pending.put(k, v); return this; }
+            @Override public Editor putStringSet(String k, Set<String> v) { pending.put(k, v); return this; }
+            @Override public Editor putInt(String k, int v) { pending.put(k, v); return this; }
+            @Override public Editor putLong(String k, long v) { pending.put(k, v); return this; }
+            @Override public Editor putFloat(String k, float v) { pending.put(k, v); return this; }
+            @Override public Editor putBoolean(String k, boolean v) { pending.put(k, v); return this; }
+            @Override public Editor remove(String k) { pending.put(k, null); return this; }
+            @Override public Editor clear() { clearAll = true; return this; }
+
+            @Override public boolean commit() { apply(); return true; }
+
+            @Override public void apply() {
+                if (clearAll) map.clear();
+                for (Map.Entry<String, Object> e : pending.entrySet()) {
+                    if (e.getValue() == null) map.remove(e.getKey());
+                    else map.put(e.getKey(), e.getValue());
+                }
+            }
         }
     }
 }

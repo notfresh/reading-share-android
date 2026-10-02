@@ -1,5 +1,7 @@
 package person.notfresh.readingshare.eventlog;
 
+import android.content.SharedPreferences;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -21,7 +23,9 @@ public final class EventLogClient {
     private final SyncConfig syncConfig;
     private final SyncLogStore syncLogStore;
     private final LinkApplier linkApplier;
-    private volatile boolean bootstrapped = false;
+    private final SharedPreferences bootstrapPrefs;
+
+    private static final String BOOTSTRAP_DONE_KEY = "bootstrap_done";
 
     private EventLogClient(EventLogStore store, TimeSource clock,
                            SyncPointStore syncStore,
@@ -29,7 +33,8 @@ public final class EventLogClient {
                            EventLogPuller puller,
                            SyncConfig syncConfig,
                            SyncLogStore syncLogStore,
-                           LinkApplier linkApplier) {
+                           LinkApplier linkApplier,
+                           SharedPreferences bootstrapPrefs) {
         this.store = store;
         this.clock = clock;
         this.syncStore = syncStore;
@@ -38,6 +43,7 @@ public final class EventLogClient {
         this.syncConfig = syncConfig;
         this.syncLogStore = syncLogStore;
         this.linkApplier = linkApplier;
+        this.bootstrapPrefs = bootstrapPrefs;
     }
 
     public static EventLogClient get() {
@@ -49,18 +55,21 @@ public final class EventLogClient {
         return c;
     }
 
-    public static synchronized void init(EventLogStore store) {
-        init(store, System::currentTimeMillis, null, null, null, null, null, NOOP_LINK_APPLIER);
+    public static synchronized void init(EventLogStore store, SharedPreferences bootstrapPrefs) {
+        init(store, System::currentTimeMillis, null, null, null, null, null,
+                NOOP_LINK_APPLIER, bootstrapPrefs);
     }
 
     /** 单 store + applier init — 用于无服务端同步场景但仍要折叠本地事件 */
-    public static synchronized void init(EventLogStore store, LinkApplier linkApplier) {
+    public static synchronized void init(EventLogStore store, LinkApplier linkApplier,
+                                         SharedPreferences bootstrapPrefs) {
         init(store, System::currentTimeMillis, null, null, null, null, null,
-                linkApplier == null ? NOOP_LINK_APPLIER : linkApplier);
+                linkApplier == null ? NOOP_LINK_APPLIER : linkApplier, bootstrapPrefs);
     }
 
-    public static synchronized void init(EventLogStore store, TimeSource clock) {
-        init(store, clock, null, null, null, null, null, NOOP_LINK_APPLIER);
+    public static synchronized void init(EventLogStore store, TimeSource clock,
+                                         SharedPreferences bootstrapPrefs) {
+        init(store, clock, null, null, null, null, null, NOOP_LINK_APPLIER, bootstrapPrefs);
     }
 
     /**
@@ -70,6 +79,9 @@ public final class EventLogClient {
      * / {@code pull} will then throw {@link EventLogException} when called.
      * {@code linkApplier} folds pulled events back into business tables; pass
      * a real impl (e.g. {@code LinkEventApplier}) for the links topic.
+     * {@code bootstrapPrefs} persists the "本地 link 已灌进 events 表" 标志位 —
+     * 生产传 {@code getSharedPreferences("eventlog_bootstrap_prefs", MODE_PRIVATE)},
+     * 测试传 FakeSharedPreferences。
      */
     public static synchronized void init(EventLogStore store,
                                          SyncPointStore syncStore,
@@ -77,9 +89,10 @@ public final class EventLogClient {
                                          EventLogPuller puller,
                                          SyncConfig syncConfig,
                                          SyncLogStore syncLogStore,
-                                         LinkApplier linkApplier) {
+                                         LinkApplier linkApplier,
+                                         SharedPreferences bootstrapPrefs) {
         init(store, System::currentTimeMillis, syncStore, pusher, puller,
-                syncConfig, syncLogStore, linkApplier);
+                syncConfig, syncLogStore, linkApplier, bootstrapPrefs);
     }
 
     public static synchronized void init(EventLogStore store, TimeSource clock,
@@ -88,10 +101,12 @@ public final class EventLogClient {
                                          EventLogPuller puller,
                                          SyncConfig syncConfig,
                                          SyncLogStore syncLogStore,
-                                         LinkApplier linkApplier) {
+                                         LinkApplier linkApplier,
+                                         SharedPreferences bootstrapPrefs) {
         INSTANCE = new EventLogClient(store, clock, syncStore, pusher, puller,
                 syncConfig, syncLogStore,
-                linkApplier == null ? NOOP_LINK_APPLIER : linkApplier);
+                linkApplier == null ? NOOP_LINK_APPLIER : linkApplier,
+                bootstrapPrefs);
     }
 
     /** 单向门警告 — 此 fallback 仅给老 init 路径用，业务方必须显式注入。 */
@@ -110,15 +125,15 @@ public final class EventLogClient {
     }
 
     public boolean isBootstrapped() {
-        return bootstrapped;
+        return bootstrapPrefs.getBoolean(BOOTSTRAP_DONE_KEY, false);
     }
 
     public void setBootstrapFlag() {
-        this.bootstrapped = true;
+        bootstrapPrefs.edit().putBoolean(BOOTSTRAP_DONE_KEY, true).apply();
     }
 
     public void resetBootstrapFlag() {
-        this.bootstrapped = false;
+        bootstrapPrefs.edit().putBoolean(BOOTSTRAP_DONE_KEY, false).apply();
     }
 
     public EventRecord create(String topic, String entityId, long eventTimeMillis, String dataJson) {
