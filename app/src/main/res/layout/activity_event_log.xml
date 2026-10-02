@@ -39,6 +39,28 @@
         android:text="加载更多" />
 
     <Button
+        android:id="@+id/eventlog_sync_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="4dp"
+        android:text="立即同步" />
+
+    <TextView
+        android:id="@+id/eventlog_last_sync_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:text="暂无同步记录"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
+
+    <Button
         android:id="@+id/eventlog_clear_button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
