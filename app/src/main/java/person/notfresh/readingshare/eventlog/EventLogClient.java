@@ -15,11 +15,26 @@ public final class EventLogClient {
 
     private final EventLogStore store;
     private final TimeSource clock;
+    private final SyncPointStore syncStore;
+    private final EventLogPusher pusher;
+    private final EventLogPuller puller;
+    private final SyncConfig syncConfig;
+    private final SyncLogStore syncLogStore;
     private volatile boolean bootstrapped = false;
 
-    private EventLogClient(EventLogStore store, TimeSource clock) {
+    private EventLogClient(EventLogStore store, TimeSource clock,
+                           SyncPointStore syncStore,
+                           EventLogPusher pusher,
+                           EventLogPuller puller,
+                           SyncConfig syncConfig,
+                           SyncLogStore syncLogStore) {
         this.store = store;
         this.clock = clock;
+        this.syncStore = syncStore;
+        this.pusher = pusher;
+        this.puller = puller;
+        this.syncConfig = syncConfig;
+        this.syncLogStore = syncLogStore;
     }
 
     public static EventLogClient get() {
@@ -32,11 +47,37 @@ public final class EventLogClient {
     }
 
     public static synchronized void init(EventLogStore store) {
-        init(store, System::currentTimeMillis);
+        init(store, System::currentTimeMillis, null, null, null, null, null);
     }
 
     public static synchronized void init(EventLogStore store, TimeSource clock) {
-        INSTANCE = new EventLogClient(store, clock);
+        init(store, clock, null, null, null, null, null);
+    }
+
+    /**
+     * Full init — wires up remote sync. Pass {@code null} for any of
+     * {@code syncStore} / {@code pusher} / {@code puller} / {@code syncConfig} /
+     * {@code syncLogStore} to keep that subsystem disabled. {@code pushPending}
+     * / {@code pull} will then throw {@link EventLogException} when called.
+     */
+    public static synchronized void init(EventLogStore store,
+                                         SyncPointStore syncStore,
+                                         EventLogPusher pusher,
+                                         EventLogPuller puller,
+                                         SyncConfig syncConfig,
+                                         SyncLogStore syncLogStore) {
+        init(store, System::currentTimeMillis, syncStore, pusher, puller,
+                syncConfig, syncLogStore);
+    }
+
+    public static synchronized void init(EventLogStore store, TimeSource clock,
+                                         SyncPointStore syncStore,
+                                         EventLogPusher pusher,
+                                         EventLogPuller puller,
+                                         SyncConfig syncConfig,
+                                         SyncLogStore syncLogStore) {
+        INSTANCE = new EventLogClient(store, clock, syncStore, pusher, puller,
+                syncConfig, syncLogStore);
     }
 
     public static synchronized void reset() {
@@ -45,6 +86,10 @@ public final class EventLogClient {
 
     public EventLogStore store() {
         return store;
+    }
+
+    public SyncLogStore syncLogStore() {
+        return syncLogStore;
     }
 
     public boolean isBootstrapped() {
@@ -93,6 +138,135 @@ public final class EventLogClient {
 
     public void deleteAll() {
         store.deleteAll();
+    }
+
+    /**
+     * Push locally-stored events for {@code topic} to the remote server,
+     * advancing the push cursor on success. Per PROTOCOL §10.5 PUSH 流程:
+     *
+     * <ol>
+     *   <li>Read push cursor from {@link SyncPointStore}.</li>
+     *   <li>Query local events with {@code process_time > cursor}, batch size 100.</li>
+     *   <li>POST the batch (§4.1.1). On non-2xx, return {@code -1}; cursor untouched.</li>
+     *   <li>On 2xx, advance push cursor to {@code batch[-1].process_time}.</li>
+     * </ol>
+     *
+     * <p>Threading: BLOCKING. Callers MUST run on a background thread.</p>
+     *
+     * @return number of events pushed on success; {@code -1} on failure
+     */
+    public int pushPending(String topic) {
+        ensureSyncReady();
+        String cursorKey = pushCursorKey(topic);
+        String cursor = syncStore.get(cursorKey);
+        List<EventRecord> batch = store.sinceByProcessTime(topic, cursor);
+        if (batch.isEmpty()) {
+            logSyncAttempt(SyncLogEntry.Direction.PUSH, 0, 0, null, true);
+            return 0;
+        }
+        EventLogPusher.PushResult r;
+        try {
+            r = pusher.push(topic, batch);
+        } catch (EventLogException e) {
+            logSyncAttempt(SyncLogEntry.Direction.PUSH, batch.size(), 0,
+                    e.getMessage(), false);
+            throw e;
+        }
+        if (!r.success) {
+            logSyncAttempt(SyncLogEntry.Direction.PUSH, r.sentCount, 0,
+                    r.errorMessage, false);
+            return -1;
+        }
+        syncStore.set(cursorKey, r.lastPushedProcessTime);
+        logSyncAttempt(SyncLogEntry.Direction.PUSH, r.sentCount, 0, null, true);
+        return r.sentCount;
+    }
+
+    /**
+     * Pull events for {@code topic} from the remote server and persist them
+     * locally, advancing the pull cursor on success. Per PROTOCOL §10.5 PULL 流程:
+     *
+     * <ol>
+     *   <li>Read pull cursor from {@link SyncPointStore}.</li>
+     *   <li>Loop: GET a batch (§4.2), append events to local store.</li>
+     *   <li>Advance cursor to {@code batch[-1].process_time} after each batch.</li>
+     *   <li>Stop when batch size < limit (signal: no more events).</li>
+     * </ol>
+     *
+     * <p>LWW folding (§5.4) is NOT performed here — caller / sync layer is
+     * responsible. This method only ensures remote events reach the local
+     * append-only log.</p>
+     *
+     * <p>Threading: BLOCKING. Callers MUST run on a background thread.</p>
+     *
+     * @return total number of events pulled and persisted
+     */
+    public int pull(String topic) {
+        ensureSyncReady();
+        final int batchLimit = 1000;
+        final int maxLoops = 100; // safety cap
+        String cursorKey = pullCursorKey(topic);
+        String cursor = syncStore.get(cursorKey);
+        int total = 0;
+        boolean allOk = true;
+        String lastError = null;
+        for (int i = 0; i < maxLoops; i++) {
+            EventLogPuller.PullResult r;
+            try {
+                r = puller.pull(topic, cursor, batchLimit);
+            } catch (EventLogException e) {
+                allOk = false;
+                lastError = e.getMessage();
+                break;
+            }
+            if (!r.success) {
+                allOk = false;
+                lastError = r.errorMessage;
+                break;
+            }
+            List<EventRecord> batch = r.events;
+            if (batch.isEmpty()) {
+                break;
+            }
+            for (EventRecord e : batch) {
+                store.append(e);
+                total++;
+            }
+            cursor = batch.get(batch.size() - 1).getProcessTime();
+            syncStore.set(cursorKey, cursor);
+            if (batch.size() < batchLimit) {
+                break; // signal: server returned less than limit
+            }
+        }
+        logSyncAttempt(SyncLogEntry.Direction.PULL, 0, total, lastError, allOk);
+        return total;
+    }
+
+    private void logSyncAttempt(SyncLogEntry.Direction direction,
+                                int sentCount, int receivedCount,
+                                String errorMessage, boolean success) {
+        if (syncLogStore == null) return;
+        try {
+            String ts = formatIso8601(clock.nowMillis());
+            syncLogStore.add(direction, ts, success, sentCount, receivedCount, errorMessage);
+        } catch (Exception ignored) {
+            // best-effort: sync logging must never break sync itself
+        }
+    }
+
+    private void ensureSyncReady() {
+        if (syncStore == null || pusher == null || puller == null || syncConfig == null) {
+            throw new EventLogException(
+                    "EventLogClient sync not initialized; call init() with pusher/puller/syncConfig");
+        }
+    }
+
+    private String pushCursorKey(String topic) {
+        return "push:" + syncConfig.baseUrl() + ":" + topic;
+    }
+
+    private String pullCursorKey(String topic) {
+        return "pull:" + syncConfig.baseUrl() + ":" + topic;
     }
 
     private EventRecord record(String topic, String entityId, long eventTimeMillis,
