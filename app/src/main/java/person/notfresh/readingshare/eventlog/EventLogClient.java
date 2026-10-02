@@ -191,27 +191,34 @@ public final class EventLogClient {
         ensureSyncReady();
         String cursorKey = pushCursorKey(topic);
         String cursor = syncStore.get(cursorKey);
-        List<EventRecord> batch = store.sinceByProcessTime(topic, cursor);
-        if (batch.isEmpty()) {
-            logSyncAttempt(SyncLogEntry.Direction.PUSH, 0, 0, null, true);
-            return 0;
+        // 协议 §10.5 PUSH: 每批 ≤ BATCH_LIMIT(store 层默认 100 条),
+        // 客户端循环取批直到取空 — 上千条待推事件不再只推第一批。
+        final int maxLoops = 10000; // 安全上限,防游标卡死空转
+        int totalSent = 0;
+        boolean allOk = true;
+        String lastError = null;
+        for (int i = 0; i < maxLoops; i++) {
+            List<EventRecord> batch = store.sinceByProcessTime(topic, cursor);
+            if (batch.isEmpty()) break;
+            EventLogPusher.PushResult r;
+            try {
+                r = pusher.push(topic, batch);
+            } catch (EventLogException e) {
+                logSyncAttempt(SyncLogEntry.Direction.PUSH, totalSent, 0,
+                        e.getMessage(), false);
+                throw e;
+            }
+            if (!r.success) {
+                allOk = false;
+                lastError = r.errorMessage;
+                break;
+            }
+            syncStore.set(cursorKey, r.lastPushedProcessTime);
+            cursor = r.lastPushedProcessTime;
+            totalSent += r.sentCount;
         }
-        EventLogPusher.PushResult r;
-        try {
-            r = pusher.push(topic, batch);
-        } catch (EventLogException e) {
-            logSyncAttempt(SyncLogEntry.Direction.PUSH, batch.size(), 0,
-                    e.getMessage(), false);
-            throw e;
-        }
-        if (!r.success) {
-            logSyncAttempt(SyncLogEntry.Direction.PUSH, r.sentCount, 0,
-                    r.errorMessage, false);
-            return -1;
-        }
-        syncStore.set(cursorKey, r.lastPushedProcessTime);
-        logSyncAttempt(SyncLogEntry.Direction.PUSH, r.sentCount, 0, null, true);
-        return r.sentCount;
+        logSyncAttempt(SyncLogEntry.Direction.PUSH, totalSent, 0, lastError, allOk);
+        return allOk ? totalSent : -1;
     }
 
     /**
