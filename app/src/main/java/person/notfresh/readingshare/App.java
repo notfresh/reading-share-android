@@ -5,13 +5,26 @@ import android.database.sqlite.SQLiteDatabase;
 import android.provider.Settings;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventAction;
 import person.notfresh.readingshare.eventlog.EventLogClient;
+import person.notfresh.readingshare.eventlog.EventLogPuller;
+import person.notfresh.readingshare.eventlog.EventLogPusher;
+import person.notfresh.readingshare.eventlog.EventLogStore;
 import person.notfresh.readingshare.eventlog.EventRecord;
+import person.notfresh.readingshare.eventlog.HttpEventLogPuller;
+import person.notfresh.readingshare.eventlog.HttpEventLogPusher;
 import person.notfresh.readingshare.eventlog.SqliteEventLogStore;
+import person.notfresh.readingshare.eventlog.SqliteSyncLogStore;
+import person.notfresh.readingshare.eventlog.SqliteSyncPointStore;
+import person.notfresh.readingshare.eventlog.SyncConfig;
+import person.notfresh.readingshare.eventlog.SyncLogStore;
+import person.notfresh.readingshare.eventlog.SyncPointStore;
+import person.notfresh.readingshare.sync.SimpleSyncManager;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
 
@@ -22,6 +35,9 @@ import person.notfresh.readingshare.model.LinkJson;
  * onCreate / onUpgrade 检查。后续 DAO 调用直接拿现成连接,不再重复 acquireReference。
  */
 public class App extends Application {
+
+    private ExecutorService syncExecutor;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -33,8 +49,50 @@ public class App extends Application {
         if (deviceId == null || deviceId.isEmpty()) {
             deviceId = "unknown";
         }
-        EventLogClient.init(new SqliteEventLogStore(db, deviceId));
+        EventLogStore store = new SqliteEventLogStore(db, deviceId);
+        // Sync config reuses the SharedPreferences that SettingFragment writes
+        // to via SimpleSyncManager — same server, same secret, different sync
+        // layer (eventlog vs link full-exchange).
+        boolean syncWired = SimpleSyncManager.hasConfig(this);
+        if (syncWired) {
+            String url = SimpleSyncManager.getServerUrl(this);
+            String secret = SimpleSyncManager.getSecretKey(this);
+            SyncConfig syncConfig = new SyncConfig(url, secret);
+            SyncPointStore syncStore = new SqliteSyncPointStore(db);
+            SyncLogStore syncLogStore = new SqliteSyncLogStore(db);
+            EventLogPusher pusher = new HttpEventLogPusher(url, secret);
+            EventLogPuller puller = new HttpEventLogPuller(url, secret);
+            EventLogClient.init(store, syncStore, pusher, puller, syncConfig, syncLogStore);
+        } else {
+            EventLogClient.init(store);
+        }
         bootstrapEventLogIfNeeded(db, deviceId);
+        // TODO: 启用启动同步 — 当前 §4.1 POST /events 批量 body 已实现并经测试，
+        //       但还没做端到端联调。打开本注释前，先本地起服务端
+        //       （python app.py），在 SettingFragment 填好 server_url + secret_key，
+        //       然后观察事件日志页面"上次同步"那条记录是否变化。
+        // if (syncWired) {
+        //     triggerStartupSync();
+        // }
+    }
+
+    /**
+     * Kick off one push + pull cycle on a background thread, per
+     * PROTOCOL §10.5 客户端同步触发策略 (启动一次). Failures are swallowed
+     * — this is best-effort; the next app launch will retry.
+     */
+    private void triggerStartupSync() {
+        if (syncExecutor == null) {
+            syncExecutor = Executors.newSingleThreadExecutor();
+        }
+        syncExecutor.submit(() -> {
+            try {
+                EventLogClient.get().pushPending("links");
+                EventLogClient.get().pull("links");
+            } catch (Exception ignored) {
+                // best-effort: log to Logcat in future iteration
+            }
+        });
     }
 
     private void bootstrapEventLogIfNeeded(SQLiteDatabase db, String deviceId) {
