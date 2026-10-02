@@ -20,6 +20,7 @@ public final class EventLogClient {
     private final EventLogPuller puller;
     private final SyncConfig syncConfig;
     private final SyncLogStore syncLogStore;
+    private final LinkApplier linkApplier;
     private volatile boolean bootstrapped = false;
 
     private EventLogClient(EventLogStore store, TimeSource clock,
@@ -27,7 +28,8 @@ public final class EventLogClient {
                            EventLogPusher pusher,
                            EventLogPuller puller,
                            SyncConfig syncConfig,
-                           SyncLogStore syncLogStore) {
+                           SyncLogStore syncLogStore,
+                           LinkApplier linkApplier) {
         this.store = store;
         this.clock = clock;
         this.syncStore = syncStore;
@@ -35,6 +37,7 @@ public final class EventLogClient {
         this.puller = puller;
         this.syncConfig = syncConfig;
         this.syncLogStore = syncLogStore;
+        this.linkApplier = linkApplier;
     }
 
     public static EventLogClient get() {
@@ -47,27 +50,36 @@ public final class EventLogClient {
     }
 
     public static synchronized void init(EventLogStore store) {
-        init(store, System::currentTimeMillis, null, null, null, null, null);
+        init(store, System::currentTimeMillis, null, null, null, null, null, NOOP_LINK_APPLIER);
+    }
+
+    /** 单 store + applier init — 用于无服务端同步场景但仍要折叠本地事件 */
+    public static synchronized void init(EventLogStore store, LinkApplier linkApplier) {
+        init(store, System::currentTimeMillis, null, null, null, null, null,
+                linkApplier == null ? NOOP_LINK_APPLIER : linkApplier);
     }
 
     public static synchronized void init(EventLogStore store, TimeSource clock) {
-        init(store, clock, null, null, null, null, null);
+        init(store, clock, null, null, null, null, null, NOOP_LINK_APPLIER);
     }
 
     /**
-     * Full init — wires up remote sync. Pass {@code null} for any of
+     * Full init — wires up remote sync + LWW folding. Pass {@code null} for any of
      * {@code syncStore} / {@code pusher} / {@code puller} / {@code syncConfig} /
      * {@code syncLogStore} to keep that subsystem disabled. {@code pushPending}
      * / {@code pull} will then throw {@link EventLogException} when called.
+     * {@code linkApplier} folds pulled events back into business tables; pass
+     * a real impl (e.g. {@code LinkEventApplier}) for the links topic.
      */
     public static synchronized void init(EventLogStore store,
                                          SyncPointStore syncStore,
                                          EventLogPusher pusher,
                                          EventLogPuller puller,
                                          SyncConfig syncConfig,
-                                         SyncLogStore syncLogStore) {
+                                         SyncLogStore syncLogStore,
+                                         LinkApplier linkApplier) {
         init(store, System::currentTimeMillis, syncStore, pusher, puller,
-                syncConfig, syncLogStore);
+                syncConfig, syncLogStore, linkApplier);
     }
 
     public static synchronized void init(EventLogStore store, TimeSource clock,
@@ -75,10 +87,15 @@ public final class EventLogClient {
                                          EventLogPusher pusher,
                                          EventLogPuller puller,
                                          SyncConfig syncConfig,
-                                         SyncLogStore syncLogStore) {
+                                         SyncLogStore syncLogStore,
+                                         LinkApplier linkApplier) {
         INSTANCE = new EventLogClient(store, clock, syncStore, pusher, puller,
-                syncConfig, syncLogStore);
+                syncConfig, syncLogStore,
+                linkApplier == null ? NOOP_LINK_APPLIER : linkApplier);
     }
+
+    /** 单向门警告 — 此 fallback 仅给老 init 路径用，业务方必须显式注入。 */
+    private static final LinkApplier NOOP_LINK_APPLIER = event -> { /* noop */ };
 
     public static synchronized void reset() {
         INSTANCE = null;
@@ -233,6 +250,10 @@ public final class EventLogClient {
             for (EventRecord e : batch) {
                 store.append(e);
                 total++;
+                // LWW folding — pull 到的事件折叠回 link 表（PROTOCOL §5.4）
+                // 折叠是 sync layer 职责，本部署里 EventLogClient 兼任；
+                // applier 决定哪些 topic 折叠（link 业务折叠，其它 noop）
+                linkApplier.apply(e);
             }
             cursor = batch.get(batch.size() - 1).getProcessTime();
             syncStore.set(cursorKey, cursor);

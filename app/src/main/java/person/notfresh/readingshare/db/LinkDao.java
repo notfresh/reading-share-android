@@ -88,6 +88,29 @@ public class LinkDao {
         return linkId;
     }
 
+    /**
+     * 用服务端给定的 {@code item.id} 写入 / 覆盖 links 行 — 同步折叠用：
+     * 服务端 entity_id 即本地 link._id，原值写入避免 auto-id 漂移。
+     * CONFLICT_REPLACE 保证重复到达（服务端重发）幂等。
+     */
+    public void replaceById(LinkItem item) {
+        if (item == null || item.getId() <= 0) return;
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_ID, item.getId());
+        values.put(LinkDbHelper.COLUMN_TITLE, item.getTitle());
+        values.put(LinkDbHelper.COLUMN_URL, item.getUrl());
+        values.put(LinkDbHelper.COLUMN_SOURCE_APP, item.getSourceApp());
+        values.put(LinkDbHelper.COLUMN_TIMESTAMP, item.getTimestamp());
+        values.put(LinkDbHelper.COLUMN_ORIGINAL_INTENT, item.getOriginalIntent());
+        values.put(LinkDbHelper.COLUMN_TARGET_ACTIVITY, item.getTargetActivity());
+        values.put(LinkDbHelper.COLUMN_REMARK, item.getRemark());
+        values.put(LinkDbHelper.COLUMN_SUMMARY, item.getSummary());
+        database.insertWithOnConflict(
+                LinkDbHelper.TABLE_LINKS, null, values,
+                SQLiteDatabase.CONFLICT_REPLACE);
+        updateLinkTags(item);
+    }
+
     public void deleteLink(String url) {
         database.delete(
                 LinkDbHelper.TABLE_LINKS,

@@ -18,12 +18,14 @@ import person.notfresh.readingshare.eventlog.EventLogStore;
 import person.notfresh.readingshare.eventlog.EventRecord;
 import person.notfresh.readingshare.eventlog.HttpEventLogPuller;
 import person.notfresh.readingshare.eventlog.HttpEventLogPusher;
+import person.notfresh.readingshare.eventlog.LinkApplier;
 import person.notfresh.readingshare.eventlog.SqliteEventLogStore;
 import person.notfresh.readingshare.eventlog.SqliteSyncLogStore;
 import person.notfresh.readingshare.eventlog.SqliteSyncPointStore;
 import person.notfresh.readingshare.eventlog.SyncConfig;
 import person.notfresh.readingshare.eventlog.SyncLogStore;
 import person.notfresh.readingshare.eventlog.SyncPointStore;
+import person.notfresh.readingshare.links.LinkEventApplier;
 import person.notfresh.readingshare.sync.SimpleSyncManager;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
@@ -54,6 +56,9 @@ public class App extends Application {
         // to via SimpleSyncManager — same server, same secret, different sync
         // layer (eventlog vs link full-exchange).
         boolean syncWired = SimpleSyncManager.hasConfig(this);
+        // 单例：db / LinkDao / LinkApplier 整个 app 生命周期共用一份
+        LinkDao linkDao = new LinkDao(db);
+        LinkApplier linkApplier = new LinkEventApplier(linkDao);
         if (syncWired) {
             String url = SimpleSyncManager.getServerUrl(this);
             String secret = SimpleSyncManager.getSecretKey(this);
@@ -62,9 +67,9 @@ public class App extends Application {
             SyncLogStore syncLogStore = new SqliteSyncLogStore(db);
             EventLogPusher pusher = new HttpEventLogPusher(url, secret);
             EventLogPuller puller = new HttpEventLogPuller(url, secret);
-            EventLogClient.init(store, syncStore, pusher, puller, syncConfig, syncLogStore);
+            EventLogClient.init(store, syncStore, pusher, puller, syncConfig, syncLogStore, linkApplier);
         } else {
-            EventLogClient.init(store);
+            EventLogClient.init(store, linkApplier);
         }
         bootstrapEventLogIfNeeded(db, deviceId);
         if (syncWired) {
