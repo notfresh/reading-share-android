@@ -95,7 +95,9 @@ public class SimpleSyncManager {
     public static String getSecretKey(Context context) {
         if (context == null) return "";
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getString(KEY_SECRET_KEY, "");
+        // 读时也 trim — 清理历史脏数据（旧 APK 没 trim 写入时存的带 \n secret）
+        String v = prefs.getString(KEY_SECRET_KEY, "");
+        return v == null ? "" : v.trim();
     }
 
     public static boolean hasConfig(Context context) {
@@ -118,7 +120,10 @@ public class SimpleSyncManager {
     public static void saveSecretKey(Context context, String secretKey) {
         if (context == null) return;
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putString(KEY_SECRET_KEY, secretKey == null ? "" : secretKey).apply();
+        // trim 写入 — 防粘贴时多带换行/空格导致 secret 末尾有 \n，
+        // 进 HTTP Authorization 头会被 HttpURLConnection 抛 IllegalArgumentException
+        String v = secretKey == null ? "" : secretKey.trim();
+        prefs.edit().putString(KEY_SECRET_KEY, v).apply();
     }
 
     /**

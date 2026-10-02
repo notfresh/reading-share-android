@@ -39,6 +39,9 @@ public final class HttpEventLogPuller implements EventLogPuller {
         if (secret == null || secret.isEmpty()) {
             throw new EventLogException("secret is empty");
         }
+        // 防御性 trim — 防止上游传入的 secret 末尾有换行/空格，
+        // 进 HTTP Authorization 头会触发 IllegalArgumentException
+        this.secret = secret.trim();
         this.baseUrl = baseUrl.endsWith("/")
                 ? baseUrl.substring(0, baseUrl.length() - 1)
                 : baseUrl;
