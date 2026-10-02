@@ -81,6 +81,30 @@ public class SimpleSyncManager {
     }
 
     /**
+     * Static, lightweight variants for callers that just need to read
+     * the configured URL / secret without opening a LinkDao connection.
+     * Instance methods above are unchanged for backward compatibility
+     * with SettingFragment and other existing call sites.
+     */
+    public static String getServerUrl(Context context) {
+        if (context == null) return "";
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(KEY_SERVER_URL, "");
+    }
+
+    public static String getSecretKey(Context context) {
+        if (context == null) return "";
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(KEY_SECRET_KEY, "");
+    }
+
+    public static boolean hasConfig(Context context) {
+        String url = getServerUrl(context);
+        String key = getSecretKey(context);
+        return url != null && !url.isEmpty() && key != null && !key.isEmpty();
+    }
+
+    /**
      * 计算链接的 hash
      * hash = SHA256(title + "::" + url)
      */
