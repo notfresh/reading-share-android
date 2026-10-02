@@ -1,6 +1,9 @@
 package person.notfresh.readingshare;
 
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.UnderlineSpan;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
@@ -122,12 +125,22 @@ public class EventLogActivity extends AppCompatActivity {
             }
             runOnUiThread(() -> {
                 if (recent[0].isEmpty()) {
-                    lastSyncText.setText("暂无同步记录");
+                    lastSyncText.setText(makeClickableHint("暂无同步记录"));
                 } else {
-                    lastSyncText.setText(formatSyncEntry(recent[0].get(0)));
+                    lastSyncText.setText(makeClickableHint(formatSyncEntry(recent[0].get(0))));
                 }
             });
         }).start();
+    }
+
+    /** 给摘要末尾追加"· 点击查看完整日志"并加下划线 — 提示用户这行可点 */
+    private static Spanned makeClickableHint(String summary) {
+        String hint = "\n点击查看完整日志";
+        String full = summary + hint;
+        SpannableString ss = new SpannableString(full);
+        ss.setSpan(new UnderlineSpan(), summary.length(), full.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return ss;
     }
 
     private static String formatSyncEntry(SyncLogEntry e) {
