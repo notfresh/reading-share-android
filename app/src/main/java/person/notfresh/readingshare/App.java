@@ -67,13 +67,9 @@ public class App extends Application {
             EventLogClient.init(store);
         }
         bootstrapEventLogIfNeeded(db, deviceId);
-        // TODO: 启用启动同步 — 当前 §4.1 POST /events 批量 body 已实现并经测试，
-        //       但还没做端到端联调。打开本注释前，先本地起服务端
-        //       （python app.py），在 SettingFragment 填好 server_url + secret_key，
-        //       然后观察事件日志页面"上次同步"那条记录是否变化。
-        // if (syncWired) {
-        //     triggerStartupSync();
-        // }
+        if (syncWired) {
+            triggerStartupSync();
+        }
     }
 
     /**
