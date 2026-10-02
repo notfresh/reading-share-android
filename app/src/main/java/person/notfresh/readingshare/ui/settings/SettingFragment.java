@@ -225,20 +225,8 @@ public class SettingFragment extends Fragment {
             }
         });
 
-        // 同步按钮点击事件
-        root.findViewById(R.id.button_sync).setOnClickListener(v -> {
-            // 先保存当前配置
-            String serverUrl = serverUrlInput.getText().toString().trim();
-            String secretKey = syncSecretKeyInput.getText().toString().trim();
-
-            if (serverUrl.isEmpty() || secretKey.isEmpty()) {
-                syncStatusText.setText("请填写服务器地址和同步密钥");
-                return;
-            }
-
-            syncManager.saveConfig(serverUrl, secretKey);
-            performSync();
-        });
+        // 同步按钮点击事件（已删除 — 同步入口改到 EventLogActivity 内的"立即同步"按钮，
+        //               由 EventLogClient.pushPending + pull 驱动；不再走 SimpleSyncManager.performSync）
 
         // 阅读模式设置（normal / smooth）
         RadioGroup readingModeGroup = root.findViewById(R.id.reading_mode_group);
