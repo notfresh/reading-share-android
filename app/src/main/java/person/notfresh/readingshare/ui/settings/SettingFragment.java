@@ -447,29 +447,50 @@ public class SettingFragment extends Fragment {
         
         // 如果启用去重，过滤掉已存在的链接
         List<LinkItem> itemsToImport = result.items;
+        // 与 itemsToImport 对齐的 subject 名字列表(只有真正会写入的 item 才保留)
+        List<List<String>> subjectsToImport = result.subjectsPerItem;
         int duplicateCount = 0;
-        
+
         if (removeDuplicates) {
             List<LinkItem> filteredItems = new ArrayList<>();
-            for (LinkItem item : itemsToImport) {
+            List<List<String>> filteredSubjects = new ArrayList<>();
+            for (int i = 0; i < itemsToImport.size(); i++) {
+                LinkItem item = itemsToImport.get(i);
+                List<String> subjects = i < subjectsToImport.size()
+                        ? subjectsToImport.get(i) : java.util.Collections.emptyList();
                 if (!linkDao.urlExists(item.getUrl())) {
                     filteredItems.add(item);
+                    filteredSubjects.add(subjects);
                 } else {
                     duplicateCount++;
                 }
             }
             itemsToImport = filteredItems;
+            subjectsToImport = filteredSubjects;
         }
-        
+
         // 将导入的链接保存到数据库
         int importedCount = 0;
-        for (LinkItem item : itemsToImport) {
+        for (int i = 0; i < itemsToImport.size(); i++) {
+            LinkItem item = itemsToImport.get(i);
             try {
                 linkDao.insertLink(item);
                 EventLogClient.get().create("links",
                         String.valueOf(item.getId()),
                         item.getTimestamp(),
                         LinkJson.toJsonString(item));
+                // 关联 subject(若导出时带过来)— 已存在复用,不存在新建
+                List<String> subjects = i < subjectsToImport.size()
+                        ? subjectsToImport.get(i) : java.util.Collections.emptyList();
+                if (subjects != null && !subjects.isEmpty()) {
+                    java.util.Map<String, Long> nameToId = SubjectUtil.resolveOrCreateSubjects(
+                            requireContext(), subjects);
+                    for (Long subjectId : nameToId.values()) {
+                        if (subjectId != null) {
+                            SubjectUtil.linkLinkToSubject(requireContext(), item.getId(), subjectId);
+                        }
+                    }
+                }
                 importedCount++;
             } catch (Exception e) {
                 // 忽略插入失败的情况
