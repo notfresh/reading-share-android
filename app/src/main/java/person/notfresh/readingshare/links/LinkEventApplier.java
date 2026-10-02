@@ -56,6 +56,12 @@ public final class LinkEventApplier implements LinkApplier {
     private void handleCreate(EventRecord event) {
         LinkItem item = decode(event);
         if (item == null) return;
+        // 同步去重：URL + title 完全相同 → 本地已是同一份,跳过落库
+        // (URL 同但 title 不同 → 覆盖,标题变更要跟上;DELETE 不走此分支)
+        String existingTitle = linkDao.getLinkTitleByUrl(item.getUrl());
+        if (existingTitle != null && existingTitle.equals(item.getTitle())) {
+            return;
+        }
         // create: 拉服务端版本作为权威 — 直接 replace（已存在的则覆盖）
         // 幂等：服务端可能重发同 id 的 create，CONFLICT_REPLACE 安全
         linkDao.replaceById(item);
