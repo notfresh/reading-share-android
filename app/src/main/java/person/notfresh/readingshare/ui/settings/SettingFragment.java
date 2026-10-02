@@ -169,11 +169,14 @@ public class SettingFragment extends Fragment {
 
         // 初始化服务器URL输入框
         serverUrlInput = root.findViewById(R.id.server_url_input);
-        
-        // 从 SharedPreferences 加载保存的URL
-        // use named prefs for cross-component access
+
+        // 从 SharedPreferences 加载保存的URL（统一读 simple_sync，与 SimpleSyncManager
+        // 一致 — 修复 URL 改动不生效 bug，之前读 settings 与 simple_sync 分离）
         SharedPreferences globalPrefs = requireActivity().getSharedPreferences("settings", Context.MODE_PRIVATE);
-        String savedUrl = globalPrefs.getString("server_url", DEFAULT_SERVER_URL);
+        String savedUrl = SimpleSyncManager.getServerUrl(requireContext());
+        if (savedUrl.isEmpty()) {
+            savedUrl = DEFAULT_SERVER_URL;
+        }
         serverUrlInput.setText(savedUrl);
 
         CheckBox showMailFabCheckbox = root.findViewById(R.id.show_mail_fab_checkbox);
@@ -199,10 +202,8 @@ public class SettingFragment extends Fragment {
                     newUrl = DEFAULT_SERVER_URL;
                     serverUrlInput.setText(newUrl);
                 }
-                // 保存新的URL到全局设置
-                SharedPreferences.Editor editor = globalPrefs.edit();
-                editor.putString("server_url", newUrl);
-                editor.apply();
+                // 写 simple_sync（eventlog 同步从这里读）
+                SimpleSyncManager.saveServerUrl(requireContext(), newUrl);
             }
         });
 
@@ -211,17 +212,15 @@ public class SettingFragment extends Fragment {
         syncStatusText = root.findViewById(R.id.sync_status_text);
 
         // 加载保存的密钥
-        String savedKey = syncManager.getSecretKey();
+        String savedKey = SimpleSyncManager.getSecretKey(requireContext());
         syncSecretKeyInput.setText(savedKey);
 
         // 监听密钥输入框焦点变化
         syncSecretKeyInput.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) {
                 String newKey = syncSecretKeyInput.getText().toString().trim();
-                String serverUrl = serverUrlInput.getText().toString().trim();
-                if (!newKey.isEmpty() && !serverUrl.isEmpty()) {
-                    syncManager.saveConfig(serverUrl, newKey);
-                }
+                // secret 与 URL 独立保存 — 互不依赖，避免"填了 secret 没填 URL 不保存"的 bug
+                SimpleSyncManager.saveSecretKey(requireContext(), newKey);
             }
         });
 

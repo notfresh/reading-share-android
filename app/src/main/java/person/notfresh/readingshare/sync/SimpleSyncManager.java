@@ -105,6 +105,23 @@ public class SimpleSyncManager {
     }
 
     /**
+     * Static, independent setters. URL失焦写一个,secret失焦写一个,互不依赖 —
+     * 比 {@link #saveConfig(String, String)} 联写更 SE(单一来源 / 各管各的)。
+     * SettingFragment URL失焦 / secret失焦分别调各自 setter。
+     */
+    public static void saveServerUrl(Context context, String serverUrl) {
+        if (context == null) return;
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString(KEY_SERVER_URL, serverUrl == null ? "" : serverUrl).apply();
+    }
+
+    public static void saveSecretKey(Context context, String secretKey) {
+        if (context == null) return;
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString(KEY_SECRET_KEY, secretKey == null ? "" : secretKey).apply();
+    }
+
+    /**
      * 计算链接的 hash
      * hash = SHA256(title + "::" + url)
      */
