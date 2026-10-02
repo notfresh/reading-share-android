@@ -16,13 +16,18 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 导入工具类，用于从 CSV 或 JSON 文件导入链接数据
  */
 public class ImportUtil {
-    
+
+    // 多 subject 分隔符 — 与 ExportUtil.joinSubjectNames 对称
+    private static final String SUBJECT_DELIMITER = "\\|";
+
     /**
      * 导入结果类
      */
@@ -32,21 +37,37 @@ public class ImportUtil {
         public final int errorCount;
         public final List<LinkItem> items;
         public final List<String> errors;
-        
-        public ImportResult(String format, int successCount, int errorCount, 
+        /**
+         * 顺序与 items 对齐:subjects[i] 是 items[i] 应当归属的 subject 名字列表(已 trim)。
+         * caller 拿到 linkId 后,调用 {@link SubjectUtil#resolveOrCreateSubjects}
+         * + {@link SubjectUtil#linkLinkToSubject} 完成关联。
+         */
+        public final List<List<String>> subjectsPerItem;
+
+        public ImportResult(String format, int successCount, int errorCount,
                           List<LinkItem> items, List<String> errors) {
+            this(format, successCount, errorCount, items, errors,
+                    new ArrayList<List<String>>());
+        }
+
+        public ImportResult(String format, int successCount, int errorCount,
+                          List<LinkItem> items, List<String> errors,
+                          List<List<String>> subjectsPerItem) {
             this.format = format;
             this.successCount = successCount;
             this.errorCount = errorCount;
             this.items = items;
             this.errors = errors;
+            this.subjectsPerItem = subjectsPerItem == null
+                    ? new ArrayList<List<String>>()
+                    : subjectsPerItem;
         }
-        
+
         public boolean isSuccess() {
             return errorCount == 0;
         }
     }
-    
+
     /**
      * 检测文件格式（扩展名优先，MIME 类型后备）
      * @param context Context
@@ -55,7 +76,7 @@ public class ImportUtil {
      */
     public static String detectFileFormat(Context context, Uri uri) {
         String path = uri.getPath();
-        
+
         // 1. 优先检查文件路径扩展名
         if (path != null) {
             if (path.endsWith(".csv")) {
@@ -64,15 +85,15 @@ public class ImportUtil {
                 return "JSON";
             }
         }
-        
+
         // 2. 如果扩展名不可用，使用 MIME 类型作为后备
         // 适用于云存储 URI（如 Google Drive）可能没有明确的路径扩展名
         ContentResolver contentResolver = context.getContentResolver();
         String mimeType = contentResolver.getType(uri);
-        
+
         if (mimeType != null) {
             // 支持多种 CSV MIME 类型变体
-            if (mimeType.equals("text/csv") || 
+            if (mimeType.equals("text/csv") ||
                 mimeType.equals("text/comma-separated-values") ||
                 mimeType.equals("application/csv")) {
                 return "CSV";
@@ -80,11 +101,11 @@ public class ImportUtil {
                 return "JSON";
             }
         }
-        
+
         // 无法确定文件类型
         return null;
     }
-    
+
     /**
      * 从 URI 导入文件（自动检测格式）
      * @param context Context
@@ -93,13 +114,13 @@ public class ImportUtil {
      */
     public static ImportResult importFromUri(Context context, Uri uri) {
         String format = detectFileFormat(context, uri);
-        
+
         if (format == null) {
             List<String> errors = new ArrayList<>();
             errors.add("无法确定文件类型，请确保文件是 CSV 或 JSON 格式");
-            return new ImportResult(null, 0, 1, new ArrayList<>(), errors);
+            return new ImportResult(null, 0, 1, new ArrayList<LinkItem>(), errors);
         }
-        
+
         if ("CSV".equals(format)) {
             return importFromCsv(context, uri);
         } else if ("JSON".equals(format)) {
@@ -107,33 +128,34 @@ public class ImportUtil {
         } else {
             List<String> errors = new ArrayList<>();
             errors.add("不支持的文件格式: " + format);
-            return new ImportResult(format, 0, 1, new ArrayList<>(), errors);
+            return new ImportResult(format, 0, 1, new ArrayList<LinkItem>(), errors);
         }
     }
-    
+
     /**
      * 从 CSV 文件导入
      * @param context Context
      * @param uri CSV 文件 URI
-     * @return ImportResult 导入结果
+     * @return ImportResult 导入结果(含 subjectsPerItem)
      */
     public static ImportResult importFromCsv(Context context, Uri uri) {
         List<LinkItem> items = new ArrayList<>();
+        List<List<String>> subjectsPerItem = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-        
+
         try {
             InputStream inputStream = context.getContentResolver().openInputStream(uri);
             if (inputStream == null) {
                 errors.add("无法打开文件");
                 return new ImportResult("CSV", 0, 1, items, errors);
             }
-            
+
             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
             String line;
-            
+
             // 跳过标题行
             reader.readLine();
-            
+
             while ((line = reader.readLine()) != null) {
                 try {
                     // 使用正则表达式来处理逗号分隔的问题
@@ -144,15 +166,15 @@ public class ImportUtil {
                         String title = columns[0].trim().replaceFirst("^\"|\"$", "");
                         String url = columns[1].trim().replaceFirst("^\"|\"$", "");
                         String dateStr = columns[2].trim().replaceFirst("^\"|\"$", "");
-                        
+
                         Date date = null;
                         String[] dateFormats = {
                             "yyyy-MM-dd HH:mm:ss",
                             "yyyy/MM/dd HH:mm",
-                            "yyyy-MM-dd HH:mm", 
+                            "yyyy-MM-dd HH:mm",
                             "yyyy/MM/dd"
                         };
-                        
+
                         for (String format : dateFormats) {
                             try {
                                 SimpleDateFormat sdf = new SimpleDateFormat(format);
@@ -162,12 +184,12 @@ public class ImportUtil {
                                 continue;
                             }
                         }
-                        
+
                         if (date == null) {
                             throw new ParseException("无法解析日期: " + dateStr, 0);
                         }
                         long timestamp = date.getTime();
-                        
+
                         // 处理标签列
                         List<String> tags = new ArrayList<>();
                         if (columns.length >= 4) {
@@ -191,7 +213,7 @@ public class ImportUtil {
                                 }
                             }
                         }
-                        
+
                         int clickCount = 0;
                         if (columns.length >= 5) {
                             try {
@@ -201,20 +223,42 @@ public class ImportUtil {
                                 clickCount = 0;
                             }
                         }
-                        
-                        String summary = "";    
+
+                        String summary = "";
                         if (columns.length >= 6) {
                             summary = columns[5].trim().replaceFirst("^\"|\"$", "");
                         }
-                        
+
+                        // 是否置顶 — 列 7(0/1),缺省 false
+                        boolean isPinned = false;
+                        if (columns.length >= 7) {
+                            String pinStr = columns[6].trim().replaceFirst("^\"|\"$", "");
+                            isPinned = "1".equals(pinStr) || "true".equalsIgnoreCase(pinStr);
+                        }
+
+                        // 所属主题 — 列 8,'|' 分隔(去掉每个名字前后空格)
+                        List<String> subjectNames = new ArrayList<>();
+                        if (columns.length >= 8) {
+                            String subjectsStr = columns[7].trim().replaceFirst("^\"|\"$", "");
+                            if (!subjectsStr.isEmpty()) {
+                                for (String name : subjectsStr.split(SUBJECT_DELIMITER)) {
+                                    String t = name.trim();
+                                    if (!t.isEmpty()) subjectNames.add(t);
+                                }
+                            }
+                        }
+
                         LinkItem newLink = new LinkItem(title, url, "imported", "", "");
                         newLink.setTimestamp(timestamp);
                         newLink.setTags(tags);
                         newLink.setClickCount(clickCount);
                         newLink.setSummary(summary);
-                        
+                        newLink.setPinned(isPinned);
+
                         items.add(newLink);
-                        Log.d("ImportUtil", "解析 CSV 行: " + title + ", 标签数量=" + tags.size());
+                        subjectsPerItem.add(subjectNames);
+                        Log.d("ImportUtil", "解析 CSV 行: " + title + ", 标签数量=" + tags.size()
+                                + ", subjects=" + subjectNames.size());
                     }
                 } catch (Exception e) {
                     String errorMsg = "处理行时出错: " + line + ", 错误: " + e.getMessage();
@@ -223,66 +267,68 @@ public class ImportUtil {
                 }
             }
             reader.close();
-            
-            return new ImportResult("CSV", items.size(), errors.size(), items, errors);
+
+            return new ImportResult("CSV", items.size(), errors.size(), items, errors, subjectsPerItem);
         } catch (Exception e) {
             String errorMsg = "导入 CSV 失败: " + e.getMessage();
             Log.e("ImportUtil", errorMsg, e);
             errors.add(errorMsg);
-            return new ImportResult("CSV", items.size(), errors.size(), items, errors);
+            return new ImportResult("CSV", items.size(), errors.size(), items, errors, subjectsPerItem);
         }
     }
-    
+
     /**
      * 从 JSON 文件导入
      * @param context Context
      * @param uri JSON 文件 URI
-     * @return ImportResult 导入结果
+     * @return ImportResult 导入结果(含 subjectsPerItem)
      */
     public static ImportResult importFromJson(Context context, Uri uri) {
         List<LinkItem> items = new ArrayList<>();
+        List<List<String>> subjectsPerItem = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-        
+
         try {
             InputStream inputStream = context.getContentResolver().openInputStream(uri);
             if (inputStream == null) {
                 errors.add("无法打开文件");
                 return new ImportResult("JSON", 0, 1, items, errors);
             }
-            
+
             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
             StringBuilder jsonString = new StringBuilder();
             String line;
-            
+
             // 读取整个 JSON 文件
             while ((line = reader.readLine()) != null) {
                 jsonString.append(line);
             }
             reader.close();
-            
+
             // 解析 JSON
             JSONArray jsonArray = new JSONArray(jsonString.toString());
-            
+
             for (int i = 0; i < jsonArray.length(); i++) {
                 try {
                     JSONObject jsonObject = jsonArray.getJSONObject(i);
-                    
+
                     // 读取必需字段
                     String title = jsonObject.optString("title", "");
                     String url = jsonObject.optString("url", "");
-                    
+
                     if (title.isEmpty() || url.isEmpty()) {
                         String errorMsg = "跳过无效项（缺少 title 或 url）: " + jsonObject.toString();
                         Log.w("ImportUtil", errorMsg);
                         errors.add(errorMsg);
                         continue;
                     }
-                    
+
                     // 读取可选字段
                     long timestamp = jsonObject.optLong("timestamp", System.currentTimeMillis());
                     int clickCount = jsonObject.optInt("clickCount", 0);
                     String summary = jsonObject.optString("summary", "");
-                    
+                    boolean isPinned = jsonObject.optBoolean("isPinned", false);
+
                     // 读取标签
                     List<String> tags = new ArrayList<>();
                     if (jsonObject.has("tags")) {
@@ -296,35 +342,50 @@ public class ImportUtil {
                             }
                         }
                     }
-                    
+
+                    // 读取 subjects
+                    List<String> subjectNames = new ArrayList<>();
+                    if (jsonObject.has("subjects")) {
+                        JSONArray subjectsArray = jsonObject.optJSONArray("subjects");
+                        if (subjectsArray != null) {
+                            for (int j = 0; j < subjectsArray.length(); j++) {
+                                String name = subjectsArray.optString(j, "");
+                                String t = name.trim();
+                                if (!t.isEmpty()) subjectNames.add(t);
+                            }
+                        }
+                    }
+
                     // 创建 LinkItem
                     LinkItem newLink = new LinkItem(title, url, "imported", "", "");
                     newLink.setTimestamp(timestamp);
                     newLink.setTags(tags);
                     newLink.setClickCount(clickCount);
                     newLink.setSummary(summary);
-                    
+                    newLink.setPinned(isPinned);
+
                     items.add(newLink);
-                    Log.d("ImportUtil", "解析 JSON 对象: " + title + ", 标签数量=" + tags.size());
+                    subjectsPerItem.add(subjectNames);
+                    Log.d("ImportUtil", "解析 JSON 对象: " + title + ", 标签数量=" + tags.size()
+                            + ", subjects=" + subjectNames.size());
                 } catch (JSONException e) {
                     String errorMsg = "解析 JSON 对象失败: " + e.getMessage();
                     Log.e("ImportUtil", errorMsg, e);
                     errors.add(errorMsg);
                 }
             }
-            
-            return new ImportResult("JSON", items.size(), errors.size(), items, errors);
+
+            return new ImportResult("JSON", items.size(), errors.size(), items, errors, subjectsPerItem);
         } catch (JSONException e) {
             String errorMsg = "JSON 解析失败: " + e.getMessage();
             Log.e("ImportUtil", errorMsg, e);
             errors.add(errorMsg);
-            return new ImportResult("JSON", items.size(), errors.size(), items, errors);
+            return new ImportResult("JSON", items.size(), errors.size(), items, errors, subjectsPerItem);
         } catch (Exception e) {
             String errorMsg = "导入 JSON 失败: " + e.getMessage();
             Log.e("ImportUtil", errorMsg, e);
             errors.add(errorMsg);
-            return new ImportResult("JSON", items.size(), errors.size(), items, errors);
+            return new ImportResult("JSON", items.size(), errors.size(), items, errors, subjectsPerItem);
         }
     }
 }
-

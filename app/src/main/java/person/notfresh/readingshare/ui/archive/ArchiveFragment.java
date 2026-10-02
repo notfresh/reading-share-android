@@ -46,6 +46,7 @@ import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.ShareUtil;
+import person.notfresh.readingshare.util.SubjectUtil;
 
 public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
 
@@ -322,10 +323,13 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
 
         try {
             // 先保存到公共 Documents 目录
+            List<LinkItem> exportList = new ArrayList<>(selectedItems);
+            Map<Long, List<String>> linkIdToSubjectNames = buildSubjectMap(exportList);
             Uri fileUri = ExportUtil.exportToPublicDirectory(
-                requireContext(), 
-                new ArrayList<>(selectedItems), 
-                isJson
+                requireContext(),
+                exportList,
+                isJson,
+                linkIdToSubjectNames
             );
             
             // 生成文件名（已包含扩展名）
@@ -410,5 +414,15 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
     public void onLinkRemarkUpdated(LinkItem item) {
         // 如果需要刷新UI，可以在这里处理
         // 目前LinkDao中更新了数据库，而adapter中已经更新了视图，所以这里不需要额外操作
+    }
+
+    /** 给一组 link 算出 linkId → subject 名字 映射,供 ExportUtil 带上 subject 列 */
+    private Map<Long, List<String>> buildSubjectMap(List<LinkItem> items) {
+        if (items == null || items.isEmpty()) return java.util.Collections.emptyMap();
+        List<Long> ids = new ArrayList<>(items.size());
+        for (LinkItem item : items) {
+            if (item != null && item.getId() > 0) ids.add(item.getId());
+        }
+        return SubjectUtil.getSubjectNamesByLinkIds(requireContext(), ids);
     }
 }

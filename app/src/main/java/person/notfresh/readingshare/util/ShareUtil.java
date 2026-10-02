@@ -15,8 +15,10 @@ import android.content.ClipData;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import androidx.core.content.FileProvider;
 import org.json.JSONException;
@@ -44,17 +46,19 @@ public class ShareUtil {
     public static void shareLinksAsFile(Context context, List<LinkItem> items, boolean isJson, String fileName, boolean ifSaveOnly) {
         try {
             Uri fileUri = null;
+            // 算 linkId → subject 名字,导出文件带上 subject 列
+            Map<Long, List<String>> linkIdToSubjectNames = buildSubjectMap(context, items);
             if(ifSaveOnly){
-                fileUri = ExportUtil.exportToPublicDirectory(context, items, isJson, fileName);
+                fileUri = ExportUtil.exportToPublicDirectory(context, items, isJson, fileName, linkIdToSubjectNames);
                 // 显示保存成功提示
                 String format = isJson ? "JSON" : "CSV";
                 Toast.makeText(context, format + " 文件已保存到 Documents 目录", Toast.LENGTH_SHORT).show();
                 return;
             } else {
                 // 导出文件到应用目录
-                String filePath = isJson 
-                    ? ExportUtil.exportToJson(context, items, fileName)
-                    : ExportUtil.exportToCsv(context, items, fileName);
+                String filePath = isJson
+                    ? ExportUtil.exportToJson(context, items, fileName, linkIdToSubjectNames)
+                    : ExportUtil.exportToCsv(context, items, fileName, linkIdToSubjectNames);
                 
                 // 使用 FileProvider 生成 URI（而不是 file:// URI）
                 File file = new File(filePath);
@@ -398,6 +402,16 @@ public class ShareUtil {
             chooser.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, new ComponentName[]{self});
         } catch (Throwable ignored) {
         }
+    }
+
+    /** 给一组 link 算出 linkId → subject 名字 映射,供 ExportUtil 带上 subject 列 */
+    private static Map<Long, List<String>> buildSubjectMap(Context context, List<LinkItem> items) {
+        if (items == null || items.isEmpty()) return Collections.emptyMap();
+        List<Long> ids = new ArrayList<>(items.size());
+        for (LinkItem item : items) {
+            if (item != null && item.getId() > 0) ids.add(item.getId());
+        }
+        return SubjectUtil.getSubjectNamesByLinkIds(context, ids);
     }
 }
 

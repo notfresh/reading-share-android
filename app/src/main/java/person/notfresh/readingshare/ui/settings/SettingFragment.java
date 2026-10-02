@@ -32,7 +32,9 @@ import androidx.fragment.app.Fragment;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.MainActivity;
@@ -48,6 +50,7 @@ import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.ImportUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
+import person.notfresh.readingshare.util.SubjectUtil;
 import com.google.android.material.textfield.TextInputEditText;
 
 import person.notfresh.readingshare.sync.SimpleSyncManager;
@@ -543,10 +546,13 @@ public class SettingFragment extends Fragment {
             String errorMessage = null;
             
             try {
+                List<LinkItem> exportList = linkDao.getAllLinks();
+                Map<Long, List<String>> linkIdToSubjectNames = buildSubjectMap(exportList);
                 fileUri = ExportUtil.exportToPublicDirectory(
-                    requireContext(), 
-                    linkDao.getAllLinks(), 
-                    isJson
+                    requireContext(),
+                    exportList,
+                    isJson,
+                    linkIdToSubjectNames
                 );
                 success = true;
             } catch (Exception e) {
@@ -601,10 +607,13 @@ public class SettingFragment extends Fragment {
             String errorMessage = null;
             
             try {
+                List<LinkItem> exportList = linkDao.getAllLinks();
+                Map<Long, List<String>> linkIdToSubjectNames = buildSubjectMap(exportList);
                 fileUri = ExportUtil.exportToPublicDirectory(
-                    requireContext(), 
-                    linkDao.getAllLinks(), 
-                    isJson
+                    requireContext(),
+                    exportList,
+                    isJson,
+                    linkIdToSubjectNames
                 );
                 success = true;
             } catch (Exception e) {
@@ -663,5 +672,14 @@ public class SettingFragment extends Fragment {
         );
         return prefs.getString("server_url", DEFAULT_SERVER_URL);
     }
-    
+
+    /** 给一组 link 算出 linkId → subject 名字 映射,供 ExportUtil 带上 subject 列 */
+    private Map<Long, List<String>> buildSubjectMap(List<LinkItem> items) {
+        if (items == null || items.isEmpty()) return Collections.emptyMap();
+        List<Long> ids = new ArrayList<>(items.size());
+        for (LinkItem item : items) {
+            if (item != null && item.getId() > 0) ids.add(item.getId());
+        }
+        return SubjectUtil.getSubjectNamesByLinkIds(requireContext(), ids);
+    }
 }

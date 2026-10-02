@@ -8,8 +8,12 @@ import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.TextUtils;
+import android.util.Log;
+
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -17,120 +21,101 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+
 import person.notfresh.readingshare.model.LinkItem;
-import android.util.Log;
-import org.json.JSONException;
 
 public class ExportUtil {
-    
+
+    // CSV 列定义 — 单点修改,exportToCsv/writeDataToStream 共用
+    private static final String CSV_HEADER =
+            "标题,链接,时间,标签,阅读次数,摘要,是否置顶,所属主题";
+
+    // JSON 字段常量 — 单一来源
+    private static final String JSON_KEY_TITLE = "title";
+    private static final String JSON_KEY_URL = "url";
+    private static final String JSON_KEY_TAGS = "tags";
+    private static final String JSON_KEY_IS_PINNED = "isPinned";
+    private static final String JSON_KEY_SUBJECTS = "subjects";
+
     /**
      * 导出到JSON文件，支持自定义文件名
+     * @param linkIdToSubjectNames linkId → 它归属的 subject 名字列表;null 时 subjects 字段写空数组
      */
-    public static String exportToJson(Context context, List<LinkItem> links, String fileName) throws IOException, JSONException {
-        JSONArray jsonArray = new JSONArray();
-        
-        for (LinkItem link : links) {
-            try {
-                JSONObject jsonObject = new JSONObject();
-                jsonObject.put("title", link.getTitle());
-                jsonObject.put("url", link.getUrl());
-                jsonObject.put("tags", new JSONArray(link.getTags()));
-                jsonArray.put(jsonObject);
-            } catch (JSONException e) {
-                Log.e("ExportUtil", "Error creating JSON object", e);
-            }
-        }
-        
+    public static String exportToJson(Context context, List<LinkItem> links, String fileName,
+                                      Map<Long, List<String>> linkIdToSubjectNames)
+            throws IOException, JSONException {
         // 确保文件名有.json后缀
         if (!fileName.toLowerCase().endsWith(".json")) {
             fileName += ".json";
         }
-        
+
         File exportDir = new File(context.getExternalFilesDir(null), "exports");
         if (!exportDir.exists()) {
             exportDir.mkdirs();
         }
-        
+
         File file = new File(exportDir, fileName);
         // 使用 UTF-8 编码明确指定
         OutputStreamWriter writer = new OutputStreamWriter(
-            new FileOutputStream(file), StandardCharsets.UTF_8);
-        // 将 JSONObject 转义的反斜杠还原（\/ -> /），使 JSON 更易读
-        String jsonString = jsonArray.toString(4).replace("\\/", "/");
-        writer.write(jsonString);
+                new FileOutputStream(file), StandardCharsets.UTF_8);
+        writer.write(buildJson(links, linkIdToSubjectNames));
         writer.flush();
         writer.close();
-        
+
         return file.getAbsolutePath();
     }
 
     /**
      * 导出到CSV文件，支持自定义文件名
+     * @param linkIdToSubjectNames linkId → 它归属的 subject 名字列表;null 时所属主题列写空
      */
-    public static String exportToCsv(Context context, List<LinkItem> links, String fileName) throws IOException {
+    public static String exportToCsv(Context context, List<LinkItem> links, String fileName,
+                                     Map<Long, List<String>> linkIdToSubjectNames) throws IOException {
         // 确保文件名有.csv后缀
         if (!fileName.toLowerCase().endsWith(".csv")) {
             fileName += ".csv";
         }
-        
+
         File exportDir = new File(context.getExternalFilesDir(null), "exports");
         if (!exportDir.exists()) {
             exportDir.mkdirs();
         }
-        
+
         File file = new File(exportDir, fileName);
         // 使用 UTF-8 编码明确指定
         OutputStreamWriter writer = new OutputStreamWriter(
-            new FileOutputStream(file), StandardCharsets.UTF_8);
-        
-        // 创建CSV内容
-        StringBuilder csv = new StringBuilder();
-        // 写入CSV标题行
-        csv.append("标题,链接,时间,标签,阅读次数,摘要\n");
-        
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-        
-        // 写入每一条链接
-        for (LinkItem link : links) {
-            String title = escapeCSV(link.getTitle());
-            String url = escapeCSV(link.getUrl());
-            String date = sdf.format(new Date(link.getTimestamp()));
-            String tags = escapeCSV(TextUtils.join(",", link.getTags()));
-            String clickCount = String.valueOf(link.getClickCount());
-            String summary = escapeCSV(link.getSummary());
-            
-            csv.append(String.format("%s,%s,%s,%s,%s,%s\n",
-                    title, url, date, tags, clickCount, summary));
-        }
-        
-        writer.write(csv.toString());
+                new FileOutputStream(file), StandardCharsets.UTF_8);
+        writer.write(buildCsv(links, linkIdToSubjectNames));
         writer.flush();
         writer.close();
-        
+
         return file.getAbsolutePath();
     }
 
     /**
-     * 原始的导出到JSON方法（向后兼容）
+     * 原始的导出到JSON方法（向后兼容）— 无 subject 关联信息
      */
     public static String exportToJson(Context context, List<LinkItem> links) throws IOException, JSONException {
         // 生成默认文件名
         String fileName = "links_" + getCurrentTime() + "_readshare.json";
         // 调用新方法
-        return exportToJson(context, links, fileName);
+        return exportToJson(context, links, fileName, null);
     }
 
     /**
-     * 原始的导出到CSV方法（向后兼容）
+     * 原始的导出到CSV方法（向后兼容）— 无 subject 关联信息
      */
     public static String exportToCsv(Context context, List<LinkItem> links) throws IOException {
         // 生成默认文件名
         String fileName = "links_" + getCurrentTime() + "_readshare.csv";
         // 调用新方法
-        return exportToCsv(context, links, fileName);
+        return exportToCsv(context, links, fileName, null);
     }
 
     /**
@@ -147,19 +132,22 @@ public class ExportUtil {
      * @param context Context
      * @param links 要导出的链接列表
      * @param isJson 是否为 JSON 格式（false 为 CSV）
+     * @param linkIdToSubjectNames linkId → 它归属的 subject 名字列表;null 时相关列写空
      * @return 保存的文件 URI
      * @throws IOException 文件操作异常
      * @throws JSONException JSON 解析异常
      */
-    public static Uri exportToPublicDirectory(Context context, List<LinkItem> links, 
-                                             boolean isJson) throws IOException, JSONException {
+    public static Uri exportToPublicDirectory(Context context, List<LinkItem> links,
+                                              boolean isJson,
+                                              Map<Long, List<String>> linkIdToSubjectNames)
+            throws IOException, JSONException {
         // 使用默认文件名（已包含扩展名）
-        String defaultFileName = isJson 
-            ? "links_" + getCurrentTime() + "_readshare.json.txt"
-            : "links_" + getCurrentTime() + "_readshare.csv";
-        return exportToPublicDirectory(context, links, isJson, defaultFileName);
+        String defaultFileName = isJson
+                ? "links_" + getCurrentTime() + "_readshare.json.txt"
+                : "links_" + getCurrentTime() + "_readshare.csv";
+        return exportToPublicDirectory(context, links, isJson, defaultFileName, linkIdToSubjectNames);
     }
-    
+
     /**
      * 导出到公共 Documents 目录（支持自定义文件名）
      * 注意：文件名应该已经在调用前处理好了（添加扩展名等），这里直接使用
@@ -167,28 +155,31 @@ public class ExportUtil {
      * @param links 要导出的链接列表
      * @param isJson 是否为 JSON 格式（false 为 CSV）
      * @param fileName 已处理好的文件名（包含扩展名）
+     * @param linkIdToSubjectNames linkId → 它归属的 subject 名字列表;null 时相关列写空
      * @return 保存的文件 URI
      * @throws IOException 文件操作异常
      * @throws JSONException JSON 解析异常
      */
-    public static Uri exportToPublicDirectory(Context context, List<LinkItem> links, 
-                                             boolean isJson, String fileName) throws IOException, JSONException {
+    public static Uri exportToPublicDirectory(Context context, List<LinkItem> links,
+                                              boolean isJson, String fileName,
+                                              Map<Long, List<String>> linkIdToSubjectNames)
+            throws IOException, JSONException {
         String mimeType = isJson ? "text/plain" : "text/csv";
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Android 10+ 使用 MediaStore API
             ContentValues values = new ContentValues();
             values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
             values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
             values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS);
-            
+
             ContentResolver resolver = context.getContentResolver();
             Uri fileUri = resolver.insert(MediaStore.Files.getContentUri("external"), values);
-            
+
             if (fileUri != null) {
                 OutputStream outputStream = resolver.openOutputStream(fileUri);
                 if (outputStream != null) {
-                    writeDataToStream(outputStream, links, isJson);
+                    writeDataToStream(outputStream, links, isJson, linkIdToSubjectNames);
                     outputStream.close();
                     return fileUri;
                 }
@@ -197,73 +188,118 @@ public class ExportUtil {
         } else {
             // Android 9 及以下使用传统文件存储
             File documentsFolder = Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOCUMENTS);
+                    Environment.DIRECTORY_DOCUMENTS);
             if (!documentsFolder.exists()) {
                 documentsFolder.mkdirs();
             }
-            
+
             File outputFile = new File(documentsFolder, fileName);
             FileOutputStream fos = new FileOutputStream(outputFile);
-            writeDataToStream(fos, links, isJson);
+            writeDataToStream(fos, links, isJson, linkIdToSubjectNames);
             fos.close();
-            
+
             return Uri.fromFile(outputFile);
         }
     }
-    
+
+    /** 向后兼容 — 无 subject 信息 */
+    public static Uri exportToPublicDirectory(Context context, List<LinkItem> links,
+                                              boolean isJson) throws IOException, JSONException {
+        return exportToPublicDirectory(context, links, isJson, (Map<Long, List<String>>) null);
+    }
+
+    /** 向后兼容 — 无 subject 信息 */
+    public static Uri exportToPublicDirectory(Context context, List<LinkItem> links,
+                                              boolean isJson, String fileName)
+            throws IOException, JSONException {
+        return exportToPublicDirectory(context, links, isJson, fileName, null);
+    }
+
     /**
      * 将数据写入输出流
      * @param outputStream 输出流
      * @param links 链接列表
      * @param isJson 是否为 JSON 格式
+     * @param linkIdToSubjectNames linkId → 它归属的 subject 名字列表;null 时相关列写空
      * @throws IOException 文件操作异常
      * @throws JSONException JSON 解析异常
      */
-    private static void writeDataToStream(OutputStream outputStream, List<LinkItem> links, 
-                                         boolean isJson) throws IOException, JSONException {
+    private static void writeDataToStream(OutputStream outputStream, List<LinkItem> links,
+                                         boolean isJson,
+                                         Map<Long, List<String>> linkIdToSubjectNames)
+            throws IOException, JSONException {
         OutputStreamWriter writer = new OutputStreamWriter(
-            outputStream, StandardCharsets.UTF_8);
-        
+                outputStream, StandardCharsets.UTF_8);
+
         if (isJson) {
-            // 写入 JSON 数据
-            JSONArray jsonArray = new JSONArray();
-            for (LinkItem link : links) {
-                try {
-                    JSONObject jsonObject = new JSONObject();
-                    jsonObject.put("title", link.getTitle());
-                    jsonObject.put("url", link.getUrl());
-                    jsonObject.put("tags", new JSONArray(link.getTags()));
-                    jsonArray.put(jsonObject);
-                } catch (JSONException e) {
-                    Log.e("ExportUtil", "Error creating JSON object", e);
-                }
-            }
-            // 将 JSONObject 转义的反斜杠还原（\/ -> /），使 JSON 更易读
-            String jsonString = jsonArray.toString(4).replace("\\/", "/");
-            writer.write(jsonString);
+            writer.write(buildJson(links, linkIdToSubjectNames));
         } else {
-            // 写入 CSV 数据
-            StringBuilder csv = new StringBuilder();
-            csv.append("标题,链接,时间,标签,阅读次数,摘要\n");
-            
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-            
-            for (LinkItem link : links) {
-                String title = escapeCSV(link.getTitle());
-                String url = escapeCSV(link.getUrl());
-                String date = sdf.format(new Date(link.getTimestamp()));
-                String tags = escapeCSV(TextUtils.join(",", link.getTags()));
-                String clickCount = String.valueOf(link.getClickCount());
-                String summary = escapeCSV(link.getSummary());
-                
-                csv.append(String.format("%s,%s,%s,%s,%s,%s\n",
-                        title, url, date, tags, clickCount, summary));
-            }
-            writer.write(csv.toString());
+            writer.write(buildCsv(links, linkIdToSubjectNames));
         }
-        
+
         writer.flush();
         writer.close();
+    }
+
+    /** 单一 CSV 构造入口 — exportToCsv / writeDataToStream 共用 */
+    private static String buildCsv(List<LinkItem> links,
+                                   Map<Long, List<String>> linkIdToSubjectNames) {
+        StringBuilder csv = new StringBuilder();
+        csv.append(CSV_HEADER).append('\n');
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+
+        for (LinkItem link : links) {
+            String title = escapeCSV(link.getTitle());
+            String url = escapeCSV(link.getUrl());
+            String date = sdf.format(new Date(link.getTimestamp()));
+            String tags = escapeCSV(TextUtils.join(",", link.getTags()));
+            String clickCount = String.valueOf(link.getClickCount());
+            String summary = escapeCSV(link.getSummary());
+            String pinned = link.isPinned() ? "1" : "0";
+            String subjects = escapeCSV(joinSubjectNames(link.getId(), linkIdToSubjectNames));
+
+            csv.append(String.format("%s,%s,%s,%s,%s,%s,%s,%s\n",
+                    title, url, date, tags, clickCount, summary, pinned, subjects));
+        }
+        return csv.toString();
+    }
+
+    /** 单一 JSON 构造入口 — exportToJson / writeDataToStream 共用 */
+    private static String buildJson(List<LinkItem> links,
+                                    Map<Long, List<String>> linkIdToSubjectNames) throws JSONException {
+        JSONArray jsonArray = new JSONArray();
+        for (LinkItem link : links) {
+            try {
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put(JSON_KEY_TITLE, link.getTitle());
+                jsonObject.put(JSON_KEY_URL, link.getUrl());
+                jsonObject.put(JSON_KEY_TAGS, new JSONArray(link.getTags()));
+                jsonObject.put(JSON_KEY_IS_PINNED, link.isPinned());
+                jsonObject.put(JSON_KEY_SUBJECTS, new JSONArray(
+                        linkIdToSubjectNames == null ? Collections.emptyList()
+                                : linkIdToSubjectNames.getOrDefault(link.getId(), Collections.emptyList())));
+                jsonArray.put(jsonObject);
+            } catch (JSONException e) {
+                Log.e("ExportUtil", "Error creating JSON object", e);
+            }
+        }
+        // 将 JSONObject 转义的反斜杠还原（\/ -> /），使 JSON 更易读
+        return jsonArray.toString(4).replace("\\/", "/");
+    }
+
+    /** linkId → subject 名字(已 trim 前后空格),用 '|' 拼接;无归属返回 "" */
+    private static String joinSubjectNames(long linkId, Map<Long, List<String>> linkIdToSubjectNames) {
+        if (linkIdToSubjectNames == null) return "";
+        List<String> names = linkIdToSubjectNames.get(linkId);
+        if (names == null || names.isEmpty()) return "";
+        List<String> trimmed = new ArrayList<>(names.size());
+        for (String n : names) {
+            if (n != null) {
+                String t = n.trim();
+                if (!t.isEmpty()) trimmed.add(t);
+            }
+        }
+        return TextUtils.join("|", trimmed);
     }
 
     private static String escapeCSV(String value) {
@@ -325,4 +361,4 @@ public class ExportUtil {
             }
         }
     }
-} 
+}
