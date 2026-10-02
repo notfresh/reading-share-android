@@ -38,11 +38,14 @@ import person.notfresh.readingshare.model.LinkJson;
  */
 public class App extends Application {
 
+    private static App instance;
+
     private ExecutorService syncExecutor;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         // 预热数据库连接(进程级单例)
         DbConnection dbConnection = DbConnection.get(this);
         SQLiteDatabase db = dbConnection.writable();
@@ -52,33 +55,75 @@ public class App extends Application {
             deviceId = "unknown";
         }
         EventLogStore store = new SqliteEventLogStore(db, deviceId);
-        // Sync config reuses the SharedPreferences that SettingFragment writes
-        // to via SimpleSyncManager — same server, same secret, different sync
-        // layer (eventlog vs link full-exchange).
-        boolean syncWired = SimpleSyncManager.hasConfig(this);
         // 单例：db / LinkDao / LinkApplier 整个 app 生命周期共用一份
         LinkDao linkDao = new LinkDao(db);
         LinkApplier linkApplier = new LinkEventApplier(linkDao);
+
+        // syncLogStore 永远 init — 这样 sync 弹窗/未配置时也能写日志
+        // pusher / puller / syncConfig 仅在配置完整时初始化,未配置时 push/pull 会抛
+        // "sync not initialized" 异常被 catch 掉,但 sync_log 至少能记录下来
+        SyncLogStore syncLogStore = new SqliteSyncLogStore(db);
+        android.content.SharedPreferences bootstrapPrefs = getSharedPreferences(
+                "eventlog_bootstrap_prefs", MODE_PRIVATE);
+
+        boolean syncWired = SimpleSyncManager.hasConfig(this);
         if (syncWired) {
-            String url = SimpleSyncManager.getServerUrl(this);
-            String secret = SimpleSyncManager.getSecretKey(this);
-            SyncConfig syncConfig = new SyncConfig(url, secret);
-            SyncPointStore syncStore = new SqliteSyncPointStore(db);
-            SyncLogStore syncLogStore = new SqliteSyncLogStore(db);
-            EventLogPusher pusher = new HttpEventLogPusher(url, secret);
-            EventLogPuller puller = new HttpEventLogPuller(url, secret);
-            android.content.SharedPreferences bootstrapPrefs = getSharedPreferences(
-                    "eventlog_bootstrap_prefs", MODE_PRIVATE);
-            EventLogClient.init(store, syncStore, pusher, puller, syncConfig, syncLogStore, linkApplier, bootstrapPrefs);
+            initFullSync(store, linkApplier, syncLogStore, bootstrapPrefs);
         } else {
-            android.content.SharedPreferences bootstrapPrefs = getSharedPreferences(
-                    "eventlog_bootstrap_prefs", MODE_PRIVATE);
-            EventLogClient.init(store, linkApplier, bootstrapPrefs);
+            // 没配置时也走完整 init,但 syncConfig/pusher/puller 传 null
+            // — syncLogStore 仍然在,弹窗能查;push/pull 会抛异常被 catch
+            EventLogClient.init(store, (SyncPointStore) null, null, null, null,
+                    syncLogStore, linkApplier, bootstrapPrefs);
         }
         bootstrapEventLogIfNeeded(db, deviceId);
         if (syncWired) {
             triggerStartupSync();
         }
+    }
+
+    /**
+     * SimpleSyncManager 写入 server_url / secret 后,回调这里重新初始化
+     * EventLogClient(把 pusher/puller/syncConfig 接上)。配置没变(null)就什么都不做。
+     */
+    public static App getInstance() {
+        return instance;
+    }
+
+    public static void reinitIfConfigured(android.content.Context ctx) {
+        if (ctx == null) return;
+        if (!SimpleSyncManager.hasConfig(ctx)) return;
+        DbConnection dbConnection = DbConnection.get(ctx);
+        SQLiteDatabase db = dbConnection.writable();
+        String deviceId = Settings.Secure.getString(
+                ctx.getContentResolver(), Settings.Secure.ANDROID_ID);
+        if (deviceId == null || deviceId.isEmpty()) {
+            deviceId = "unknown";
+        }
+        EventLogStore store = new SqliteEventLogStore(db, deviceId);
+        LinkDao linkDao = new LinkDao(db);
+        LinkApplier linkApplier = new LinkEventApplier(linkDao);
+        SyncLogStore syncLogStore = new SqliteSyncLogStore(db);
+        android.content.SharedPreferences bootstrapPrefs = ctx.getSharedPreferences(
+                "eventlog_bootstrap_prefs", android.content.Context.MODE_PRIVATE);
+        initFullSync(store, linkApplier, syncLogStore, bootstrapPrefs);
+    }
+
+    /** 完整 init — 从 SimpleSyncManager 读 url/secret,装配 SyncConfig + pusher/puller + 调 EventLogClient.init */
+    private static void initFullSync(EventLogStore store, LinkApplier linkApplier,
+                                     SyncLogStore syncLogStore,
+                                     android.content.SharedPreferences bootstrapPrefs) {
+        android.content.Context ctx = person.notfresh.readingshare.App.getInstance();
+        if (ctx == null) return;
+        String url = SimpleSyncManager.getServerUrl(ctx);
+        String secret = SimpleSyncManager.getSecretKey(ctx);
+        SyncConfig syncConfig = new SyncConfig(url, secret);
+        DbConnection dbConnection = DbConnection.get(ctx);
+        SQLiteDatabase db = dbConnection.writable();
+        SyncPointStore syncStore = new SqliteSyncPointStore(db);
+        EventLogPusher pusher = new HttpEventLogPusher(url, secret);
+        EventLogPuller puller = new HttpEventLogPuller(url, secret);
+        EventLogClient.init(store, syncStore, pusher, puller, syncConfig, syncLogStore,
+                linkApplier, bootstrapPrefs);
     }
 
     /**

@@ -115,6 +115,8 @@ public class SimpleSyncManager {
         if (context == null) return;
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit().putString(KEY_SERVER_URL, serverUrl == null ? "" : serverUrl).apply();
+        // 配置变更后让 EventLogClient 重新初始化(把 pusher/puller/syncConfig 接上)
+        person.notfresh.readingshare.App.reinitIfConfigured(context);
     }
 
     public static void saveSecretKey(Context context, String secretKey) {
@@ -124,6 +126,8 @@ public class SimpleSyncManager {
         // 进 HTTP Authorization 头会被 HttpURLConnection 抛 IllegalArgumentException
         String v = secretKey == null ? "" : secretKey.trim();
         prefs.edit().putString(KEY_SECRET_KEY, v).apply();
+        // 配置变更后让 EventLogClient 重新初始化
+        person.notfresh.readingshare.App.reinitIfConfigured(context);
     }
 
     /**
