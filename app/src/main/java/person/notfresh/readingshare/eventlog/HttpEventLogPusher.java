@@ -51,7 +51,6 @@ public final class HttpEventLogPusher implements EventLogPusher {
         this.baseUrl = baseUrl.endsWith("/")
                 ? baseUrl.substring(0, baseUrl.length() - 1)
                 : baseUrl;
-        this.secret = secret;
     }
 
     @Override
