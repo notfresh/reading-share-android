@@ -10,12 +10,10 @@ import java.util.concurrent.Executors;
 
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
-import person.notfresh.readingshare.eventlog.EventAction;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.eventlog.EventLogPuller;
 import person.notfresh.readingshare.eventlog.EventLogPusher;
 import person.notfresh.readingshare.eventlog.EventLogStore;
-import person.notfresh.readingshare.eventlog.EventRecord;
 import person.notfresh.readingshare.eventlog.HttpEventLogPuller;
 import person.notfresh.readingshare.eventlog.HttpEventLogPusher;
 import person.notfresh.readingshare.eventlog.LinkApplier;
@@ -151,19 +149,13 @@ public class App extends Application {
             try {
                 LinkDao linkDao = new LinkDao(db);
                 List<LinkItem> all = linkDao.getAllLinks();
-                long now = System.currentTimeMillis();
-                String processTime = EventLogClient.formatIso8601(now);
                 for (LinkItem link : all) {
-                    String entityId = String.valueOf(link.getId());
-                    // event_time = 实体真实创建时间(本地时区)
-                    String eventTime = EventLogClient.formatLocalIso8601(link.getTimestamp());
-                    // process_time = 日志生成时刻(UTC),三者共享同一 processTime
-                    String id = EventLogClient.computeId("links", deviceId,
-                            eventTime, entityId, EventAction.CREATE.name());
-                    EventLogClient.get().store().append(new EventRecord(
-                            id, "links", processTime, eventTime,
-                            deviceId, entityId, EventAction.CREATE,
-                            LinkJson.toJsonString(link)));
+                    // 每条 link 各分配一个严格递增的 process_time(EventLogClient 内部保证)。
+                    // 若所有 link 共用同一个 process_time,推送游标按
+                    // process_time > cursor 推进,推完第一批(100/1000 条)后就再也
+                    // 取不到同毫秒的后续事件 — 超出一批的 link 永远推不上去。
+                    EventLogClient.get().create("links", String.valueOf(link.getId()),
+                            link.getTimestamp(), LinkJson.toJsonString(link));
                 }
                 EventLogClient.get().setBootstrapFlag();
             } catch (Exception ignored) {

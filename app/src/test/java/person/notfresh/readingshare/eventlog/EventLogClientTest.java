@@ -137,15 +137,22 @@ public class EventLogClientTest {
     }
 
     @Test
-    public void eventTime_uses_caller_value_processTime_uses_clock_now() {
-        // Two calls with different eventTimeMillis but same store: event_time differs, process_time identical
+    public void eventTime_uses_caller_value_processTime_strictly_increases() {
+        // Two calls with different eventTimeMillis but same store: event_time differs;
+        // process_time 由 clock 分配且严格递增 — 同毫秒内第二条退化为 +1ms,
+        // 保证推送游标(process_time > cursor)不会跳过同毫秒的后续事件
         EventRecord a = EventLogClient.get().create("links", "e1",
                 1_000_000L, "{}");
         EventRecord b = EventLogClient.get().create("links", "e2",
                 2_000_000L, "{}");
 
         assertNotEquals(a.getEventTime(), b.getEventTime());
-        assertEquals(a.getProcessTime(), b.getProcessTime());
+        // 第一条取 clock 当前值
+        assertEquals(EventLogClient.formatIso8601(FIXED_MILLIS), a.getProcessTime());
+        // 第二条严格大于第一条(而非相同)
+        assertTrue("process_time must strictly increase, got "
+                        + a.getProcessTime() + " then " + b.getProcessTime(),
+                b.getProcessTime().compareTo(a.getProcessTime()) > 0);
     }
 
     @Test
@@ -299,7 +306,7 @@ public class EventLogClientTest {
         }
 
         @Override
-        public synchronized List<EventRecord> sinceByProcessTime(String topic, String sinceProcessTime) {
+        public synchronized List<EventRecord> sinceByProcessTime(String topic, String sinceProcessTime, int limit) {
             List<EventRecord> out = new ArrayList<>();
             for (EventRecord r : byId.values()) {
                 if (!r.getTopic().equals(topic)) continue;
@@ -308,6 +315,9 @@ public class EventLogClientTest {
                 }
             }
             out.sort((a, b) -> a.getProcessTime().compareTo(b.getProcessTime())); // ASC
+            if (out.size() > limit) {
+                return new ArrayList<>(out.subList(0, limit));
+            }
             return out;
         }
 

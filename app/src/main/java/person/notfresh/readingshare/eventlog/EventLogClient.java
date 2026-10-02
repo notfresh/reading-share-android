@@ -27,6 +27,15 @@ public final class EventLogClient {
 
     private static final String BOOTSTRAP_DONE_KEY = "bootstrap_done";
 
+    /**
+     * 推送单批条数 — 与协议 §4.1.1 服务端单次 POST 上限 1000 一致。
+     * 超过则由 {@link #pushPending} 循环分批推完。
+     */
+    private static final int PUSH_BATCH_LIMIT = 1000;
+
+    /** 最近一次分配的 process_time 毫秒值 — 保证同 topic 内严格递增。 */
+    private long lastProcessMillis = -1L;
+
     private EventLogClient(EventLogStore store, TimeSource clock,
                            SyncPointStore syncStore,
                            EventLogPusher pusher,
@@ -198,7 +207,7 @@ public final class EventLogClient {
         boolean allOk = true;
         String lastError = null;
         for (int i = 0; i < maxLoops; i++) {
-            List<EventRecord> batch = store.sinceByProcessTime(topic, cursor);
+            List<EventRecord> batch = store.sinceByProcessTime(topic, cursor, PUSH_BATCH_LIMIT);
             if (batch.isEmpty()) break;
             EventLogPusher.PushResult r;
             try {
@@ -314,6 +323,26 @@ public final class EventLogClient {
         return "pull:" + syncConfig.baseUrl() + ":" + topic;
     }
 
+    /**
+     * 分配一个单调递增的 process_time(UTC ISO-8601,毫秒精度)。
+     *
+     * <p>同一毫秒内连续写入多条事件时,后一条退化为「上一条 +1ms」——保证
+     * 同 topic 内 process_time <b>严格递增</b>。否则推送游标按
+     * {@code process_time > cursor} 推进时,会把与游标同毫秒的剩余事件整批跳过
+     * (例如一次导入 3000 条 link 全落在同一毫秒)。</p>
+     *
+     * <p>代价:时间戳最多向前漂移 (同毫秒事件数) 毫秒;process_time 只作游标,
+     * 不参与业务语义,漂移无害。</p>
+     */
+    private synchronized String nextProcessTime() {
+        long ms = clock.nowMillis();
+        if (ms <= lastProcessMillis) {
+            ms = lastProcessMillis + 1;
+        }
+        lastProcessMillis = ms;
+        return formatIso8601(ms);
+    }
+
     private EventRecord record(String topic, String entityId, long eventTimeMillis,
                                EventAction action, String dataJson) {
         if (topic == null || topic.isEmpty()) {
@@ -324,9 +353,8 @@ public final class EventLogClient {
         }
         // event_time: 实体的真实创建时间,本地时间(ISO-8601 带偏移)
         String eventTime = formatLocalIso8601(eventTimeMillis);
-        // process_time: 日志生成时刻,UTC(ISO-8601 + Z)
-        long now = clock.nowMillis();
-        String processTime = formatIso8601(now);
+        // process_time: 日志生成时刻,UTC(ISO-8601 + Z),同 topic 内严格递增
+        String processTime = nextProcessTime();
         String deviceId = store.deviceId();
         String id = computeId(topic, deviceId, eventTime, entityId, action.name());
         EventRecord r = new EventRecord(id, topic, processTime, eventTime,

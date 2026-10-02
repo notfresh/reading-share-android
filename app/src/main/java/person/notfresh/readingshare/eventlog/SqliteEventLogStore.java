@@ -112,8 +112,10 @@ public final class SqliteEventLogStore implements EventLogStore {
     }
 
     @Override
-    public List<EventRecord> sinceByProcessTime(String topic, String sinceProcessTime) {
-        int limit = 100;
+    public List<EventRecord> sinceByProcessTime(String topic, String sinceProcessTime, int limit) {
+        if (limit <= 0) {
+            throw new EventLogException("limit must be positive, got " + limit);
+        }
         int capped = Math.min(limit, 10000);
         String cutoff = sinceProcessTime == null ? "" : sinceProcessTime;
         String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
