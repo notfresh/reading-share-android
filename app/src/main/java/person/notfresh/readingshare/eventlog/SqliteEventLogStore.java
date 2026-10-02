@@ -112,6 +112,52 @@ public final class SqliteEventLogStore implements EventLogStore {
     }
 
     @Override
+    public List<EventRecord> sinceByProcessTime(String topic, String sinceProcessTime) {
+        int limit = 100;
+        int capped = Math.min(limit, 10000);
+        String cutoff = sinceProcessTime == null ? "" : sinceProcessTime;
+        String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
+                COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
+                COL_ACTION + ", " + COL_DATA + " FROM " + TABLE_EVENTS +
+                " WHERE " + COL_TOPIC + " = ? AND " + COL_PROCESS_TIME + " > ?" +
+                " ORDER BY " + COL_PROCESS_TIME + " ASC LIMIT ?";
+        List<EventRecord> out = new ArrayList<>();
+        Cursor c = db.rawQuery(sql, new String[]{topic, cutoff, String.valueOf(capped)});
+        try {
+            while (c.moveToNext()) {
+                out.add(readRow(c));
+            }
+        } finally {
+            c.close();
+        }
+        return out;
+    }
+
+    @Override
+    public List<EventRecord> untilByProcessTime(String topic, String untilProcessTime, int limit) {
+        if (limit <= 0) {
+            throw new EventLogException("limit must be positive, got " + limit);
+        }
+        int capped = Math.min(limit, 10000);
+        String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
+                COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
+                COL_ACTION + ", " + COL_DATA + " FROM " + TABLE_EVENTS +
+                " WHERE " + COL_TOPIC + " = ? AND " + COL_PROCESS_TIME + " < ?" +
+                " ORDER BY " + COL_PROCESS_TIME + " DESC LIMIT ?";
+        List<EventRecord> out = new ArrayList<>();
+        Cursor c = db.rawQuery(sql,
+                new String[]{topic, untilProcessTime, String.valueOf(capped)});
+        try {
+            while (c.moveToNext()) {
+                out.add(readRow(c));
+            }
+        } finally {
+            c.close();
+        }
+        return out;
+    }
+
+    @Override
     public EventRecord latest(String topic) {
         String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
                 COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
