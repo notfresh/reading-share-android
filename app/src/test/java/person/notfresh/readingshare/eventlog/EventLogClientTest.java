@@ -83,6 +83,21 @@ public class EventLogClientTest {
     }
 
     @Test
+    public void old_carries_previous_state_create_has_none() {
+        EventRecord c = EventLogClient.get().create("links", "e1",
+                FIXED_EVENT_MILLIS, "{\"title\":\"v1\"}");
+        assertNull("create 没有\"变更前\"", c.getOldJson());
+
+        EventRecord u = EventLogClient.get().update("links", "e1",
+                FIXED_EVENT_MILLIS, "{\"title\":\"v2\"}");
+        assertEquals("update 的 old = 上一条 data", "{\"title\":\"v1\"}", u.getOldJson());
+
+        EventRecord d = EventLogClient.get().delete("links", "e1", FIXED_MILLIS);
+        assertEquals("delete 的 old = 被删前状态", "{\"title\":\"v2\"}", d.getOldJson());
+        assertNull("delete 的 data 仍为 null", d.getData());
+    }
+
+    @Test
     public void id_is_sha256_of_topic_device_eventTime_entity_action_first_16_hex() {
         String topic = "links";
         String device = DEVICE;
@@ -404,7 +419,20 @@ public class EventLogClientTest {
         }
 
         @Override
-        public synchronized EventRecord latest(String topic) {
+        public synchronized String latestDataJson(String topic, String entityId) {
+            EventRecord best = null;
+            for (EventRecord r : byId.values()) {
+                if (!r.getTopic().equals(topic) || !r.getEntityId().equals(entityId)) continue;
+                if (r.getData() == null) continue;
+                if (best == null || r.getProcessTime().compareTo(best.getProcessTime()) > 0) {
+                    best = r;
+                }
+            }
+            return best == null ? null : best.getData();
+        }
+
+        @Override
+        public EventRecord latest(String topic) {
             EventRecord best = null;
             for (EventRecord r : byId.values()) {
                 if (!r.getTopic().equals(topic)) continue;

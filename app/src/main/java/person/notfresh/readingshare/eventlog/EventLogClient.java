@@ -426,8 +426,14 @@ public final class EventLogClient {
         //      远程事件在本地日志里重复写一行,折叠时还会把删掉的 link 折回来。
         String id = computeId(topic, deviceId, eventTime, entityId,
                 action.name().toLowerCase(Locale.US));
+        // §3.1: old = 本条事件生效前的实体状态(供 diff 用)。create 没有"之前" → null。
+        // 从本地事件流取该实体上一条带 data 的事件 —— 与折叠(LWW)同源,
+        // 所以 26 个埋点不需要各自传快照。
+        String oldJson = action == EventAction.CREATE
+                ? null
+                : store.latestDataJson(topic, entityId);
         EventRecord r = new EventRecord(id, topic, processTime, eventTime,
-                deviceId, entityId, action, dataJson);
+                deviceId, entityId, action, dataJson, oldJson);
         store.append(r);
         // 本地一产生事件就排队推送(防抖合并) —— 让另一台设备尽快看到这个变更
         scheduleAutoPush(topic);

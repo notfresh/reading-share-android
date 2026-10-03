@@ -103,6 +103,8 @@ public final class HttpEventLogPuller implements EventLogPuller {
                 EventAction action = EventAction.valueOf(
                         o.optString("action", "create").toUpperCase());
                 String dataJson = o.isNull("data") ? null : o.optString("data", null);
+                // §3.1 old(旧服务端不返回该字段 → isNull 为 true → null,兼容)
+                String oldJson = o.isNull("old") ? null : o.optString("old", null);
                 events.add(new EventRecord(
                         o.getString("id"),
                         o.optString("topic", ""),
@@ -111,7 +113,8 @@ public final class HttpEventLogPuller implements EventLogPuller {
                         o.optString("device_id", ""),
                         o.optString("entity_id", ""),
                         action,
-                        dataJson
+                        dataJson,
+                        oldJson
                 ));
             }
             return PullResult.ok(events);

@@ -121,6 +121,9 @@ public final class HttpEventLogPusher implements EventLogPusher {
                     // Pass through as-is; server treats it as opaque payload.
                     o.put("data", data);
                 }
+                // §3.1 old:变更前快照(同样按 JSON 字符串透传);create 或没历史时为 null
+                String oldJson = r.getOldJson();
+                o.put("old", oldJson == null ? JSONObject.NULL : oldJson);
                 arr.put(o);
             }
             JSONObject root = new JSONObject();

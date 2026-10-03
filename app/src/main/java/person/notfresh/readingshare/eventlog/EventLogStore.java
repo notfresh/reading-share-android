@@ -38,6 +38,12 @@ public interface EventLogStore {
 
     void deleteAll();
 
+    /**
+     * 该实体最近一条"带 data 的事件"的 payload(JSON 字符串),用于给新事件填
+     * {@code old}(PROTOCOL §3.1 变更前快照)。无历史返回 null。
+     */
+    String latestDataJson(String topic, String entityId);
+
     EventRecord latest(String topic);
 
     String deviceId();

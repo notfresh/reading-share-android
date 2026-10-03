@@ -12,6 +12,7 @@ public final class EventRecord {
     private final String entityId;
     private final EventAction action;
     private final String data;
+    private final String oldJson;
 
     public EventRecord(String id,
                        String topic,
@@ -20,7 +21,8 @@ public final class EventRecord {
                        String deviceId,
                        String entityId,
                        EventAction action,
-                       String data) {
+                       String data,
+                       String oldJson) {
         this.id = Objects.requireNonNull(id, "id");
         this.topic = Objects.requireNonNull(topic, "topic");
         this.processTime = Objects.requireNonNull(processTime, "processTime");
@@ -29,6 +31,7 @@ public final class EventRecord {
         this.entityId = Objects.requireNonNull(entityId, "entityId");
         this.action = Objects.requireNonNull(action, "action");
         this.data = data;
+        this.oldJson = oldJson;
     }
 
     public String getId() { return id; }
@@ -38,6 +41,9 @@ public final class EventRecord {
     public String getDeviceId() { return deviceId; }
     public String getEntityId() { return entityId; }
     public EventAction getAction() { return action; }
+    /** 变更前快照(§3.1);create 或写入方拿不到历史时为 null。 */
+    public String getOldJson() { return oldJson; }
+
     public String getData() { return data; }
 
     @Override
@@ -64,6 +70,7 @@ public final class EventRecord {
                 ", entityId='" + entityId + '\'' +
                 ", action=" + action +
                 ", data='" + data + '\'' +
+                ", old='" + oldJson + '\'' +
                 '}';
     }
 }

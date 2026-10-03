@@ -9,6 +9,7 @@ import java.util.List;
 
 import static person.notfresh.readingshare.eventlog.EventLogSchema.COL_ACTION;
 import static person.notfresh.readingshare.eventlog.EventLogSchema.COL_DATA;
+import static person.notfresh.readingshare.eventlog.EventLogSchema.COL_OLD;
 import static person.notfresh.readingshare.eventlog.EventLogSchema.COL_DEVICE_ID;
 import static person.notfresh.readingshare.eventlog.EventLogSchema.COL_ENTITY_ID;
 import static person.notfresh.readingshare.eventlog.EventLogSchema.COL_EVENT_TIME;
@@ -43,6 +44,7 @@ public final class SqliteEventLogStore implements EventLogStore {
         cv.put(COL_ENTITY_ID, record.getEntityId());
         cv.put(COL_ACTION, record.getAction().name());
         cv.put(COL_DATA, record.getData());
+        cv.put(COL_OLD, record.getOldJson());
         db.insertWithOnConflict(TABLE_EVENTS, null, cv, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
@@ -60,7 +62,7 @@ public final class SqliteEventLogStore implements EventLogStore {
         String cutoff = sinceEventTime == null ? "" : sinceEventTime;
         String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
                 COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
-                COL_ACTION + ", " + COL_DATA + " FROM " + TABLE_EVENTS +
+                COL_ACTION + ", " + COL_DATA + ", " + COL_OLD + " FROM " + TABLE_EVENTS +
                 " WHERE " + COL_TOPIC + " = ? AND " + COL_EVENT_TIME + " > ?" +
                 " ORDER BY " + COL_EVENT_TIME + " ASC LIMIT ?";
         List<EventRecord> out = new ArrayList<>();
@@ -87,14 +89,14 @@ public final class SqliteEventLogStore implements EventLogStore {
         if (untilEventTime == null) {
             sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
                     COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
-                    COL_ACTION + ", " + COL_DATA + " FROM " + TABLE_EVENTS +
+                    COL_ACTION + ", " + COL_DATA + ", " + COL_OLD + " FROM " + TABLE_EVENTS +
                     " WHERE " + COL_TOPIC + " = ?" +
                     " ORDER BY " + COL_EVENT_TIME + " DESC LIMIT ?";
             args = new String[]{topic, String.valueOf(capped)};
         } else {
             sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
                     COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
-                    COL_ACTION + ", " + COL_DATA + " FROM " + TABLE_EVENTS +
+                    COL_ACTION + ", " + COL_DATA + ", " + COL_OLD + " FROM " + TABLE_EVENTS +
                     " WHERE " + COL_TOPIC + " = ? AND " + COL_EVENT_TIME + " < ?" +
                     " ORDER BY " + COL_EVENT_TIME + " DESC LIMIT ?";
             args = new String[]{topic, untilEventTime, String.valueOf(capped)};
@@ -120,7 +122,7 @@ public final class SqliteEventLogStore implements EventLogStore {
         String cutoff = sinceProcessTime == null ? "" : sinceProcessTime;
         String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
                 COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
-                COL_ACTION + ", " + COL_DATA + " FROM " + TABLE_EVENTS +
+                COL_ACTION + ", " + COL_DATA + ", " + COL_OLD + " FROM " + TABLE_EVENTS +
                 " WHERE " + COL_TOPIC + " = ? AND " + COL_PROCESS_TIME + " > ?" +
                 " ORDER BY " + COL_PROCESS_TIME + " ASC LIMIT ?";
         List<EventRecord> out = new ArrayList<>();
@@ -143,7 +145,7 @@ public final class SqliteEventLogStore implements EventLogStore {
         int capped = Math.min(limit, 10000);
         String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
                 COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
-                COL_ACTION + ", " + COL_DATA + " FROM " + TABLE_EVENTS +
+                COL_ACTION + ", " + COL_DATA + ", " + COL_OLD + " FROM " + TABLE_EVENTS +
                 " WHERE " + COL_TOPIC + " = ? AND " + COL_PROCESS_TIME + " < ?" +
                 " ORDER BY " + COL_PROCESS_TIME + " DESC LIMIT ?";
         List<EventRecord> out = new ArrayList<>();
@@ -163,7 +165,7 @@ public final class SqliteEventLogStore implements EventLogStore {
     public EventRecord latest(String topic) {
         String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
                 COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
-                COL_ACTION + ", " + COL_DATA + " FROM " + TABLE_EVENTS +
+                COL_ACTION + ", " + COL_DATA + ", " + COL_OLD + " FROM " + TABLE_EVENTS +
                 " WHERE " + COL_TOPIC + " = ? ORDER BY " + COL_PROCESS_TIME + " DESC LIMIT 1";
         Cursor c = db.rawQuery(sql, new String[]{topic});
         try {
@@ -201,6 +203,25 @@ public final class SqliteEventLogStore implements EventLogStore {
         db.delete(TABLE_EVENTS, null, null);
     }
 
+    /**
+     * 该实体最近一条"带 data 的事件"的 payload(JSON 字符串),用于给新事件填 old。
+     * 按 process_time(与折叠/LWW 同口径);无历史返回 null。
+     */
+    @Override
+    public String latestDataJson(String topic, String entityId) {
+        Cursor c = db.rawQuery(
+                "SELECT " + COL_DATA + " FROM " + TABLE_EVENTS +
+                        " WHERE " + COL_TOPIC + " = ? AND " + COL_ENTITY_ID + " = ?" +
+                        " AND " + COL_DATA + " IS NOT NULL" +
+                        " ORDER BY " + COL_PROCESS_TIME + " DESC LIMIT 1",
+                new String[]{topic, entityId});
+        try {
+            return c.moveToFirst() ? c.getString(0) : null;
+        } finally {
+            c.close();
+        }
+    }
+
     private static EventRecord readRow(Cursor c) {
         return new EventRecord(
                 c.getString(c.getColumnIndexOrThrow(COL_ID)),
@@ -210,7 +231,8 @@ public final class SqliteEventLogStore implements EventLogStore {
                 c.getString(c.getColumnIndexOrThrow(COL_DEVICE_ID)),
                 c.getString(c.getColumnIndexOrThrow(COL_ENTITY_ID)),
                 EventAction.valueOf(c.getString(c.getColumnIndexOrThrow(COL_ACTION))),
-                c.getString(c.getColumnIndexOrThrow(COL_DATA))
+                c.getString(c.getColumnIndexOrThrow(COL_DATA)),
+                c.getString(c.getColumnIndexOrThrow(COL_OLD))
         );
     }
 }

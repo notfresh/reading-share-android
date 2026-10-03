@@ -18,9 +18,14 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -306,6 +311,33 @@ public class EventLogActivity extends AppCompatActivity {
         }).start();
     }
 
+    /**
+     * 字段级 diff:列出 old → data 之间变化的字段(只比一层,够看清一条链接改了什么)。
+     * 任一侧不是 JSON 对象时返回 null(不显示 diff 段)。
+     */
+    private static String formatFieldDiff(String oldJson, String newJson) {
+        if (oldJson == null || newJson == null) return null;
+        try {
+            JSONObject before = new JSONObject(oldJson);
+            JSONObject after = new JSONObject(newJson);
+            TreeSet<String> keys = new TreeSet<>();
+            for (Iterator<String> it = before.keys(); it.hasNext(); ) keys.add(it.next());
+            for (Iterator<String> it = after.keys(); it.hasNext(); ) keys.add(it.next());
+            StringBuilder sb = new StringBuilder();
+            for (String k : keys) {
+                String b = before.has(k) ? String.valueOf(before.get(k)) : null;
+                String a = after.has(k) ? String.valueOf(after.get(k)) : null;
+                if (b != null && b.equals(a)) continue;
+                sb.append("  ").append(k).append(": ")
+                        .append(b == null ? "(无)" : b).append(" → ")
+                        .append(a == null ? "(删)" : a).append('\n');
+            }
+            return sb.length() == 0 ? "  (无字段差异)\n" : sb.toString();
+        } catch (JSONException e) {
+            return null;
+        }
+    }
+
     private void showDetail(EventRecord item) {
         StringBuilder sb = new StringBuilder();
         sb.append("id:           ").append(item.getId()).append('\n');
@@ -315,7 +347,12 @@ public class EventLogActivity extends AppCompatActivity {
         sb.append("device_id:    ").append(item.getDeviceId()).append('\n');
         sb.append("process_time: ").append(item.getProcessTime()).append('\n');
         sb.append("event_time:   ").append(item.getEventTime()).append('\n');
-        sb.append("data:         ").append(item.getData() == null ? "null" : item.getData());
+        sb.append("data:         ").append(item.getData() == null ? "null" : item.getData()).append('\n');
+        sb.append("old:          ").append(item.getOldJson() == null ? "null" : item.getOldJson());
+        String diff = formatFieldDiff(item.getOldJson(), item.getData());
+        if (diff != null) {
+            sb.append("\n\n变更(old → data):\n").append(diff);
+        }
 
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_event_detail, null);
         TextView text = dialogView.findViewById(R.id.event_detail_text);

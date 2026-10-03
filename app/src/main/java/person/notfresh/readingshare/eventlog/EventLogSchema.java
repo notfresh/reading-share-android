@@ -1,10 +1,11 @@
 package person.notfresh.readingshare.eventlog;
 
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
 final class EventLogSchema {
 
-    static final int SCHEMA_VERSION = 2;
+    static final int SCHEMA_VERSION = 3;
 
     static final String TABLE_EVENTS = "events";
 
@@ -16,6 +17,8 @@ final class EventLogSchema {
     static final String COL_ENTITY_ID = "entity_id";
     static final String COL_ACTION = "action";
     static final String COL_DATA = "data";
+    /** PROTOCOL §3.1 变更前快照(JSON 字符串);create 恒为 NULL。v3 新增。 */
+    static final String COL_OLD = "old";
 
     static final String TABLE_META = "eventlog_meta";
 
@@ -32,6 +35,27 @@ final class EventLogSchema {
     static final String COL_LOG_RECEIVED_COUNT = "received_count";
     static final String COL_LOG_ERROR_MESSAGE = "error_message";
 
+    /** 幂等补列:按 PRAGMA table_info 判断,缺了才 ALTER。 */
+    private static void migrateAddColumn(SQLiteDatabase db, String table,
+                                        String column, String type) {
+        boolean exists = false;
+        Cursor c = db.rawQuery("PRAGMA table_info(" + table + ")", null);
+        try {
+            int nameIdx = c.getColumnIndex("name");
+            while (c.moveToNext()) {
+                if (column.equals(c.getString(nameIdx))) {
+                    exists = true;
+                    break;
+                }
+            }
+        } finally {
+            c.close();
+        }
+        if (!exists) {
+            db.execSQL("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type);
+        }
+    }
+
     private EventLogSchema() {}
 
     static void ensureSchema(SQLiteDatabase db) {
@@ -44,7 +68,8 @@ final class EventLogSchema {
                         COL_DEVICE_ID + " TEXT NOT NULL, " +
                         COL_ENTITY_ID + " TEXT NOT NULL, " +
                         COL_ACTION + " TEXT NOT NULL, " +
-                        COL_DATA + " TEXT" +
+                        COL_DATA + " TEXT, " +
+                        COL_OLD + " TEXT" +
                         ")"
         );
         db.execSQL(
@@ -76,6 +101,8 @@ final class EventLogSchema {
                         COL_LOG_ERROR_MESSAGE + " TEXT" +
                         ")"
         );
+        // 迁移:老库补 "old" 列 —— CREATE TABLE IF NOT EXISTS 不给已存在的表加列。
+        migrateAddColumn(db, TABLE_EVENTS, COL_OLD, "TEXT");
         db.execSQL(
                 "CREATE INDEX IF NOT EXISTS idx_sync_log_timestamp " +
                         "ON " + TABLE_SYNC_LOG + "(" + COL_LOG_TIMESTAMP + " DESC)"
