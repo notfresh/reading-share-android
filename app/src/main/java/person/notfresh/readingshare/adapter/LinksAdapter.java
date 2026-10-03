@@ -637,7 +637,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     return true;
                 case 4:
                     Log.d("LinksAdapter", "切换置顶被点击, linkId: " + item.getId() + ", 当前置顶状态: " + item.isPinned());
-                    linkDao.togglePinStatus(item.getId());
+                    // 先落库并拿回新状态,回填到 item —— payload 必须带新置顶状态
+                    boolean pinned = linkDao.togglePinStatus(item.getId());
+                    item.setPinned(pinned);
                     EventLogClient.get().update("links",
                             String.valueOf(item.getId()),
                             System.currentTimeMillis(),

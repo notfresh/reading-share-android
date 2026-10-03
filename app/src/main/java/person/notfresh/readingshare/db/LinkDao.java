@@ -81,6 +81,9 @@ public class LinkDao {
         values.put(LinkDbHelper.COLUMN_TARGET_ACTIVITY, item.getTargetActivity());
         values.put(LinkDbHelper.COLUMN_REMARK, item.getRemark());
         values.put(LinkDbHelper.COLUMN_SUMMARY, item.getSummary());
+        // is_pinned 也要落库 —— 导入(ImportUtil 已解出 isPinned)走的就是这个方法,
+        // 不写的话 CSV/JSON 里的置顶状态会被静默丢掉。
+        values.put("is_pinned", item.isPinned() ? 1 : 0);
 
         long linkId = database.insert(LinkDbHelper.TABLE_LINKS, null, values);
         item.setId(linkId);
@@ -105,6 +108,9 @@ public class LinkDao {
         values.put(LinkDbHelper.COLUMN_TARGET_ACTIVITY, item.getTargetActivity());
         values.put(LinkDbHelper.COLUMN_REMARK, item.getRemark());
         values.put(LinkDbHelper.COLUMN_SUMMARY, item.getSummary());
+        // is_pinned 也要落库 —— 拉取折叠(LinkEventApplier.handleCreate/handleUpdate)
+        // 靠这里把服务端的置顶状态还原到本地,不写的话另一台永远置顶不上。
+        values.put("is_pinned", item.isPinned() ? 1 : 0);
         database.insertWithOnConflict(
                 LinkDbHelper.TABLE_LINKS, null, values,
                 SQLiteDatabase.CONFLICT_REPLACE);
@@ -207,7 +213,12 @@ public class LinkDao {
         );
     }
 
-    public void togglePinStatus(long linkId) {
+    /**
+     * 切换置顶状态。
+     * @return 切换后的置顶状态 —— 调用方(埋点)要拿它写进事件 payload,
+     *         否则 payload 里带的是旧值,同步出去等于没置顶。
+     */
+    public boolean togglePinStatus(long linkId) {
         SQLiteDatabase db = database;
         Log.d("LinkDao", "开始切换置顶状态, linkId: " + linkId);
 
@@ -227,6 +238,7 @@ public class LinkDao {
         int updatedRows = db.update(LinkDbHelper.TABLE_LINKS, values, "_id = ?",
                 new String[]{String.valueOf(linkId)});
         Log.d("LinkDao", "更新结果: " + updatedRows + " 行受影响");
+        return values.getAsInteger("is_pinned") == 1;
     }
 
     public void updateSummary(long linkId, String summary) {
@@ -327,7 +339,10 @@ public class LinkDao {
                 item.setSummary(summary);
                 item.setRemark(remark);
                 item.setClickCount(clickCount);  // 设置 clickCount
-                
+                // is_pinned 也要读 —— getAllLinks() 是 bootstrap 灌历史事件的数据源,
+                // 不读的话事件 payload 里恒为 false,新设备整库拉取会把置顶冲掉。
+                item.setPinned(cursor.getInt(cursor.getColumnIndexOrThrow("is_pinned")) == 1);
+
                 // 加载该链接的标签
                 List<String> tags = getLinkTags(id);
                 for (String tag : tags) {
