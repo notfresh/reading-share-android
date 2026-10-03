@@ -148,7 +148,7 @@
                 android:id="@+id/reading_mode_normal"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="常规" />
+                android:text="常规（不显示控制层）" />
 
             <RadioButton
                 android:id="@+id/reading_mode_smooth"
