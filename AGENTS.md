@@ -39,3 +39,7 @@
 - 用户有 3000+ 链接，禁止 `getAllLinks()` 一次性加载。
 - 新增链接列表功能必须用 `getLinksPage(offset, limit)` + `searchLinks(LinkSearchSpec)`。
 - 数据库版本已 17，links 表已加 title/timestamp/tags.name 索引，搜索走 SQL LIKE 命中索引。
+
+# 第七条 - 版本号
+- 每次改完（bug / 特性 / 优化）**问一句：要不要升版本**。
+- 升的位置：`app/build.gradle` 的 `versionCode`（+1）与 `versionName`（如 2.3.1 → 2.3.2）。
