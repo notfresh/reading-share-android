@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -95,6 +96,28 @@ public class EventLogClientTest {
         EventRecord d = EventLogClient.get().delete("links", "e1", FIXED_MILLIS);
         assertEquals("delete 的 old = 被删前状态", "{\"title\":\"v2\"}", d.getOldJson());
         assertNull("delete 的 data 仍为 null", d.getData());
+    }
+
+    @Test
+    public void untilByProcessTime_query_has_no_null_arg_on_first_page() {
+        // 第一页 = UI 传 null 游标(EventLogActivity.loadNextPage)。
+        // 2026-10-03 线上崩过:null 被直接塞进 SQL 参数,bindString 抛
+        // IllegalArgumentException。此处锁死"参数里不允许出现 null"。
+        SqliteEventLogStore.Query first =
+                SqliteEventLogStore.buildUntilByProcessTimeQuery("links", null, 50);
+        assertEquals(2, first.args.length);
+        for (String a : first.args) {
+            assertNotNull("SQL 参数不能是 null(第一页)", a);
+        }
+        assertFalse("第一页不该带上界条件", first.sql.contains("process_time <"));
+
+        SqliteEventLogStore.Query next = SqliteEventLogStore.buildUntilByProcessTimeQuery(
+                "links", "2026-01-01T00:00:00.000Z", 50);
+        assertEquals(3, next.args.length);
+        for (String a : next.args) {
+            assertNotNull("SQL 参数不能是 null(翻页)", a);
+        }
+        assertTrue("翻页要带上界条件", next.sql.contains("process_time <"));
     }
 
     @Test

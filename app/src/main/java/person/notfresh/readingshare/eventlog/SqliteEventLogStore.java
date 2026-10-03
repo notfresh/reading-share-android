@@ -142,15 +142,9 @@ public final class SqliteEventLogStore implements EventLogStore {
         if (limit <= 0) {
             throw new EventLogException("limit must be positive, got " + limit);
         }
-        int capped = Math.min(limit, 10000);
-        String sql = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
-                COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
-                COL_ACTION + ", " + COL_DATA + ", " + COL_OLD + " FROM " + TABLE_EVENTS +
-                " WHERE " + COL_TOPIC + " = ? AND " + COL_PROCESS_TIME + " < ?" +
-                " ORDER BY " + COL_PROCESS_TIME + " DESC LIMIT ?";
+        Query q = buildUntilByProcessTimeQuery(topic, untilProcessTime, Math.min(limit, 10000));
         List<EventRecord> out = new ArrayList<>();
-        Cursor c = db.rawQuery(sql,
-                new String[]{topic, untilProcessTime, String.valueOf(capped)});
+        Cursor c = db.rawQuery(q.sql, q.args);
         try {
             while (c.moveToNext()) {
                 out.add(readRow(c));
@@ -159,6 +153,43 @@ public final class SqliteEventLogStore implements EventLogStore {
             c.close();
         }
         return out;
+    }
+
+    /**
+     * untilByProcessTime 的 SQL + 参数。游标为 {@code null} 表示第一页("从最新往回看"),
+     * 此时**不加上界条件**。
+     *
+     * <p>⚠️ 游标绝不能直接塞进参数数组:第一页传的就是 null,而
+     * {@code SQLiteProgram.bindString(null)} 会抛 IllegalArgumentException,整个列表页直接崩。</p>
+     *
+     * <p>抽成静态方法是为了让"第一页不带 null 参数"这条不变量能被纯 JUnit 单测覆盖 ——
+     * store 其它方法都要 Android SQLite 运行时,单测只能走 FakeStore,覆盖不到参数数组。</p>
+     */
+    static Query buildUntilByProcessTimeQuery(String topic, String untilProcessTime, int capped) {
+        String select = "SELECT " + COL_ID + ", " + COL_TOPIC + ", " + COL_PROCESS_TIME + ", " +
+                COL_EVENT_TIME + ", " + COL_DEVICE_ID + ", " + COL_ENTITY_ID + ", " +
+                COL_ACTION + ", " + COL_DATA + ", " + COL_OLD + " FROM " + TABLE_EVENTS;
+        if (untilProcessTime == null) {
+            return new Query(
+                    select + " WHERE " + COL_TOPIC + " = ?" +
+                            " ORDER BY " + COL_PROCESS_TIME + " DESC LIMIT ?",
+                    new String[]{topic, String.valueOf(capped)});
+        }
+        return new Query(
+                select + " WHERE " + COL_TOPIC + " = ? AND " + COL_PROCESS_TIME + " < ?" +
+                        " ORDER BY " + COL_PROCESS_TIME + " DESC LIMIT ?",
+                new String[]{topic, untilProcessTime, String.valueOf(capped)});
+    }
+
+    /** {@link #buildUntilByProcessTimeQuery} 的返回值容器(sql 与 args 必须成对)。 */
+    static final class Query {
+        final String sql;
+        final String[] args;
+
+        Query(String sql, String[] args) {
+            this.sql = sql;
+            this.args = args;
+        }
     }
 
     @Override
