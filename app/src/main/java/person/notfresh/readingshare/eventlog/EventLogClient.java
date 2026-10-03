@@ -356,7 +356,14 @@ public final class EventLogClient {
         // process_time: 日志生成时刻,UTC(ISO-8601 + Z),同 topic 内严格递增
         String processTime = nextProcessTime();
         String deviceId = store.deviceId();
-        String id = computeId(topic, deviceId, eventTime, entityId, action.name());
+        // id 必须用「线上协议值」算 —— PROTOCOL §3.1 的 action 枚举是
+        // create|update|delete(小写),服务端按收到的小写 action 重算同一个 id。
+        // 用 EventAction.name() 的 "DELETE" 大写会算出一套不同的 id,导致:
+        //   1) 推送的 id 与服务端存储的 id 不匹配(曾表现为 400 id_mismatch);
+        //   2) 拉取落库(INSERT OR IGNORE 按 id 去重)永远去不掉重 ——
+        //      远程事件在本地日志里重复写一行,折叠时还会把删掉的 link 折回来。
+        String id = computeId(topic, deviceId, eventTime, entityId,
+                action.name().toLowerCase(Locale.US));
         EventRecord r = new EventRecord(id, topic, processTime, eventTime,
                 deviceId, entityId, action, dataJson);
         store.append(r);
