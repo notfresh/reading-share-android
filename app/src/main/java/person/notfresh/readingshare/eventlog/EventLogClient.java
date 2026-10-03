@@ -169,6 +169,18 @@ public final class EventLogClient {
         return store.until(topic, untilEventTime, limit);
     }
 
+    /**
+     * 按 process_time(日志写入时刻)倒序翻页 —— 事件日志 UI 的"写入序"展示。
+     *
+     * <p>与 {@link #until} 的区别: {@code until} 按 event_time 排,而 event_time 是
+     * 各埋点自己传的"实体时间"(有的传 now(),有的传 link.getTimestamp() =
+     * 链接创建时间),同一屏里新旧混排,看起来顺序是乱的。
+     * process_time 由 {@link #nextProcessTime()} 保证同 topic 内严格递增,是真正的写入序。</p>
+     */
+    public List<EventRecord> untilByProcessTime(String topic, String untilProcessTime, int limit) {
+        return store.untilByProcessTime(topic, untilProcessTime, limit);
+    }
+
     public EventRecord latest(String topic) {
         return store.latest(topic);
     }

@@ -272,8 +272,11 @@ public class EventLogActivity extends AppCompatActivity {
         loadMoreButton.setText("加载中…");
         final String useCursor = cursor;
         new Thread(() -> {
-            // A 语义：until() 拿 "cursor 之前"的 N 条按 DESC；第一页 cursor=null 拿最晚 N 条
-            List<EventRecord> page = EventLogClient.get().until("links", useCursor, PAGE_SIZE);
+            // A 语义：拿 "cursor 之前"的 N 条按 DESC；第一页 cursor=null 拿最新写入的 N 条。
+            // 按 process_time(写入序) —— 不按 event_time：各埋点传的 event_time 语义不一
+            // (有的传 now()，有的传 link.timestamp)，按它排会忽新忽旧。
+            List<EventRecord> page = EventLogClient.get()
+                    .untilByProcessTime("links", useCursor, PAGE_SIZE);
             runOnUiThread(() -> {
                 if (page.isEmpty()) {
                     exhausted = true;
@@ -286,7 +289,7 @@ public class EventLogActivity extends AppCompatActivity {
                 for (int i = 0; i < page.size(); i++) {
                     events.add(page.get(i));
                 }
-                cursor = page.get(page.size() - 1).getEventTime();
+                cursor = page.get(page.size() - 1).getProcessTime();
                 if (page.size() < PAGE_SIZE) {
                     exhausted = true;
                     loadMoreButton.setText("已经到底");
