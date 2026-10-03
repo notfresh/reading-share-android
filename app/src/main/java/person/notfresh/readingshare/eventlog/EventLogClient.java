@@ -10,6 +10,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class EventLogClient {
 
@@ -36,6 +40,15 @@ public final class EventLogClient {
     /** 最近一次分配的 process_time 毫秒值 — 保证同 topic 内严格递增。 */
     private long lastProcessMillis = -1L;
 
+    /**
+     * 本地一产生事件就自动推送：安静 {@link #AUTO_PUSH_DEBOUNCE_MS} 毫秒后推一批。
+     * 单线程 + 单次排队({@link #autoPushScheduled}) 保证：① 不并发推；
+     * ② 一次批量操作(导入 / 灌历史)只触发一次推送，而不是每条一个 HTTP 请求。
+     */
+    private static final long AUTO_PUSH_DEBOUNCE_MS = 1500L;
+    private final ScheduledExecutorService autoPushExecutor;
+    private final AtomicBoolean autoPushScheduled = new AtomicBoolean(false);
+
     private EventLogClient(EventLogStore store, TimeSource clock,
                            SyncPointStore syncStore,
                            EventLogPusher pusher,
@@ -53,6 +66,11 @@ public final class EventLogClient {
         this.syncLogStore = syncLogStore;
         this.linkApplier = linkApplier;
         this.bootstrapPrefs = bootstrapPrefs;
+        this.autoPushExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "eventlog-auto-push");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     public static EventLogClient get() {
@@ -243,6 +261,38 @@ public final class EventLogClient {
     }
 
     /**
+     * 事件刚落库 → 安排一次自动推送(防抖合并)。
+     *
+     * <p>为什么防抖:导入 1000 条 / bootstrap 灌 3000 条时,若每条一个 POST 就是
+     * 上千次请求;合并成"安静一会儿后推一批"后,单条用户操作 ≈ 一次请求。</p>
+     *
+     * <p>失败不在这里处理 —— 推送游标不推进 = 事件仍在本地,由下一次推送
+     * (或启动同步 / 手动同步)重试,天然 at-least-once 幂等。</p>
+     *
+     * <p>未配置同步(无 pusher/syncConfig)时静默跳过。</p>
+     */
+    private void scheduleAutoPush(String topic) {
+        if (syncStore == null || pusher == null || puller == null || syncConfig == null) {
+            return; // 未配置同步:静默跳过,不能因为没填 URL 就出问题
+        }
+        if (!autoPushScheduled.compareAndSet(false, true)) {
+            return; // 已有一次排在队里 → 合并掉,不重复排
+        }
+        try {
+            autoPushExecutor.schedule(() -> {
+                autoPushScheduled.set(false);
+                try {
+                    pushPending(topic);
+                } catch (Exception ignored) {
+                    // best-effort:失败已写进 sync_log,事件仍在本地等下次
+                }
+            }, AUTO_PUSH_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+        } catch (Exception ignored) {
+            autoPushScheduled.set(false); // 调度器异常时别把标志卡死
+        }
+    }
+
+    /**
      * Pull events for {@code topic} from the remote server and persist them
      * locally, advancing the pull cursor on success. Per PROTOCOL §10.5 PULL 流程:
      *
@@ -379,6 +429,8 @@ public final class EventLogClient {
         EventRecord r = new EventRecord(id, topic, processTime, eventTime,
                 deviceId, entityId, action, dataJson);
         store.append(r);
+        // 本地一产生事件就排队推送(防抖合并) —— 让另一台设备尽快看到这个变更
+        scheduleAutoPush(topic);
         return r;
     }
 

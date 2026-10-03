@@ -13,6 +13,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
@@ -268,6 +270,45 @@ public class EventLogClientTest {
         assertEquals(u.getId(), EventLogClient.get().latest("links").getId());
     }
 
+    /** 本地一落库就自动推送(防抖合并):连续两条事件只推一次,批次里两条都在。 */
+    @Test
+    public void record_triggers_debounced_auto_push() throws Exception {
+        FakePusher pusher = new FakePusher();
+        FakeSyncPoints points = new FakeSyncPoints();
+        EventLogPuller puller = (topic, since, limit) ->
+                EventLogPuller.PullResult.ok(new ArrayList<>());
+        EventLogClient.init(store, points, pusher, puller,
+                new SyncConfig("http://test.local", "s3cret"), null, null, fakePrefs);
+
+        EventLogClient.get().create("links", "e1", FIXED_MILLIS, "{}");
+        EventLogClient.get().update("links", "e1", FIXED_MILLIS, "{\"v\":2}");
+
+        assertTrue("防抖窗口内应自动推一次", pusher.pushed.await(6, TimeUnit.SECONDS));
+        assertEquals("两条事件应合并成一次推送", 1, pusher.batches.size());
+        assertEquals(2, pusher.batches.get(0).size());
+    }
+
+    private static final class FakePusher implements EventLogPusher {
+        final List<List<EventRecord>> batches = new ArrayList<>();
+        final CountDownLatch pushed = new CountDownLatch(1);
+
+        @Override
+        public synchronized PushResult push(String topic, List<EventRecord> batch) {
+            batches.add(new ArrayList<>(batch));
+            pushed.countDown();
+            return PushResult.ok(batch.size(), batch.size(), 0,
+                    batch.get(batch.size() - 1).getProcessTime());
+        }
+    }
+
+    private static final class FakeSyncPoints implements SyncPointStore {
+        private final Map<String, String> map = new HashMap<>();
+
+        @Override public String get(String key) { return map.get(key); }
+        @Override public void set(String key, String value) { map.put(key, value); }
+        @Override public void delete(String key) { map.remove(key); }
+    }
+
     private static final class FakeStore implements EventLogStore {
         private final String deviceId;
         private final Map<String, EventRecord> byId = new HashMap<>();
@@ -292,9 +333,10 @@ public class EventLogClientTest {
                 throw new EventLogException("limit must be positive, got " + limit);
             }
             List<EventRecord> out = new ArrayList<>();
+            String cutoff = sinceEventTime == null ? "" : sinceEventTime;
             for (EventRecord r : byId.values()) {
                 if (!r.getTopic().equals(topic)) continue;
-                if (r.getEventTime().compareTo(sinceEventTime) > 0) {
+                if (r.getEventTime().compareTo(cutoff) > 0) {
                     out.add(r);
                 }
             }
@@ -308,9 +350,11 @@ public class EventLogClientTest {
         @Override
         public synchronized List<EventRecord> sinceByProcessTime(String topic, String sinceProcessTime, int limit) {
             List<EventRecord> out = new ArrayList<>();
+            // 游标首次为 null —— 对齐生产 SqliteEventLogStore 的 null → "" 兜底
+            String cutoff = sinceProcessTime == null ? "" : sinceProcessTime;
             for (EventRecord r : byId.values()) {
                 if (!r.getTopic().equals(topic)) continue;
-                if (r.getProcessTime().compareTo(sinceProcessTime) > 0) {
+                if (r.getProcessTime().compareTo(cutoff) > 0) {
                     out.add(r);
                 }
             }
