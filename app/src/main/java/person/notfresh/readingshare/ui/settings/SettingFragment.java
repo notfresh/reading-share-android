@@ -45,6 +45,13 @@ import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.db.SearchHistoryManager;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.URLSpan;
+import android.text.style.StyleSpan;
+import android.graphics.Typeface;
+import android.widget.TextView;
+import android.content.pm.PackageManager;
 import com.google.android.material.snackbar.Snackbar;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.ImportUtil;
@@ -191,11 +198,38 @@ public class SettingFragment extends Fragment {
             }
         });
 
+        CheckBox showRandomEntryCheckbox = root.findViewById(R.id.show_random_entry_checkbox);
+        showRandomEntryCheckbox.setChecked(globalPrefs.getBoolean("show_random_fab", true));
+        showRandomEntryCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            globalPrefs.edit().putBoolean("show_random_fab", isChecked).apply();
+            if (requireActivity() instanceof MainActivity) {
+                ((MainActivity) requireActivity()).updateRandomFabVisibility();
+            }
+        });
+
+        // 左手/右手模式:默认右手,切到左手时 fab 区域跑到左边
+        RadioButton fabSideRightRb = root.findViewById(R.id.fab_side_right);
+        RadioButton fabSideLeftRb = root.findViewById(R.id.fab_side_left);
+        RadioGroup fabSideGroup = root.findViewById(R.id.fab_side_group);
+        boolean isLeft = globalPrefs.getBoolean("fab_side_left", false);
+        fabSideRightRb.setChecked(!isLeft);
+        fabSideLeftRb.setChecked(isLeft);
+        fabSideGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            boolean left = (checkedId == R.id.fab_side_left);
+            globalPrefs.edit().putBoolean("fab_side_left", left).apply();
+            if (requireActivity() instanceof MainActivity) {
+                ((MainActivity) requireActivity()).applyFabSide();
+            }
+        });
+
         root.findViewById(R.id.button_link_history).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), LinksHistoryActivity.class)));
 
         root.findViewById(R.id.button_event_log).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), EventLogActivity.class)));
+
+        // 「关于」弹窗(简化版:app 名 + 版本 + GitHub 链接下划线)
+        root.findViewById(R.id.button_about).setOnClickListener(v -> showAboutDialog());
 
         // 监听输入框内容变化 — 实时保存(每改一个字符就 apply 一次)。
         // 顺序很重要:setText(savedUrl) 在 addTextChangedListener 之前调用,
@@ -702,5 +736,49 @@ public class SettingFragment extends Fragment {
             if (item != null && item.getId() > 0) ids.add(item.getId());
         }
         return SubjectUtil.getSubjectNamesByLinkIds(requireContext(), ids);
+    }
+
+    /**
+     * 「关于」弹窗:app 名 + 版本号 + GitHub 链接(下划线,可点击跳转)
+     * 仿 EventLogActivity.makeClickableHint 的样式(SpannableString + URLSpan)
+     */
+    private void showAboutDialog() {
+        String appName = getString(R.string.app_name);
+        // debug 构建默认不生成 BuildConfig,用 PackageManager 拿 versionName(通用方案)
+        String version;
+        try {
+            version = requireContext().getPackageManager()
+                    .getPackageInfo(requireContext().getPackageName(), 0).versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            version = "?";
+        }
+        String url = "https://github.com/notfresh/reading-share-android";
+
+        // "读享\n版本 2.3.12.1\n\n项目主页 https://github.com/..." —— 最后一行整体可点
+        String line1 = appName;
+        String line2 = "版本 " + version;
+        String linkText = url;
+        String full = line1 + "\n" + line2 + "\n\n" + linkText;
+
+        SpannableString ss = new SpannableString(full);
+        // 让「app 名」加粗(让用户一眼看到名字)
+        ss.setSpan(new StyleSpan(Typeface.BOLD), 0, line1.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        // 让最后一行(url)是下划线 + 可点击
+        int linkStart = line1.length() + 1 + line2.length() + 2;  // "\n\n" 后
+        int linkEnd = full.length();
+        ss.setSpan(new URLSpan(url), linkStart, linkEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        TextView tv = new TextView(requireContext());
+        tv.setText(ss);
+        tv.setTextIsSelectable(true);
+        tv.setPadding(48, 32, 48, 32);
+        tv.setLinksClickable(true);
+        tv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+
+        new AlertDialog.Builder(requireContext())
+            .setTitle("关于")
+            .setView(tv)
+            .setPositiveButton("关闭", null)
+            .show();
     }
 }

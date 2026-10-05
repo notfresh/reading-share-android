@@ -37,6 +37,7 @@ import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.ui.home.HomeFragment;
+import person.notfresh.readingshare.ui.subject.SubjectFragment;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.app.AlertDialog;
@@ -62,6 +63,8 @@ import androidx.annotation.Nullable;
 import java.net.URLConnection;
 import android.content.SharedPreferences;
 import androidx.core.view.GravityCompat;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import android.view.Gravity;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
@@ -88,6 +91,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean hasFocus = false;
     private String lastClipboardText = "";  // 添加这个变量来记录上次处理的剪贴板内容
     private NavController navController;  // 将 navController 声明为类成员变量
+    private boolean isFabExpanded = false;  // fab 区域是否展开
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -180,7 +184,52 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
             updateMailFabVisibility();
-            
+
+            // 随机入口 FAB(HomeFragment = 洗牌链接,SubjectFragment = 随机切换主题)
+            binding.appBarMain.fabRandom.setOnClickListener(view -> {
+                if (navController == null) return;
+                NavDestination dest = navController.getCurrentDestination();
+                if (dest == null) return;
+                if (dest.getId() == R.id.nav_home) {
+                    if (HomeFragment.activeInstance != null) {
+                        HomeFragment.activeInstance.onShuffleFabClicked();
+                    } else {
+                        Toast.makeText(this, "请在主页使用随机功能", Toast.LENGTH_SHORT).show();
+                    }
+                } else if (dest.getId() == R.id.nav_subject) {
+                    if (SubjectFragment.activeInstance != null) {
+                        SubjectFragment.activeInstance.onRandomSubjectFabClicked();
+                    } else {
+                        Toast.makeText(this, "请在主题页使用随机切换", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(this, "当前页面不支持随机功能", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            // 展开/折叠 toggle:控制槽位显隐(无动画,简洁)
+            binding.appBarMain.fabExpandToggle.setOnClickListener(view -> {
+                isFabExpanded = !isFabExpanded;
+                updateFabExpandState();
+            });
+
+            // 槽位 1:切换 链接/主题(跨 fragment 一直显示)
+            binding.appBarMain.fabSlot1.setOnClickListener(view -> {
+                if (navController == null) return;
+                NavDestination dest = navController.getCurrentDestination();
+                if (dest == null) return;
+                int targetId = (dest.getId() == R.id.nav_home) ? R.id.nav_subject : R.id.nav_home;
+                navigateTo(targetId);
+            });
+
+            // destination 变化时同步 fab_random 显隐
+            navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
+                updateRandomFabVisibility();
+            });
+
+            updateRandomFabVisibility();
+            applyFabSide();
+
         } catch (Exception e) {
             Log.e("MainActivity", "onCreate failed", e);
             Toast.makeText(this, "应用启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -219,6 +268,7 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         updateNavHeader();
         updateMailFabVisibility();
+        updateRandomFabVisibility();
     }
 
     public void updateMailFabVisibility() {
@@ -227,6 +277,71 @@ public class MainActivity extends AppCompatActivity {
                     .getBoolean("show_mail_fab", false);
             binding.appBarMain.fab.setVisibility(showMailFab ? View.VISIBLE : View.GONE);
         }
+    }
+
+    /**
+     * 随机入口 FAB 显隐:
+     *   - 用户开关(show_random_fab)开
+     *   - 当前 fragment 是 nav_home 或 nav_subject(其他 fragment 没意义)
+     * 由 NavDestination 变化驱动 + onCreate / onResume 兜底,避免 navController
+     * 尚未 ready 时 getCurrentDestination 返回 null 导致 fab 永远不显示
+     */
+    private boolean isRandomFabDestination() {
+        if (navController == null) return false;
+        NavDestination dest = navController.getCurrentDestination();
+        if (dest == null) return false;
+        int id = dest.getId();
+        return id == R.id.nav_home || id == R.id.nav_subject;
+    }
+
+    public void updateRandomFabVisibility() {
+        if (binding == null || binding.appBarMain == null || binding.appBarMain.fabRandom == null) {
+            return;
+        }
+        boolean userEnabled = getSharedPreferences("settings", MODE_PRIVATE)
+                .getBoolean("show_random_fab", true);
+        boolean showable = userEnabled && isRandomFabDestination();
+        binding.appBarMain.fabRandom.setVisibility(showable ? View.VISIBLE : View.GONE);
+        // 展开/折叠 toggle 跟主按钮同进退(没主按钮没展开的意义)
+        if (binding.appBarMain.fabExpandToggle != null) {
+            binding.appBarMain.fabExpandToggle.setVisibility(showable ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    /**
+     * 槽位显隐:fab_slot_1(切换链接/主题)一直显示,不受折叠影响;
+     * fab_slot_2 仅在 isFabExpanded=true 时显示。
+     * 主 fab_random / fab_expand_toggle / fab(邮件) 不受影响。
+     */
+    private void updateFabExpandState() {
+        if (binding == null || binding.appBarMain == null) return;
+        binding.appBarMain.fabSlot1.setVisibility(View.VISIBLE);  // 始终显示
+        int vis = isFabExpanded ? View.VISIBLE : View.GONE;
+        binding.appBarMain.fabSlot2.setVisibility(vis);
+    }
+
+    /**
+     * 左手/右手模式:左手模式把 fab_container 从 right 切到 left,并镜像 margin。
+     * 通过运行时改 layoutParams(不动 xml)。
+     */
+    public void applyFabSide() {
+        if (binding == null || binding.appBarMain == null) return;
+        boolean isLeft = getSharedPreferences("settings", MODE_PRIVATE)
+                .getBoolean("fab_side_left", false);
+        CoordinatorLayout.LayoutParams lp =
+                (CoordinatorLayout.LayoutParams) binding.appBarMain.fabContainer.getLayoutParams();
+        // 从 dimens.xml 读 fab_margin 的实际像素值(对称)
+        int margin = (int) getResources().getDimension(R.dimen.fab_margin);
+        if (isLeft) {
+            lp.gravity = GravityCompat.START | Gravity.BOTTOM;
+            lp.leftMargin = margin;
+            lp.rightMargin = 0;
+        } else {
+            lp.gravity = GravityCompat.END | Gravity.BOTTOM;
+            lp.rightMargin = margin;
+            lp.leftMargin = 0;
+        }
+        binding.appBarMain.fabContainer.setLayoutParams(lp);
     }
 
     @Override

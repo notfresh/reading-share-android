@@ -77,8 +77,29 @@ public class SubjectFragment extends Fragment implements SubjectItemAdapter.OnSu
 
     @Override public void onResume() {
         super.onResume();
+        activeInstance = this;
         if (subject != null) loadSubject(subject.getId());
         else if (!listDialogShown && subjectDao != null) openRememberedSubjectOrList();
+    }
+
+    @Override public void onPause() {
+        super.onPause();
+        if (activeInstance == this) {
+            activeInstance = null;
+        }
+    }
+
+    /**
+     * 当前激活的 SubjectFragment(自己设,自己清,与生命周期对齐)
+     * MainActivity 点击 fab_random 时在 nav_subject 上调本方法
+     */
+    public static volatile SubjectFragment activeInstance;
+
+    /**
+     * 随机切换主题(FAB 入口,完全照搬顶部 action_random_subject 的语义)
+     */
+    public void onRandomSubjectFabClicked() {
+        pickRandomSubject();
     }
 
     @Override public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {

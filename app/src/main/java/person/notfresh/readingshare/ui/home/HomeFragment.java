@@ -2643,4 +2643,38 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 .setNegativeButton("取消", null)
                 .show();
     }
+
+    /**
+     * 当前激活的 HomeFragment(自己设,自己清,与 HomeFragment 生命周期完全对齐)
+     * HomeFragment.onResume 设引用,onPause 清引用,MainActivity 点击 FAB 时直接调
+     */
+    public static volatile HomeFragment activeInstance;
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        activeInstance = this;
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (activeInstance == this) {
+            activeInstance = null;
+        }
+    }
+
+    /**
+     * 随机入口(底部 FAB)的点击处理
+     * 完全照抄顶部栏 action_shuffle 的语义(HomeFragment.java:312-320):
+     *   - 未在洗牌模式 → 进入并洗牌
+     *   - 已在洗牌模式 → 重新洗牌
+     */
+    public void onShuffleFabClicked() {
+        if (isShuffleMode) {
+            reshuffleLinks();
+        } else {
+            toggleShuffleMode();
+        }
+    }
 }

@@ -30,6 +30,44 @@
             android:layout_marginTop="8dp"
             android:text="显示邮件入口" />
 
+        <CheckBox
+            android:id="@+id/show_random_entry_checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:checked="true"
+            android:text="显示随机入口" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FAB 区域位置"
+            android:textSize="18sp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/fab_side_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="8dp">
+
+            <RadioButton
+                android:id="@+id/fab_side_right"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="右手模式(默认,右下角)" />
+
+            <RadioButton
+                android:id="@+id/fab_side_left"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="左手模式(左下角)" />
+
+        </RadioGroup>
+
         <Button
             android:id="@+id/button_link_history"
             android:layout_width="wrap_content"
@@ -264,6 +302,13 @@
                 android:maxLines="1" />
 
         </com.google.android.material.textfield.TextInputLayout>
+
+        <Button
+            android:id="@+id/button_about"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="关于" />
 
     </LinearLayout>
 </ScrollView>
