@@ -60,12 +60,17 @@ import com.google.android.flexbox.FlexboxLayout;
 
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.links.strategy.XiaohongshuSkipStrategy;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
+import person.notfresh.readingshare.util.TagSuggestionHelper;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.graphics.drawable.DrawableCompat;
+import java.util.HashSet;
+import java.util.Set;
+import androidx.recyclerview.widget.RecyclerView;
 
 public class WebViewActivity extends AppCompatActivity {
     private WebView webView;
@@ -722,20 +727,9 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     private boolean isXshlinkUrl(String url) {
-        if (url == null || url.trim().isEmpty()) {
-            return false;
-        }
-        String host = Uri.parse(url.trim()).getHost();
-        if (host == null) {
-            return false;
-        }
-        String normalizedHost = host.toLowerCase(java.util.Locale.ROOT);
-        return "xhslink.cn".equals(normalizedHost)
-            || normalizedHost.endsWith(".xhslink.cn")
-            || "xshlink.cn".equals(normalizedHost)
-            || normalizedHost.endsWith(".xshlink.cn")
-            || "xhslink.com".equals(normalizedHost)
-            || normalizedHost.endsWith(".xhslink.com");
+        // 单一来源:XiaohongshuSkipStrategy.isXiaohongshuUrl
+        // (命名短链系列 + xiaohongshu.com 主域及子域)
+        return XiaohongshuSkipStrategy.isXiaohongshuUrl(url);
     }
 
     private boolean handleUrlOverride(WebView view, String url, boolean isMainFrame) {
@@ -908,6 +902,12 @@ public class WebViewActivity extends AppCompatActivity {
         FlexboxLayout recentTagsContainer = dialogView.findViewById(R.id.recent_tags_container);
         FlexboxLayout currentTagsContainer = dialogView.findViewById(R.id.current_tags_container);
         TextView currentTagsLabel = dialogView.findViewById(R.id.text_current_tags_label);
+
+        // 联想:用 mutable HashSet 接受后续 existingTags 填充,attach 内部按引用读
+        RecyclerView suggestionRecycler = dialogView.findViewById(R.id.suggestion_recycler);
+        TextView suggestionTitle = dialogView.findViewById(R.id.text_suggestion_label);
+        Set<String> suggestionExcluded = new HashSet<>();
+        TagSuggestionHelper.attach(input, suggestionRecycler, suggestionTitle, this, suggestionExcluded);
 
         // 加载现有标签（异步）
         final List<String> existingTags = new ArrayList<>();

@@ -1,5 +1,47 @@
 ## B
 
+# 2.3.15.2
+调整:小红书域名识别扩展到主域 `xiaohongshu.com`。
+- 之前只识别 `xhslink.cn` / `xshlink.cn` / `xhslink.com` 短链系列 → 现加入 `xiaohongshu.com` 主域及子域。
+- 抽公共方法 `XiaohongshuSkipStrategy.isXiaohongshuUrl(String url)` 作为单一判断入口,`XiaohongshuSkipStrategy.matches()` 与 `WebViewActivity.isXshlinkUrl()` 均调它,后续新增小红书域名只改一处。
+- 影响:`XiaohongshuSkipStrategy` 剪贴板检测 SKIP 策略覆盖主域(避免后台抓取被官方推广文案污染);`WebViewActivity.recordLinkHistory` 标题优先用 DB 历史标题的保护覆盖主域。
+
+# 2.3.15.1
+修复:置顶标签对话框滑动 RecyclerView 时 CheckBox 状态丢失/被误取消。
+- 根因:`onBindViewHolder` 里 `setChecked(current.contains(...))` 会触发 ViewHolder 复用前残留的 listener,把状态写回 manager。
+- 修复:`Adapter.setHasStableIds(true)` + `getItemId(hashCode)`;新增 `TagRow.checked` 作为主真相源(不读 manager);`onBindViewHolder` 先 `setOnCheckedChangeListener(null)` 再 setChecked;`onCheckedChange` 先更新 row 再写 manager,达到上限时 rollback row.checked。
+
+# 2.3.15
+新增:置顶标签(最多 3 个,写死上限),用户配置的 tag 永远排在最前,不会被任何重排打乱。
+- 入口:HomeFragment 顶栏菜单"置顶标签"(原 `action_pinned_tags`)。
+- 弹 dialog 复选框:已置顶(按顺序)在前,未置顶(按字母)在后,3 个上限,达到上限再勾 → toast 提示。
+- 持久化:SharedPreferences `pinned_tags_prefs` / `pinned_tags`,封装在 `util/PinnedTagsManager.java`(`MAX_PINNED = 3` 写死)。
+- 数据层:`LinkDao.getTagsWithCount(Set<String> pinnedTagNames)` 重载 —— 第一步按 pinned 顺序输出,第二步按 `tag_order`,第三步按 id 升序。
+- AI 重排:`TagEmbeddingManager.sortTagsBySimilarity` 算法不变,排序完成后按 pinned 顺序 prepend 结果,删除原位置(用户原话:"把置顶的拎到最前面,做一个插入,把选中的从原位置删掉")。
+- 触发刷新:HomeFragment implements `PinnedTagsPickerDialog.OnPinnedChangedListener`,保存 → `loadTags()` 重排 tag 区。
+- 不动 UI:置顶 tag 在 tag 区不特殊显示(用户要求"不做任何特殊显示处理")。
+
+# 2.3.14
+新增:HomeFragment 多选模式支持批量删除。
+- 顶栏菜单新增「批量删除」图标(`@android:drawable/ic_menu_delete`),仅在选模式时显示,退出选模式自动隐藏。
+- 空选择时直接 toast 提示;选中时弹 AlertDialog 二次确认("确认删除选中的 N 条链接?此操作不可撤销"),确定后才执行。
+- 抽出公共方法 `deleteSelectedLinks(List<LinkItem> items)`,复用现有「分享后删除」路径的循环,两处都走同一份写事件日志 + 删 + 刷列表。
+- 行为契约:跟 `shareAsFile` 内的「分享后删除」保持一致(写 delete 事件 + adapter.removeLinkItem + refreshLinksList)。
+
+# 2.3.13.1
+调整:标签联想点击行为 —— 从"追加"改为"替换最后一个逗号段"。
+- 用户反馈:"要用联想的词替换原始词语,而不是两个词"。
+- helper `TagSuggestionHelper.replaceLastSegment()`:输入框里找到最后一个英文/中文逗号的位置,保留前半段和逗号,用候选 tag 替换其后的片段。无逗号则整段替换。
+- 与「最近使用」面板的 append 行为有意不同,更符合"用联想词替换原始词"的直觉。
+
+# 2.3.13
+新增:打标签对话框联想功能 —— 在输入框下方加 suggestion RecyclerView,每字符(150ms)根据输入最后一个逗号段做子串 contains 过滤已有标签。
+- 复用现有 `item_recent_tag` chip 样式失败(行高+占满宽度冲突),新建 `item_tag_suggestion.xml` —— 白底 selectableItemBackground,占满宽度,可点。
+- 抽公共 helper `util/TagSuggestionHelper.java`,两个入口共用(LinksAdapter 列表项的「添加标签」+ WebViewActivity 顶栏的「添加标签」)。
+- 排除当前 link 已有的 tag(LinksAdapter 读 item.getTags();WebViewActivity 用 mutable HashSet 引用,后续 existingTags 填充后下次筛选生效)。
+- 无匹配整块隐藏(title + recycler 都 GONE)。
+- 点击候选 → 替换输入框最后一个逗号段(逗号之前的保留,逗号也保留;无逗号则整段替换),与"最近使用"面板的 append 行为不同,更符合"用联想词替换原始词"的直觉。
+
 # 2.3.12.1
 新增：设置页底部加「关于」按钮，弹出关于弹窗。
 - 弹窗内容:app 名(加粗) + 版本号(BuildConfig.VERSION_NAME 动态读) + GitHub 项目地址(下划线 + 可点击跳转)。

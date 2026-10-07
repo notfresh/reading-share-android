@@ -52,6 +52,7 @@ import person.notfresh.readingshare.embedding.TagEmbeddingManager;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
+import person.notfresh.readingshare.util.PinnedTagsManager;
 import person.notfresh.readingshare.ui.subject.SelectSubjectDialog;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.ShareUtil;
@@ -387,8 +388,9 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 使用后台线程加载标签数据
         new Thread(() -> {
             // 后台获取标签数据
-            Map<String, Integer> tagsWithCount = linkDao.getTagsWithCount();
-            Log.d("TagsFragment", "Tags loaded: " + tagsWithCount.size());
+            Set<String> pinnedTagNames = new PinnedTagsManager(requireContext()).getPinnedTags();
+            Map<String, Integer> tagsWithCount = linkDao.getTagsWithCount(pinnedTagNames);
+            Log.d("TagsFragment", "Tags loaded: " + tagsWithCount.size() + ", pinned=" + pinnedTagNames.size());
             
             // 获取无标签的链接数量
             int noTagCount = linkDao.getLinksWithoutTags().size();

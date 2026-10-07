@@ -50,6 +50,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import person.notfresh.readingshare.util.SearchQueryParser;
+import person.notfresh.readingshare.util.TagSuggestionHelper;
 import java.io.IOException;
 import person.notfresh.readingshare.util.AppUtils;
 import person.notfresh.readingshare.WebViewActivity;
@@ -1392,7 +1393,13 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_tag, null);
             EditText input = dialogView.findViewById(R.id.edit_tag_input);
             FlexboxLayout recentTagsContainer = dialogView.findViewById(R.id.recent_tags_container);
-            
+
+            // 联想:suggestion_recycler(text_suggestion_label 同 id 隐含 gone) 默认 gone
+            RecyclerView suggestionRecycler = dialogView.findViewById(R.id.suggestion_recycler);
+            TextView suggestionTitle = dialogView.findViewById(R.id.text_suggestion_label);
+            Set<String> suggestionExcluded = new HashSet<>(item.getTags() == null ? java.util.Collections.emptyList() : item.getTags());
+            TagSuggestionHelper.attach(input, suggestionRecycler, suggestionTitle, context, suggestionExcluded);
+
             // 获取并显示最近标签
             List<String> recentTags = RecentTagsManager.getRecentTags(context);
             if (!recentTags.isEmpty()) {
