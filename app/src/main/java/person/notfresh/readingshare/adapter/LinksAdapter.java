@@ -1322,39 +1322,36 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             if (remark != null && !remark.isEmpty()) {
                 // 清理备注文本 - 去除多余空行和首尾空白
                 remark = cleanupRemarkText(remark);
-                
+
                 // 如果清理后文本为空，则不显示
                 if (remark.isEmpty()) {
                     remarkText.setVisibility(View.GONE);
                     showMoreRemarkText.setVisibility(View.GONE);
                     return;
                 }
-                
+
                 remarkText.setVisibility(View.VISIBLE);
                 remarkText.setText("备注: " + remark);
-                remarkText.setMaxLines(2); // 默认显示两行
-                
+                remarkText.setMaxLines(5); // 列表里最多显示 5 行
+                remarkText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
                 // 创建final副本供Lambda使用
                 final String finalRemark = remark;
-                
-                // 测量文本是否需要"显示更多"
+
+                // 列表项固定 maxLines=5,只看是否被实际截断:
+                // 视觉上若 getLineCount() 达到 5 行 → 必然被截断 → 显示"查看完整备注"
+                // 注释:原方案用 post + getLineCount 偶发 layout 时机问题导致按钮不出现;
+                // 现在用 post 二次校验,首次 layout 未完成时跳过(按钮保持 gone),下次复用 viewHolder 时再触发;
+                // 但本场景用户滚动列表时会重复触发,最终 lineCount 稳定后结果正确。
                 remarkText.post(() -> {
-                    // 检查文本是否被截断或包含换行符
-                    boolean needsExpansion = countLines(finalRemark) > 2;
-                    
+                    boolean needsExpansion = remarkText.getLineCount() >= 5;
+
                     if (needsExpansion) {
                         showMoreRemarkText.setVisibility(View.VISIBLE);
-                        showMoreRemarkText.setText("显示更多");
-                        
-                        showMoreRemarkText.setOnClickListener(v -> {
-                            if (remarkText.getMaxLines() <= 2) {
-                                remarkText.setMaxLines(Integer.MAX_VALUE);
-                                showMoreRemarkText.setText("收起");
-                            } else {
-                                remarkText.setMaxLines(2);
-                                showMoreRemarkText.setText("显示更多");
-                            }
-                        });
+                        showMoreRemarkText.setText("查看完整备注");
+                        // 点击 → 弹窗展示全文(不撑爆列表)
+                        showMoreRemarkText.setOnClickListener(v ->
+                                showFullRemarkDialog(v.getContext(), finalRemark));
                     } else {
                         showMoreRemarkText.setVisibility(View.GONE);
                     }
@@ -1365,12 +1362,32 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
         }
 
+        /**
+         * 弹出展示完整备注文本(可滚动、可选中复制)。
+         */
+        private void showFullRemarkDialog(android.content.Context ctx, String remark) {
+            // ScrollView 包 TextView,避免长文本撑爆 dialog
+            android.widget.ScrollView scroll = new android.widget.ScrollView(ctx);
+            int pad = (int) (16 * ctx.getResources().getDisplayMetrics().density);
+            scroll.setPadding(pad, pad, pad, pad);
+            TextView tv = new TextView(ctx);
+            tv.setText(remark);
+            tv.setTextSize(14f);
+            tv.setTextIsSelectable(true); // 允许长按选中复制
+            scroll.addView(tv);
+            new android.app.AlertDialog.Builder(ctx)
+                    .setTitle("完整备注")
+                    .setView(scroll)
+                    .setPositiveButton("关闭", null)
+                    .show();
+        }
+
         // 添加计算换行符数量的辅助方法
         private int countLines(String text) {
             if (text == null || text.isEmpty()) {
                 return 0;
             }
-            
+
             int count = 1;
             for (int i = 0; i < text.length(); i++) {
                 if (text.charAt(i) == '\n') {
@@ -1389,15 +1406,35 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         }
 
         private void showAddTagDialog(Context context, LinkItem item) {
-            // 创建一个自定义布局，包含输入框和最近标签
+            // 创建一个自定义布局,包含输入框 + 最近标签 + 当前标签 + 联想(打字时才出现)
             View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_tag, null);
             EditText input = dialogView.findViewById(R.id.edit_tag_input);
             FlexboxLayout recentTagsContainer = dialogView.findViewById(R.id.recent_tags_container);
+            FlexboxLayout currentTagsContainer = dialogView.findViewById(R.id.current_tags_container);
+            TextView currentTagsLabel = dialogView.findViewById(R.id.text_current_tags_label);
 
-            // 联想:suggestion_recycler(text_suggestion_label 同 id 隐含 gone) 默认 gone
+            // 当前标签(该链接已打的 tag):展示在 currentTagsContainer,点击可删。
+            // 同时维护 excluded 集合(联想过滤时排除这些 tag)。
+            List<String> existingTags = item.getTags() == null ? new ArrayList<>() : new ArrayList<>(item.getTags());
+            Set<String> suggestionExcluded = new HashSet<>(existingTags);
+            if (!existingTags.isEmpty()) {
+                currentTagsLabel.setVisibility(View.VISIBLE);
+                for (String tag : existingTags) {
+                    TextView tagView = (TextView) LayoutInflater.from(context)
+                            .inflate(R.layout.item_tag, currentTagsContainer, false);
+                    tagView.setText(tag);
+                    tagView.setOnClickListener(v -> {
+                        currentTagsContainer.removeView(tagView);
+                        existingTags.remove(tag);
+                        suggestionExcluded.remove(tag);
+                    });
+                    currentTagsContainer.addView(tagView);
+                }
+            }
+
+            // 联想:suggestion_recycler(xml 默认 gone),attach 内自动按引用读 excluded
             RecyclerView suggestionRecycler = dialogView.findViewById(R.id.suggestion_recycler);
             TextView suggestionTitle = dialogView.findViewById(R.id.text_suggestion_label);
-            Set<String> suggestionExcluded = new HashSet<>(item.getTags() == null ? java.util.Collections.emptyList() : item.getTags());
             TagSuggestionHelper.attach(input, suggestionRecycler, suggestionTitle, context, suggestionExcluded);
 
             // 获取并显示最近标签

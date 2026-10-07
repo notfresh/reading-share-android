@@ -191,7 +191,7 @@ public final class TagSuggestionHelper {
             if (tags != null) allTags.addAll(tags);
         }
 
-        /** query null/空 → 清空 filtered;否则子串 contains 过滤,排除 exclude 项。 */
+        /** query null/空 → 整块隐藏(由 caller 控制);非空 → 子串 contains 过滤,排除 exclude 项。 */
         void applyFilter(String query, Set<String> exclude) {
             filtered.clear();
             if (query == null) { notifyDataSetChanged(); return; }

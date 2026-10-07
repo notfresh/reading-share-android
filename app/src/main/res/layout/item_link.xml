@@ -150,7 +150,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:visibility="gone"
-                android:text="显示更多" />
+                android:text="查看完整备注" />
         </RelativeLayout>
 
     </LinearLayout>

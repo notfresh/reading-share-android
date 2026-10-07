@@ -838,6 +838,7 @@ public class LinkDao {
         String title = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TITLE));
         String url = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_URL));
         String summary = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SUMMARY));
+        String remark = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_REMARK));
         String sourceApp = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_SOURCE_APP));
         String originalIntent = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_ORIGINAL_INTENT));
         String targetActivity = cursor.getString(cursor.getColumnIndexOrThrow(LinkDbHelper.COLUMN_TARGET_ACTIVITY));
@@ -848,14 +849,15 @@ public class LinkDao {
         LinkItem item = new LinkItem(title, url, sourceApp, originalIntent, targetActivity, timestamp);
         item.setId(id);
         item.setSummary(summary);
+        item.setRemark(remark); // 数据库里写的备注优先于 URL 抽出的默认空备注
         item.setClickCount(clickCount);
-        
+
         // 加载该链接的标签
         List<String> tags = getLinkTags(id);
         for (String tag : tags) {
             item.addTag(tag);
         }
-        
+
         return item;
     }
 

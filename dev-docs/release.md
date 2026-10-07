@@ -1,5 +1,46 @@
 ## B
 
+# 2.3.15.9
+调整:恢复「当前标签」面板 —— 显示该链接已打的 tag。
+- 2.3.15.8 把 currentTagsContainer 删了,实测用户希望显示(能看到+可点删除),但仍希望联想按打字触发。
+- 改:输入框 + 最近标签 + 当前标签(链接已打 tag,点击删除)+ 联想(打字才出现);excluded 集合随当前标签删除列表更新。
+
+# 2.3.15.8
+调整:添加标签对话框中,「当前标签」面板与「已有标签(输入即联想)」初始可见列表**全部默认不展示**,只保留输入框 + 最近标签 + 打字时的子串自动联想。
+- 之前 2.3.15.6/2.3.15.7 尝试展示,实测用户期望「自动联想」即可,不主动铺所有 tag。
+- 删:`LinksAdapter.showAddTagDialog` 里 currentTagsContainer 的渲染 / 点击删除逻辑;`TagSuggestionHelper.applyFilter` 空 query 路径回到「整块隐藏」。
+- 留:输入框 + 最近标签 + suggestion(打字出现,清空又消失);excluded 集合(当前 link 已有的 tag 不参与联想)仍生效。
+
+# 2.3.15.7
+修复:`LinksAdapter.showAddTagDialog` 入口漏处理「当前标签」面板(链接已打的 tag)。
+- 根因:HomeFragment 列表项长按「添加标签」走 `LinksAdapter:1408`,该函数只接联想 + 最近标签,**完全没读 item.getTags() 填充 `current_tags_container`**。
+- WebViewActivity:895 入口的 showAddTagDialog 处理过这块。
+- 修:对齐 WebViewActivity 的实现,在 LinksAdapter 里 findViewById 拿 `current_tags_container` / `current_tags_label`,遍历 item.getTags() 渲染 chip;点击删除时同时从 existingTags 与 suggestionExcluded 移除(让刚删的 tag 立即在联想里出现)。
+
+# 2.3.15.6
+修复:添加标签对话框打开时,联想区(标题"已有标签(输入即联想)")不显示任何已有标签。
+- 根因:`TagSuggestionHelper.SuggestionAdapter.applyFilter` 在 query 为空时直接 return 清空 filtered,导致标题和 RecyclerView 都被 hide。
+- 修:空 query 时改为「展示全量已有标签(排除 exclude 项)」,只对 exclude 集合内的 tag 过滤;非空 query 时按子串 contains 过滤。
+- 用户体验:刚打开添加标签 dialog → 立刻看到所有已有 tag;开始打字 → 按子串过滤缩窄。
+
+# 2.3.15.5
+修复:备注数据库写入有,但 `createLinkItemFromCursor` 不读,列表里永远只显示 URL 抽出的空备注。
+- 根因:`LinkDao.insertLink` / `updateLink` / `updateLinkRemark` 都正确写 `COLUMN_REMARK`,但 `createLinkItemFromCursor` 把这一列漏掉了。
+- 修:在 `LinkDao.createLinkItemFromCursor` 加 `cursor.getString(COLUMN_REMARK)` + `item.setRemark(remark)`。
+- 影响面:`getLinksPage` / `searchLinks` / `getLinkById` / `getLinksWithoutTags` / `getLinksByTag` 等所有走 `createLinkItemFromCursor` 的查询 → 现在都能正确带出备注。
+
+# 2.3.15.4
+调整:备注显示上限从 2 行改为 5 行 + 触发条件 lineCount >= 5。
+- 2.3.15.3 上线后实测:2 行太短,长备注信息不完整;`getLineCount() > 2` 偶发 layout 时机问题导致"查看完整备注"链接不出现。
+- 现在 maxLines=5,只触发条件改为 `>= 5`(达到上限必被截断,稳定),展示更友好。
+
+# 2.3.15.3
+优化:链接列表备注显示。
+- 列表始终只显示 2 行(原先用 countLines 测换行符数,对大段连续文字判定失效 → 长备注撑爆屏幕)。
+- 改用 `TextView.getLineCount()` 测量实际行数;超过 2 行 → 显示「查看完整备注」链接。
+- 点击链接 → 弹 AlertDialog(ScrollView + TextView)展示完整备注文本,可滚动、`setTextIsSelectable(true)` 长按可选中复制。
+- 移除旧的"展开/收起"模式(展开后 maxLines=MAX_VALUE 会撑爆列表项)。
+
 # 2.3.15.2
 调整:小红书域名识别扩展到主域 `xiaohongshu.com`。
 - 之前只识别 `xhslink.cn` / `xshlink.cn` / `xhslink.com` 短链系列 → 现加入 `xiaohongshu.com` 主域及子域。
