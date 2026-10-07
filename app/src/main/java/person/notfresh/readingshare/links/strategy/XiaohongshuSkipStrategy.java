@@ -1,5 +1,7 @@
 package person.notfresh.readingshare.links.strategy;
 
+import android.net.Uri;
+
 /**
  * 小红书口令短链拦截策略。
  *
@@ -11,11 +13,28 @@ package person.notfresh.readingshare.links.strategy;
 public class XiaohongshuSkipStrategy implements LinkProcessStrategy {
 
     private static final String XHS_SHORT_LINK = "xhslink.cn";
+    private static final String XHS_MAIN_DOMAIN = "xiaohongshu.com";
+
+    /**
+     * 是否小红书域(包括短链 xhslink 系列 + 主域 xiaohongshu.com 及子域)。
+     * 单一来源,被 {@link XiaohongshuSkipStrategy#matches(String)} 和
+     * {@code WebViewActivity#isXshlinkUrl(String)} 共同引用。
+     */
+    public static boolean isXiaohongshuUrl(String url) {
+        if (url == null) return false;
+        String trimmed = url.trim().toLowerCase(java.util.Locale.ROOT);
+        if (trimmed.isEmpty()) return false;
+        // 短链系列:用 contains 即可(短链无歧义)
+        if (trimmed.contains(XHS_SHORT_LINK)) return true;
+        // 主域:用 host 判断,避免误伤含 "xiaohongshu" 字样的其他站
+        String host = Uri.parse(trimmed).getHost();
+        if (host == null) return false;
+        return host.equals(XHS_MAIN_DOMAIN) || host.endsWith("." + XHS_MAIN_DOMAIN);
+    }
 
     @Override
     public boolean matches(String url) {
-        if (url == null) return false;
-        return url.contains(XHS_SHORT_LINK);
+        return isXiaohongshuUrl(url);
     }
 
     @Override

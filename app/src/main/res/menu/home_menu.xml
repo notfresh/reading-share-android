@@ -10,6 +10,10 @@
         android:visible="false"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_pinned_tags"
+        android:title="置顶标签"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_sort_tags"
         android:icon="@android:drawable/ic_menu_sort_by_size"
         android:title="排序"
@@ -59,6 +63,12 @@
         android:id="@+id/action_select_all"
         android:icon="@drawable/ic_select_all"
         android:title="全选"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_delete_selected"
+        android:icon="@android:drawable/ic_menu_delete"
+        android:title="批量删除"
         android:visible="false"
         app:showAsAction="always" />
     <item

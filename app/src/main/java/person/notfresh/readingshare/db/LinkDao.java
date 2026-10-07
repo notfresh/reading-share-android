@@ -1,7 +1,7 @@
 package person.notfresh.readingshare.db;
 
-import android.content.ContentValues;
 import android.content.Context;
+import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -962,24 +963,45 @@ public class LinkDao {
      * @return Map<String, Integer> 标签名称和使用次数的映射
      */
     public Map<String, Integer> getTagsWithCount() {
+        return getTagsWithCount(Collections.emptySet());
+    }
+
+    /**
+     * 获取所有标签及其使用次数(按配置的排序)。
+     * <p>
+     * 排序规则(优先级从高到低):
+     * <ol>
+     *   <li>按传入的 {@code pinnedTagNames} 顺序</li>
+     *   <li>按 {@link #getTagOrder()} 顺序</li>
+     *   <li>未在配置中的新标签,按 tag_id 升序</li>
+     * </ol>
+     * @param pinnedTagNames 必须置顶的 tag 名字集合(按期望顺序)。可为 null。
+     */
+    public Map<String, Integer> getTagsWithCount(Set<String> pinnedTagNames) {
         Map<String, Integer> tagCountMap = new LinkedHashMap<>();
         SQLiteDatabase db = database;
-        
+
+        // 0. 拿 pinnedTagNames 不可变副本(保持顺序)
+        LinkedHashSet<String> pinned = (pinnedTagNames == null)
+                ? new LinkedHashSet<>()
+                : new LinkedHashSet<>(pinnedTagNames);
+
         // 1. 获取配置的排序
         List<Long> orderedTagIds = getTagOrder();
         Set<Long> orderedSet = new HashSet<>(orderedTagIds);
-        
-        // 2. 获取所有标签及计数（不排序）
+
+        // 2. 获取所有标签及计数(不排序)
         Map<Long, TagCountInfo> allTags = new HashMap<>();
+        Map<String, Long> tagNameToId = new HashMap<>();
         Cursor cursor = db.rawQuery(
-            "SELECT t." + LinkDbHelper.COLUMN_TAG_ID + 
-            ", t." + LinkDbHelper.COLUMN_TAG_NAME + 
+            "SELECT t." + LinkDbHelper.COLUMN_TAG_ID +
+            ", t." + LinkDbHelper.COLUMN_TAG_NAME +
             ", COUNT(lt." + LinkDbHelper.COLUMN_LINK_ID + ") as count " +
             "FROM " + LinkDbHelper.TABLE_TAGS + " t " +
             "LEFT JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt " +
             "ON t." + LinkDbHelper.COLUMN_TAG_ID + " = lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " " +
             "GROUP BY t." + LinkDbHelper.COLUMN_TAG_ID + ", t." + LinkDbHelper.COLUMN_TAG_NAME, null);
-        
+
         if (cursor.moveToFirst()) {
             do {
                 long tagId = cursor.getLong(0);
@@ -987,19 +1009,35 @@ public class LinkDao {
                 int count = cursor.getInt(2);
                 // 显示所有标签，包括count为0的标签
                 allTags.put(tagId, new TagCountInfo(tagName, count));
+                tagNameToId.put(tagName, tagId);
             } while (cursor.moveToNext());
         }
         cursor.close();
-        
-        // 3. 按配置的顺序添加
+
+        // 3. 先输出 pinned
+        Set<String> emittedNames = new HashSet<>();
+        for (String pinName : pinned) {
+            Long pinId = tagNameToId.get(pinName);
+            if (pinId != null) {
+                TagCountInfo info = allTags.get(pinId);
+                if (info != null) {
+                    tagCountMap.put(info.name, info.count);
+                    emittedNames.add(info.name);
+                }
+            }
+            // 找不到的 pinName(已被删除的 tag) → 静默忽略
+        }
+
+        // 4. 按配置的顺序添加(剔除已在 pinned 输出的)
         for (Long tagId : orderedTagIds) {
             TagCountInfo info = allTags.get(tagId);
-            if (info != null) {
+            if (info != null && !emittedNames.contains(info.name)) {
                 tagCountMap.put(info.name, info.count);
+                emittedNames.add(info.name);
             }
         }
-        
-        // 4. 添加未在配置中的新标签（按tag_id排序）
+
+        // 5. 添加未在配置中的新标签(按tag_id排序)
         List<Long> unorderedTagIds = new ArrayList<>();
         for (Long tagId : allTags.keySet()) {
             if (!orderedSet.contains(tagId)) {
@@ -1009,11 +1047,12 @@ public class LinkDao {
         Collections.sort(unorderedTagIds);
         for (Long tagId : unorderedTagIds) {
             TagCountInfo info = allTags.get(tagId);
-            if (info != null) {
+            if (info != null && !emittedNames.contains(info.name)) {
                 tagCountMap.put(info.name, info.count);
+                emittedNames.add(info.name);
             }
         }
-        
+
         return tagCountMap;
     }
     

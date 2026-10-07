@@ -6,8 +6,10 @@ import android.os.Looper;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,6 +20,7 @@ import java.util.concurrent.Executors;
 
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.service.EmbeddingService;
+import person.notfresh.readingshare.util.PinnedTagsManager;
 
 /**
  * TagEmbeddingManager handles tag embedding operations including:
@@ -54,6 +57,15 @@ public class TagEmbeddingManager {
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.executor = Executors.newSingleThreadExecutor();
         this.customPairBoosts = loadCustomPairBoosts();
+    }
+
+    /**
+     * 获取置顶 tag 名(顺序 = SharedPreferences 里写入的顺序)。
+     * 永远在 sortTagsBySimilarity 之前调用 → 用 context 走 PinnedTagsManager。
+     */
+    private Set<String> getPinnedTagNames() {
+        if (context == null) return Collections.emptySet();
+        return new PinnedTagsManager(context).getPinnedTags();
     }
 
     /**
@@ -211,8 +223,42 @@ public class TagEmbeddingManager {
                     sortedTagNames.add(validTagNames.get(idx));
                 }
 
-                Log.d(TAG, "Sorted " + m + " tags by similarity");
-                mainHandler.post(() -> callback.onSuccess(sortedTagIds, sortedTagNames));
+                // 5.5 把置顶 tag 按配置顺序前置(从排序结果中删除原位置)
+                LinkedHashSet<String> pinned = new LinkedHashSet<>(getPinnedTagNames());
+                if (!pinned.isEmpty()) {
+                    // 一次性:遍历 sorted,把置顶按 pinned 顺序提到最前,其余保持原序
+                    List<Long> restIds = new ArrayList<>();
+                    List<String> restNames = new ArrayList<>();
+                    // pinned 区:按 pinned 顺序出现,且必须在 sorted 里
+                    List<Long> pinnedIds = new ArrayList<>();
+                    List<String> pinnedNames = new ArrayList<>();
+                    for (String pinName : pinned) {
+                        int idx = sortedTagNames.indexOf(pinName);
+                        if (idx >= 0) {
+                            pinnedIds.add(sortedTagIds.get(idx));
+                            pinnedNames.add(pinName);
+                        }
+                    }
+                    // 其余:不是 pinned 的 tag
+                    Set<String> pinnedNameSet = new LinkedHashSet<>(pinnedNames);
+                    for (int i = 0; i < sortedTagIds.size(); i++) {
+                        if (!pinnedNameSet.contains(sortedTagNames.get(i))) {
+                            restIds.add(sortedTagIds.get(i));
+                            restNames.add(sortedTagNames.get(i));
+                        }
+                    }
+                    sortedTagIds = new ArrayList<>();
+                    sortedTagNames = new ArrayList<>();
+                    sortedTagIds.addAll(pinnedIds);
+                    sortedTagNames.addAll(pinnedNames);
+                    sortedTagIds.addAll(restIds);
+                    sortedTagNames.addAll(restNames);
+                }
+
+                Log.d(TAG, "Sorted " + sortedTagIds.size() + " tags by similarity (with " + pinned.size() + " pinned)");
+                final List<Long> finalIds = sortedTagIds;
+                final List<String> finalNames = sortedTagNames;
+                mainHandler.post(() -> callback.onSuccess(finalIds, finalNames));
 
             } catch (Exception e) {
                 Log.e(TAG, "Error sorting tags by similarity", e);

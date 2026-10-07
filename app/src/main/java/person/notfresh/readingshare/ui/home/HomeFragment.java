@@ -53,6 +53,8 @@ import person.notfresh.readingshare.ui.subject.SelectSubjectDialog;
 import person.notfresh.readingshare.ClickStatisticsActivity;
 import person.notfresh.readingshare.util.ShareUtil;
 import person.notfresh.readingshare.util.ImageUtil;
+import person.notfresh.readingshare.util.PinnedTagsManager;
+import person.notfresh.readingshare.ui.tag.PinnedTagsPickerDialog;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -94,7 +96,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 
  * @see TagsFragment（已废弃，功能已合并到此Fragment）
  */
-public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
+public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionListener, PinnedTagsPickerDialog.OnPinnedChangedListener {
 
     private static final String TAG = "HomeFragment";  // Logcat过滤关键字
     private static final int REQUEST_CODE_PICK_ICON = 1001;
@@ -110,6 +112,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private MenuItem selectAllMenuItem;  // 全选菜单项（从TagsFragment合并）
     private MenuItem addTagMenuItem;  // 添加标签菜单项（从TagsFragment合并）
     private MenuItem sortMenuItem;  // 排序菜单项（从TagsFragment合并）
+    private MenuItem deleteSelectedMenuItem;  // 批量删除菜单项
     private MenuItem exitSortMenuItem;  // 退出排序菜单项（从TagsFragment合并）
     private MenuItem autoSortMenuItem;  // 自动排序菜单项
     private MenuItem similarityConfigMenuItem;  // 相关度配置菜单项
@@ -205,6 +208,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             selectAllMenuItem = menu.findItem(R.id.action_select_all);  // 全选菜单项
             addTagMenuItem = menu.findItem(R.id.action_add_tag);  // 添加标签菜单项
             sortMenuItem = menu.findItem(R.id.action_sort_tags);  // 排序菜单项
+            deleteSelectedMenuItem = menu.findItem(R.id.action_delete_selected);  // 批量删除菜单项
             exitSortMenuItem = menu.findItem(R.id.action_exit_sort);  // 退出排序菜单项
             autoSortMenuItem = menu.findItem(R.id.action_auto_sort);  // 自动排序菜单项
             similarityConfigMenuItem = menu.findItem(R.id.action_similarity_config);  // 相关度配置菜单项
@@ -259,6 +263,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             return true;
         } else if (id == R.id.action_enter_selection) {
             toggleSelectionMode();  // 进入选择模式
+            return true;
+        } else if (id == R.id.action_delete_selected) {
+            confirmAndDeleteSelected();
+            return true;
+        } else if (id == R.id.action_pinned_tags) {
+            new PinnedTagsPickerDialog().show(getChildFragmentManager(), "pinned_tags_picker");
             return true;
         } else if (id == R.id.action_share_text) {
             shareAsText();
@@ -992,6 +1002,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         if (selectAllMenuItem != null) {
             selectAllMenuItem.setVisible(isSelectionMode);
         }
+        if (deleteSelectedMenuItem != null) {
+            deleteSelectedMenuItem.setVisible(isSelectionMode);
+        }
         
         // 标签管理菜单项（仅在非选择模式、非排序模式、非洗牌模式下显示，且标签区域可见时）
         boolean tagsVisible = tagsContainer != null && tagsContainer.getVisibility() == View.VISIBLE;
@@ -1230,18 +1243,58 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         ArrayList<LinkItem> items = new ArrayList<>(selectedItems);
         ShareUtil.shareLinksAsFileWithDialog(requireContext(), items, isJson, deleteAfterShare -> {
             if (deleteAfterShare) {
-                // 批量删除并刷新（优化：直接从适配器移除，避免重新查询数据库）
-                for (LinkItem item : items) {
-                    linkDao.deleteLink(item.getId());
-                    EventLogClient.get().delete("links", String.valueOf(item.getId()),
-                            System.currentTimeMillis());
-                    adapter.removeLinkItem(item);
-                }
-                // 刷新数据
-                refreshLinksList();
+                deleteSelectedLinks(items);
                 Toast.makeText(requireContext(), "已删除已分享的链接", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    /**
+     * 批量删除选中的链接 + 写事件日志 + 移除 + 刷新列表。
+     * 两处共用:本方法 / {@link #shareAsFile} 的 "分享后删除" 分支。
+     */
+    private void deleteSelectedLinks(List<LinkItem> items) {
+        for (LinkItem item : items) {
+            linkDao.deleteLink(item.getId());
+            EventLogClient.get().delete("links", String.valueOf(item.getId()),
+                    System.currentTimeMillis());
+            adapter.removeLinkItem(item);
+        }
+        refreshLinksList();
+    }
+
+    /**
+     * PinnedTagsPickerDialog 回调:刷新 tag 列表。
+     * 需求:"保存置顶后需要刷新 tag 区 + 重新排序"。
+     */
+    @Override
+    public void onPinnedChanged() {
+        // 标签区可见才需要重排(节省无谓刷新)
+        if (tagsContainer != null && tagsContainer.getVisibility() == View.VISIBLE) {
+            loadTags();
+        }
+    }
+
+    /**
+     * 批量删除前先确认:弹 AlertDialog 提示选中了 N 条,用户点确定才删。
+     * 空选择时直接 toast 提示。
+     */
+    private void confirmAndDeleteSelected() {
+        Set<LinkItem> selectedItems = adapter.getSelectedItems();
+        if (selectedItems.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择要删除的链接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int count = selectedItems.size();
+        new AlertDialog.Builder(requireContext())
+                .setTitle("批量删除")
+                .setMessage("确认删除选中的 " + count + " 条链接?此操作不可撤销。")
+                .setPositiveButton("删除", (dialog, which) -> {
+                    deleteSelectedLinks(new ArrayList<>(selectedItems));
+                    Toast.makeText(requireContext(), "已删除 " + count + " 条链接", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     /**
@@ -1824,8 +1877,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         return;
                     }
                     
-                    tagsWithCount = linkDao.getTagsWithCount();
-                    Log.d(TAG, "loadTags: tag count=" + tagsWithCount.size());
+                    Set<String> pinnedTagNames = new PinnedTagsManager(requireContext()).getPinnedTags();
+                    tagsWithCount = linkDao.getTagsWithCount(pinnedTagNames);
+                    Log.d(TAG, "loadTags: tag count=" + tagsWithCount.size() + ", pinned=" + pinnedTagNames.size());
                     
                     // 获取无标签的链接数量（需要访问数据库，可能抛出异常）
                     // 在数据库操作前再次检查
