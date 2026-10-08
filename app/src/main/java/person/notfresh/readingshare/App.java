@@ -1,7 +1,9 @@
 package person.notfresh.readingshare;
 
+import android.app.Activity;
 import android.app.Application;
 import android.database.sqlite.SQLiteDatabase;
+import android.os.Bundle;
 import android.provider.Settings;
 
 import java.util.List;
@@ -77,6 +79,26 @@ public class App extends Application {
         if (syncWired) {
             triggerStartupSync();
         }
+
+        // 进入后台时落盘:在最后一个 Activity onStop 后,把 WAL 页面 checkpoint 回主 db。
+        // 注意:这个回调对"多任务面板一键全部关闭"(SIGKILL)无法保护,但对其它退出路径足够。
+        registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            private int visibleCount = 0;
+
+            @Override public void onActivityCreated(Activity a, Bundle s) {}
+            @Override public void onActivityStarted(Activity a) { visibleCount++; }
+            @Override public void onActivityResumed(Activity a) {}
+            @Override public void onActivityPaused(Activity a) {}
+            @Override public void onActivityStopped(Activity a) {
+                visibleCount--;
+                if (visibleCount <= 0) {
+                    // app 进入后台,落盘
+                    dbConnection.checkpoint();
+                }
+            }
+            @Override public void onActivitySaveInstanceState(Activity a, Bundle s) {}
+            @Override public void onActivityDestroyed(Activity a) {}
+        });
     }
 
     /**

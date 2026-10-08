@@ -70,6 +70,7 @@ public final class LinkJson {
             item.setTimestamp(timestamp);
             item.setPinned(isPinned);
             item.setSummary(summary);
+            item.setRemark(remark);
             item.setClickCount(clickCount);
             item.setTags(tags);
             return item;

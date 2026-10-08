@@ -84,4 +84,22 @@ public final class DbConnection {
     public LinkDbHelper helperFor(String databaseName) {
         return new LinkDbHelper(app, databaseName);
     }
+
+    /**
+     * 强制 WAL checkpoint,把 WAL 中的所有页面写回主 db 文件。
+     *
+     * 调用时机:app 进入后台 / onActivityStopped / 关键写入完成后。
+     * 配合 LinkDbHelper 启用的 WAL,即使后续进程被 SIGKILL,已 checkpoint 的
+     * 数据一定在主 db 文件中,不会再被 SIGKILL 留在 wal 文件里。
+     *
+     * 注意:对 "多任务面板一键全部关闭" 这种直接 SIGKILL 仍然来不及,但对
+     * "上滑退出" / "返回键退出" / 系统因内存压力杀进程是有效的。
+     */
+    public void checkpoint() {
+        try {
+            defaultDb.rawQuery("PRAGMA wal_checkpoint(TRUNCATE);", null).close();
+        } catch (Exception e) {
+            android.util.Log.e("DbConnection", "checkpoint failed", e);
+        }
+    }
 }

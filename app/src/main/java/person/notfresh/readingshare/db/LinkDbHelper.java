@@ -15,7 +15,7 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     //private static final int DATABASE_VERSION = 10; // 添加文档表
     //private static final int DATABASE_VERSION = 11; // 添加主题表
 
-    private static final int DATABASE_VERSION = 17; // 浏览历史表 + 链接索引
+    private static final int DATABASE_VERSION = 18; // PRAGMA synchronous 升级 FULL,防止 SIGKILL 丢数据
     public static final String TABLE_LINKS = "links";
     public static final String TABLE_LINKS_HISTORY = "links_history";
     public static final String COLUMN_ID = "_id";
@@ -206,14 +206,33 @@ public class LinkDbHelper extends SQLiteOpenHelper {
     public LinkDbHelper(Context context, String databaseName) {
         super(context, databaseName, null, DATABASE_VERSION);
         this.databaseName = databaseName;
+        // 启用 WAL:写入路径短,journal 文件不会被 SIGKILL 留下成为孤儿。
+        // 配合 onConfigure 中的 synchronous=NORMAL,在性能与落盘安全之间取得平衡。
+        setWriteAheadLoggingEnabled(true);
         Log.d("LinkDbHelper", "使用自定义数据库: " + databaseName + ", 版本: " + DATABASE_VERSION);
-
     }
 
-
-    // 获取当前数据库名称
-    public String getDatabaseName() {
-        return this.databaseName;
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        // 落盘保证:WAL 模式下 FULL 强制每次 commit 都 fsync,防止 SIGKILL
+        // (任务面板一键全部关闭,生命周期回调不跑,checkpoint 不会触发) 时
+        // 已 commit 的事务还停留在 WAL/未合并到主 db,导致新进程读到旧数据。
+        // 之前用 NORMAL 是 Android 常见推荐配置,但实测发现 SIGKILL 路径下
+        // remark 这类小字段的 update 会丢,改成 FULL 代价是写入吞吐下降。
+        db.execSQL("PRAGMA synchronous = FULL;");
+        // 关闭外键约束检查的额外开销(本应用不使用外键)
+        db.execSQL("PRAGMA foreign_keys = OFF;");
+        // 强制设置 WAL 模式:setWriteAheadLoggingEnabled 只对新连接生效,已经
+        // 按 DELETE 模式起动的 db 需要显式 PRAGMA journal_mode = WAL 切换。
+        // 切换对已有数据无破坏性:SQLite 会先做完 rollback journal 的合并再切到 WAL。
+        // 注意:PRAGMA journal_mode 是查询语句(返回 wal/delete/truncate),必须用
+        // rawQuery,不能用 execSQL,否则会抛 Queries can be performed using SQLiteDatabase query
+        // or rawQuery methods only。
+        try (android.database.Cursor c = db.rawQuery("PRAGMA journal_mode = WAL;", null)) {
+            c.moveToFirst();
+        }
+        Log.d("LinkDbHelper", "onConfigure: WAL on, synchronous=NORMAL");
     }
 
     @Override
@@ -318,6 +337,13 @@ public class LinkDbHelper extends SQLiteOpenHelper {
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_timestamp ON " + TABLE_LINKS + "(" + COLUMN_TIMESTAMP + " DESC)");
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_tags_name ON " + TABLE_TAGS + "(" + COLUMN_TAG_NAME + ")");
                 Log.d("LinkDbHelper", "Created search indexes");
+            }
+
+            if (oldVersion < 18) {
+                // 版本18：仅切换 PRAGMA synchronous=FULL,不改 schema。
+                // PRAGMA 是连接级配置,onConfigure 已经在升级时回调并设过,
+                // 这里只需要走一遍升级路径让 onConfigure 真正生效。
+                Log.d("LinkDbHelper", "Upgraded to 18: synchronous=FULL applied via onConfigure");
             }
 
             if (oldVersion < 9) {

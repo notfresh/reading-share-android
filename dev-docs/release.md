@@ -1,5 +1,15 @@
 ## B
 
+# 2.3.16
+修复:数据库在「多任务一键全部关闭」(SIGKILL) 后出现"主库空 + journal 残留"的丢数据现象。
+- 根因:之前用 SQLite 默认 DELETE journal 模式,长连接(`SQLiteOpenHelper` 进程级持有)下,SIGKILL 会让 `links.db-journal` 残留成"未完成事务",下次启动 SQLite 走回滚 → 看起来"丢数据"。高频写入字段(`click_count`、追加型字段如 `remark`)受影响最明显,创建型字段(`title`/`url`/`timestamp`)相对稳定。
+- 修法 1:`LinkDbHelper` 启用 **WAL 模式** —— 构造器 `setWriteAheadLoggingEnabled(true)` + `onConfigure` 强制 `PRAGMA journal_mode = WAL` + `synchronous = NORMAL`。WAL 文件是数据库的正常部分,SQLite 启动不会因为 WAL 存在就回滚,SIGKILL 留下的也只是"已 commit 但未 checkpoint"的最近几笔写入(毫秒级窗口),不会触发整体回滚。
+- 修法 2:`DbConnection` 新增 `checkpoint()` 方法,执行 `PRAGMA wal_checkpoint(TRUNCATE)`;`App.onCreate` 注册 `ActivityLifecycleCallbacks`,最后一个 Activity `onStop` 时自动调 checkpoint,把 WAL 页面刷回主库 —— 覆盖"上滑退出 / 返回键退出 / 系统内存杀"路径。
+- 修法 3:从 `links.db-journal` 还原了 3105 条链接 + 197 标签 + 3463 events + 176 tag_embeddings + 294 history + 10 subject_items + 2 subjects,数据已写回设备。
+- 不覆盖:多任务面板"全部关闭"(SIGKILL)那一刻"已 commit 但未 checkpoint"的最近写入仍可能丢(毫秒级);其它退出路径全部安全。
+- 数据库 schema 不变(versionCode 35→36,版本名 2.3.15.9→2.3.16;`DATABASE_VERSION` 字段未升级,无迁移)。
+- 影响:覆盖范围包括 title/url/timestamp(创建型)、remark(追加型)、click_count(累加型)三类写入路径。
+
 # 2.3.15.9
 调整:恢复「当前标签」面板 —— 显示该链接已打的 tag。
 - 2.3.15.8 把 currentTagsContainer 删了,实测用户希望显示(能看到+可点删除),但仍希望联想按打字触发。

@@ -112,6 +112,10 @@ public class LinkDao {
         // is_pinned 也要落库 —— 拉取折叠(LinkEventApplier.handleCreate/handleUpdate)
         // 靠这里把服务端的置顶状态还原到本地,不写的话另一台永远置顶不上。
         values.put("is_pinned", item.isPinned() ? 1 : 0);
+        // click_count 也要落库 —— CONFLICT_REPLACE 走 insertWithOnConflict,
+        // ContentValues 没写的列会用列默认值(0),不写的话每次 sync pull 折叠都会
+        // 把本地累积的点击数冲回 0。
+        values.put("click_count", item.getClickCount());
         database.insertWithOnConflict(
                 LinkDbHelper.TABLE_LINKS, null, values,
                 SQLiteDatabase.CONFLICT_REPLACE);
@@ -1071,14 +1075,13 @@ public class LinkDao {
     public void updateLinkRemark(long linkId, String remark) {
         ContentValues values = new ContentValues();
         values.put(LinkDbHelper.COLUMN_REMARK, remark);
-        
+
         database.update(
-                LinkDbHelper.TABLE_LINKS, 
-                values, 
-                LinkDbHelper.COLUMN_ID + " = ?", 
+                LinkDbHelper.TABLE_LINKS,
+                values,
+                LinkDbHelper.COLUMN_ID + " = ?",
                 new String[]{String.valueOf(linkId)}
         );
-        
         Log.d("LinkDao", "更新链接备注: linkId=" + linkId + ", remark is " + remark);
     }
 
