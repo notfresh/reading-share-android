@@ -97,7 +97,18 @@ public final class DbConnection {
      */
     public void checkpoint() {
         try {
-            defaultDb.rawQuery("PRAGMA wal_checkpoint(TRUNCATE);", null).close();
+            // PRAGMA wal_checkpoint 返回 3 列(busy / log / checkpointed),必须读完游标
+            // 才会触发 checkpoint。rawQuery 后 close 但不读,SQLite 不会执行 checkpoint。
+            // 这是之前版本(只 close 不 read)WAL 没刷回主库的原因。
+            try (android.database.Cursor c = defaultDb.rawQuery("PRAGMA wal_checkpoint(TRUNCATE);", null)) {
+                if (c.moveToFirst()) {
+                    int busy = c.getInt(0);
+                    int log = c.getInt(1);
+                    int ckpt = c.getInt(2);
+                    android.util.Log.d("DbConnection",
+                            "checkpoint(TRUNCATE): busy=" + busy + " log=" + log + " ckpt=" + ckpt);
+                }
+            }
         } catch (Exception e) {
             android.util.Log.e("DbConnection", "checkpoint failed", e);
         }
