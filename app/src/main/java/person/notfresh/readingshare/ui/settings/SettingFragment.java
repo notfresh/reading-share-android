@@ -760,9 +760,9 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
                     List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(ctx);
                     if (position < 0 || position >= all.size()) return;
                     WebViewOverrideRule old = all.get(position);
-                    WebViewOverrideRule updated = new WebViewOverrideRule(old.getPattern(), newAction);
+                    WebViewOverrideRule updated = new WebViewOverrideRule(old.getContextUrl(), old.getRedirectedUrl(), newAction);
                     WebViewOverrideRules.update(ctx, position, updated);
-                    Snackbar.make(requireView(), "已更新: " + updated.getPattern(), Snackbar.LENGTH_SHORT).show();
+                    Snackbar.make(requireView(), "已更新: " + updated.getContextUrl(), Snackbar.LENGTH_SHORT).show();
                 } catch (Exception e) {
                     Snackbar.make(requireView(), "更新失败: " + e.getMessage(), Snackbar.LENGTH_SHORT).show();
                 }
@@ -773,13 +773,20 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
                 try {
                     List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(ctx);
                     if (position < 0 || position >= all.size()) return;
-                    String deletedPattern = all.get(position).getPattern();
+                    String deletedContextUrl = all.get(position).getContextUrl();
                     WebViewOverrideRules.remove(ctx, position);
                     refreshOverrideRulesList(adapterRef[0], emptyHint);
-                    Snackbar.make(requireView(), "已删除: " + deletedPattern, Snackbar.LENGTH_SHORT).show();
+                    Snackbar.make(requireView(), "已删除: " + deletedContextUrl, Snackbar.LENGTH_SHORT).show();
                 } catch (Exception e) {
                     Snackbar.make(requireView(), "删除失败: " + e.getMessage(), Snackbar.LENGTH_SHORT).show();
                 }
+            }
+
+            @Override
+            public void onRuleViewDetailClicked(int position) {
+                List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(ctx);
+                if (position < 0 || position >= all.size()) return;
+                showRuleDetailDialog(all.get(position));
             }
         });
         recycler.setAdapter(adapterRef[0]);
@@ -796,13 +803,35 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
     }
 
     /**
+     * 拦截规则查看详情弹窗(只读):显示完整 contextUrl + redirectedUrl + action,
+     * 不用 ScrollingTextView 是因为短链太长,选 AlertDialog 自带 TextView + 项目内通用
+     * `AlertDialog.Builder.setMessage(multi-line)` 行为即可。
+     */
+    private void showRuleDetailDialog(WebViewOverrideRule rule) {
+        String ctx = rule.getContextUrl();
+        String redirected = rule.getRedirectedUrl();
+        String action = rule.getAction().name();
+        StringBuilder message = new StringBuilder();
+        message.append("原始 URL:\n").append(ctx).append("\n\n");
+        if (redirected != null && !redirected.isEmpty()) {
+            message.append("重定向后 URL:\n").append(redirected).append("\n\n");
+        }
+        message.append("动作: ").append(action);
+        new AlertDialog.Builder(requireContext())
+                .setTitle("拦截规则详情")
+                .setMessage(message.toString())
+                .setPositiveButton("关闭", null)
+                .show();
+    }
+
+    /**
      * AddOverrideRuleDialog 父 fragment 回调:抽屉入口(无 prefill URL)。
      */
     @Override
     public void onRuleSubmitted(WebViewOverrideRule rule) {
         try {
             WebViewOverrideRules.add(requireContext(), rule);
-            Snackbar.make(requireView(), "已添加: " + rule.getPattern(), Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(requireView(), "已添加: " + rule.getContextUrl(), Snackbar.LENGTH_SHORT).show();
             // 重新读 + 重绘
             RecyclerView recycler = requireView().findViewById(R.id.override_rule_recycler);
             TextView emptyHint = requireView().findViewById(R.id.override_rule_empty_hint);

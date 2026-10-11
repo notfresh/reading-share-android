@@ -24,12 +24,16 @@ import person.notfresh.readingshare.model.WebViewOverrideRule;
  *
  * <p>主真相源 = 入参 rules List;外部调用方全量 setRules(...) 后本 adapter 重渲染。
  * 行内 RadioGroup 选中变化通过 onRuleActionChanged 回调给宿主;宿主负责 update(idx, rule) 持久化。</p>
+ *
+ * <p>每行显示 contextUrl(主)+ redirectedUrl(副,自动记录字段,空时整行隐藏)。
+ * 点 TextView 区域(row 主 + 副) → 弹 onRuleViewDetailClicked 给宿主。</p>
  */
 public class OverrideRuleAdapter extends RecyclerView.Adapter<OverrideRuleAdapter.VH> {
 
     public interface OnRuleChangeListener {
         void onRuleActionChanged(int position, OverrideAction newAction);
         void onRuleDeleteClicked(int position);
+        void onRuleViewDetailClicked(int position);
     }
 
     private final List<WebViewOverrideRule> data = new ArrayList<>();
@@ -39,7 +43,6 @@ public class OverrideRuleAdapter extends RecyclerView.Adapter<OverrideRuleAdapte
         this.listener = listener;
     }
 
-    /** 全量替换 + 重渲染。仅在宿主层规则列表真正变化时调。 */
     public void setRules(List<WebViewOverrideRule> rules) {
         data.clear();
         if (rules != null) data.addAll(rules);
@@ -57,7 +60,15 @@ public class OverrideRuleAdapter extends RecyclerView.Adapter<OverrideRuleAdapte
     @Override
     public void onBindViewHolder(@NonNull VH h, int position) {
         WebViewOverrideRule r = data.get(position);
-        h.pattern.setText(r.getPattern());
+        h.pattern.setText(r.getContextUrl());
+
+        String redirected = r.getRedirectedUrl();
+        if (redirected != null && !redirected.isEmpty()) {
+            h.redirected.setText("↓ " + redirected);
+            h.redirected.setVisibility(View.VISIBLE);
+        } else {
+            h.redirected.setVisibility(View.GONE);
+        }
 
         // 解绑→ setChecked → 装新 listener(防止复用 ViewHolder 触发残留 listener)
         h.actionGroup.setOnCheckedChangeListener(null);
@@ -79,6 +90,12 @@ public class OverrideRuleAdapter extends RecyclerView.Adapter<OverrideRuleAdapte
             if (pos == RecyclerView.NO_POSITION) return;
             listener.onRuleDeleteClicked(pos);
         });
+
+        h.textArea.setOnClickListener(v -> {
+            int pos = h.getBindingAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
+            listener.onRuleViewDetailClicked(pos);
+        });
     }
 
     @Override
@@ -87,7 +104,9 @@ public class OverrideRuleAdapter extends RecyclerView.Adapter<OverrideRuleAdapte
     }
 
     static class VH extends RecyclerView.ViewHolder {
+        final View textArea;
         final TextView pattern;
+        final TextView redirected;
         final RadioGroup actionGroup;
         final RadioButton askRb;
         final RadioButton openRb;
@@ -96,7 +115,9 @@ public class OverrideRuleAdapter extends RecyclerView.Adapter<OverrideRuleAdapte
 
         VH(@NonNull View itemView) {
             super(itemView);
+            textArea = itemView.findViewById(R.id.override_rule_text_area);
             pattern = itemView.findViewById(R.id.override_rule_pattern_text);
+            redirected = itemView.findViewById(R.id.override_rule_redirected_text);
             actionGroup = itemView.findViewById(R.id.override_rule_action_group);
             askRb = itemView.findViewById(R.id.override_rule_action_ask);
             openRb = itemView.findViewById(R.id.override_rule_action_open);

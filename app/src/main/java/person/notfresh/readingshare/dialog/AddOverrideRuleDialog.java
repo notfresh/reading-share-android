@@ -104,7 +104,7 @@ public class AddOverrideRuleDialog extends DialogFragment {
                 } else {
                     action = OverrideAction.ASK;
                 }
-                WebViewOverrideRule rule = new WebViewOverrideRule(pattern, action);
+                WebViewOverrideRule rule = new WebViewOverrideRule(pattern, action); // pattern 是 variable,作为 contextUrl 传入
 
                 // 回调分两条路径:parent fragment / activity
                 boolean delivered = false;

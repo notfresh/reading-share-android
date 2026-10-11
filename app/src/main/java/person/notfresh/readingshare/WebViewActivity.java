@@ -482,8 +482,16 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
             startActivity(new Intent(this, LinksHistoryActivity.class));
             return true;
         } else if (item.getItemId() == R.id.action_configure_override_rule) {
-            // 弹 AddOverrideRuleDialog,pattern 默认填充当前页面 URL
-            AddOverrideRuleDialog.showDialog(getSupportFragmentManager(), currentUrl);
+            // 弹 AddOverrideRuleDialog,contextUrl 优先预填 webview 跟重定向前的原 URL(用户原始意图)
+            // 回退到 currentUrl 是为了兼容老代码路径
+            String contextUrlForDialog;
+            if (webView != null) {
+                String originalUrl = webView.getOriginalUrl();
+                contextUrlForDialog = (originalUrl != null && !originalUrl.isEmpty()) ? originalUrl : webView.getUrl();
+            } else {
+                contextUrlForDialog = currentUrl;
+            }
+            AddOverrideRuleDialog.showDialog(getSupportFragmentManager(), contextUrlForDialog);
             return true;
         } else if (item.getItemId() == R.id.action_collapse_to_mini) {
             collapseToMiniPlayer();
@@ -751,7 +759,7 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
             try {
                 WebViewOverrideRules.add(this, rule);
                 Snackbar.make(findViewById(android.R.id.content),
-                        "已添加拦截规则: " + rule.getPattern() + " (" + rule.getAction().name() + ")",
+                        "已添加拦截规则: " + rule.getContextUrl() + " (" + rule.getAction().name() + ")",
                         Snackbar.LENGTH_SHORT).show();
             } catch (IllegalArgumentException e) {
                 Snackbar.make(findViewById(android.R.id.content),
@@ -798,14 +806,32 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
         // }
 
         // 拦截名单(白名单)优先 —— 命中规则走 OverrideAction,未命中走原 global mode
-        Optional<WebViewOverrideRule> hit = WebViewOverrideRules.firstMatch(this, url);
-        if (hit.isPresent()) {
-            Log.d("WVUrlTrace", "handleUrlOverride rule hit url=" + url
-                    + " pattern=" + hit.get().getPattern()
-                    + " action=" + hit.get().getAction());
-            applyRuleAction(url, hit.get().getAction());
-            // ASK 弹窗时让 WebView 等待用户选择(等效于 global mode=0 的行为);BLOCK / OPEN 直接吃掉
-            return hit.get().getAction() == OverrideAction.ASK;
+        // 匹配候选 = webview 当前页 URL(getUrl,重定向后的真页) + webview 原 URL(getOriginalUrl,302 之前的原始链)
+        // 同一规则里 contextUrl(用户手填的原始)与 redirectedUrl(系统自动记录的)任一被 candidate 命中即胜出
+        if (webView != null) {
+            String currentPageUrl = webView.getUrl();
+            String originalPageUrl = webView.getOriginalUrl();
+            java.util.List<String> candidates = new java.util.ArrayList<>(2);
+            if (currentPageUrl != null && !currentPageUrl.isEmpty()) candidates.add(currentPageUrl);
+            if (originalPageUrl != null && !originalPageUrl.isEmpty()) candidates.add(originalPageUrl);
+            Optional<WebViewOverrideRule> hit = WebViewOverrideRules.firstMatch(this, candidates);
+            if (hit.isPresent()) {
+                Log.d("WVUrlTrace", "handleUrlOverride rule hit candidates=" + candidates
+                        + " contextUrl=" + hit.get().getContextUrl()
+                        + " redirectedUrl=" + hit.get().getRedirectedUrl()
+                        + " action=" + hit.get().getAction());
+                String ruleContext = hit.get().getContextUrl();
+                if (currentPageUrl != null && !currentPageUrl.isEmpty()
+                        && !currentPageUrl.equalsIgnoreCase(ruleContext)) {
+                    // 重定向场景:把 candidate(重定向后的真页)写入规则的 redirectedUrl,
+                    // 之后匹配走该字段,即便 contextUrl 是短链也命中
+                    WebViewOverrideRules.recordRedirectedUrl(this, ruleContext, currentPageUrl);
+                }
+                applyRuleAction(url, hit.get().getAction());
+                // 命中后永远 return true — webview 不再尝试加载 scheme,
+                // 否则 chrome 内核会再次触发 ERR_UNKNOWN_URL_SCHEME 渲染错误页
+                return true;
+            }
         }
 
         // 获取外部链接打开模式：2=拦截所有（默认），0=弹窗确认，1=直接跳转

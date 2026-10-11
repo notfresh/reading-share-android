@@ -11,6 +11,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import person.notfresh.readingshare.model.WebViewOverrideRule;
@@ -18,26 +19,16 @@ import person.notfresh.readingshare.model.WebViewOverrideRule;
 /**
  * WebView 跳转白名单规则的数据层(单一真相源 = SharedPreferences "settings" / override_rules_json)。
  *
- * <p>对外 API 语义:</p>
- * <ul>
- *   <li>{@link #loadAll(Context)} - 从 SP 读 JSON array,空/坏数据 → 返回空列表</li>
- *   <li>{@link #firstMatch(Context, String)} - 顺序遍历,首个 pattern 子串匹配即返回 Optional</li>
- *   <li>{@link #saveAll(Context, List)} - 全量覆盖写入</li>
- *   <li>{@link #add}/{@link #update}/{@link #remove} - 增量操作(均走 saveAll)</li>
- * </ul>
+ * <p>2026-10-12 拍板(第三轮):每条规则 = contextUrl(原始 URL 子串 + 用户手填) + redirectedUrl(可选,系统自动写)
+ * + action(ASK/OPEN/BLOCK)。匹配走两个候选(getUrl + getOriginalUrl)查 contextUrl OR redirectedUrl,
+ * 任一命中胜出 —— 自动消化"原始短链 302 重定向到真页 url 怎么配都不上"的痛点。</p>
  *
- * <p>设计选择:</p>
- * <ul>
- *   <li>不缓存:每次调用现读 SP,增删立刻生效</li>
- *   <li>JSON 而非 DB:规则数 0~20 量级,JSON 序列号已足,不强加 Room</li>
- *   <li>复入现有 "settings" SP,不开新 SP</li>
- * </ul>
+ * <p>老 2.3.17 之前的数据(只 pattern 字段)由 {@link WebViewOverrideRule#fromJson}
+ * 自动映射到 contextUrl。</p>
  */
 public final class WebViewOverrideRules {
 
-    /** SharedPreferences 文件名(与 SettingFragment.getSharedPreferences("settings", ...) 一致)。 */
     public static final String PREFS_NAME = "settings";
-    /** 规则列表在 SP 里的 key。 */
     public static final String KEY_RULES_JSON = "override_rules_json";
 
     private static final String TAG = "OverrideRules";
@@ -46,9 +37,6 @@ public final class WebViewOverrideRules {
         // utility class
     }
 
-    /**
-     * 读出全部规则。空 / 解析失败 → 返回空列表(永不抛异常)。
-     */
     public static List<WebViewOverrideRule> loadAll(Context ctx) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String raw = prefs.getString(KEY_RULES_JSON, "");
@@ -62,8 +50,7 @@ public final class WebViewOverrideRules {
                 JSONObject o = arr.optJSONObject(i);
                 if (o == null) continue;
                 WebViewOverrideRule r = WebViewOverrideRule.fromJson(o);
-                // 空 pattern 的脏数据跳过
-                if (r.getPattern() == null || r.getPattern().trim().isEmpty()) continue;
+                if (r.getContextUrl() == null || r.getContextUrl().trim().isEmpty()) continue;
                 out.add(r);
             }
         } catch (JSONException e) {
@@ -74,34 +61,73 @@ public final class WebViewOverrideRules {
     }
 
     /**
-     * 命中检查:首个 pattern 包含(url 子串包含 pattern)的规则胜出。
+     * 命中检查:任一 candidate URL(contextUrl 或 redirectedUrl)被子串包含(忽略大小写)的规则胜出。
      * 大小写不敏感。
+     *
+     * @param ctx android context
+     * @param candidates 候选 URL 列表 —— 调用方传 webView.getUrl() 与 webView.getOriginalUrl()
      */
-    public static Optional<WebViewOverrideRule> firstMatch(Context ctx, String url) {
-        if (url == null || url.isEmpty()) return Optional.empty();
-        String haystack = url.toLowerCase(java.util.Locale.ROOT);
-        for (WebViewOverrideRule r : loadAll(ctx)) {
-            String needle = r.getPattern().toLowerCase(java.util.Locale.ROOT);
-            if (haystack.contains(needle)) {
-                return Optional.of(r);
+    public static Optional<WebViewOverrideRule> firstMatch(Context ctx, List<String> candidates) {
+        if (candidates == null || candidates.isEmpty()) return Optional.empty();
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.isEmpty()) continue;
+            String haystack = candidate.toLowerCase(Locale.ROOT);
+            for (WebViewOverrideRule r : loadAll(ctx)) {
+                if (haystack.contains(r.getContextUrl().toLowerCase(Locale.ROOT))) {
+                    return Optional.of(r);
+                }
+                String redir = r.getRedirectedUrl();
+                if (redir != null && !redir.isEmpty()
+                        && haystack.contains(redir.toLowerCase(Locale.ROOT))) {
+                    return Optional.of(r);
+                }
             }
         }
         return Optional.empty();
     }
 
+    /** 兼容老签名的 1-arg 重载。 */
+    public static Optional<WebViewOverrideRule> firstMatch(Context ctx, String currentPageUrl) {
+        List<String> cands = new ArrayList<>(2);
+        if (currentPageUrl != null && !currentPageUrl.isEmpty()) cands.add(currentPageUrl);
+        return firstMatch(ctx, cands);
+    }
+
     /**
-     * 全量覆盖写入。如果传入空列表则写出 "[]"(不清 key,保持 SP key 存在以便列表迭代稳定)。
+     * 自动补写规则:首次命中某条规则 contextUrl 后,如果该规则 redirectedUrl 为空,
+     * 且 candidate 与 contextUrl 不同(说明发生重定向),把 candidate 写入 redirectedUrl。
+     *
+     * @return true 表示写入过(false = 已存在/无需写入)
      */
+    public static boolean recordRedirectedUrl(Context ctx, String contextUrl, String candidate) {
+        if (contextUrl == null || contextUrl.isEmpty()) return false;
+        if (candidate == null || candidate.isEmpty()) return false;
+        if (contextUrl.equalsIgnoreCase(candidate)) return false; // 没重定向
+        List<WebViewOverrideRule> all = loadAll(ctx);
+        for (int i = 0; i < all.size(); i++) {
+            WebViewOverrideRule r = all.get(i);
+            if (r.getContextUrl().equalsIgnoreCase(contextUrl)) {
+                if (r.getRedirectedUrl() != null && !r.getRedirectedUrl().isEmpty()) {
+                    return false;
+                }
+                all.set(i, r.withRedirectedUrl(candidate));
+                saveAll(ctx, all);
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void saveAll(Context ctx, List<WebViewOverrideRule> rules) {
         JSONArray arr = new JSONArray();
         if (rules != null) {
             for (WebViewOverrideRule r : rules) {
                 if (r == null) continue;
-                if (r.getPattern() == null || r.getPattern().trim().isEmpty()) continue;
+                if (r.getContextUrl() == null || r.getContextUrl().trim().isEmpty()) continue;
                 try {
                     arr.put(r.toJson());
                 } catch (JSONException e) {
-                    Log.e(TAG, "saveAll: skip malformed rule pattern=" + r.getPattern(), e);
+                    Log.e(TAG, "saveAll: skip malformed rule contextUrl=" + r.getContextUrl(), e);
                 }
             }
         }
@@ -109,15 +135,15 @@ public final class WebViewOverrideRules {
         prefs.edit().putString(KEY_RULES_JSON, arr.toString()).apply();
     }
 
-    /** 追加一条;pattern 为空或与已有重复(忽略大小写)直接抛 IllegalArgumentException 让调用方决策。 */
+    /** 追加一条;contextUrl 为空或与已有重复(忽略大小写)抛 IllegalArgumentException。 */
     public static void add(Context ctx, WebViewOverrideRule rule) {
-        if (rule == null || rule.getPattern() == null || rule.getPattern().trim().isEmpty()) {
-            throw new IllegalArgumentException("rule or pattern empty");
+        if (rule == null || rule.getContextUrl() == null || rule.getContextUrl().trim().isEmpty()) {
+            throw new IllegalArgumentException("rule or contextUrl empty");
         }
         List<WebViewOverrideRule> all = loadAll(ctx);
         for (WebViewOverrideRule existing : all) {
-            if (existing.getPattern().equalsIgnoreCase(rule.getPattern())) {
-                throw new IllegalArgumentException("duplicate pattern: " + rule.getPattern());
+            if (existing.getContextUrl().equalsIgnoreCase(rule.getContextUrl())) {
+                throw new IllegalArgumentException("duplicate contextUrl: " + rule.getContextUrl());
             }
         }
         all.add(rule);
@@ -125,8 +151,8 @@ public final class WebViewOverrideRules {
     }
 
     public static void update(Context ctx, int index, WebViewOverrideRule rule) {
-        if (rule == null || rule.getPattern() == null || rule.getPattern().trim().isEmpty()) {
-            throw new IllegalArgumentException("rule or pattern empty");
+        if (rule == null || rule.getContextUrl() == null || rule.getContextUrl().trim().isEmpty()) {
+            throw new IllegalArgumentException("rule or contextUrl empty");
         }
         List<WebViewOverrideRule> all = loadAll(ctx);
         if (index < 0 || index >= all.size()) {
@@ -145,7 +171,6 @@ public final class WebViewOverrideRules {
         saveAll(ctx, all);
     }
 
-    /** 测试/调试用:返回不可修改快照。 */
     public static List<WebViewOverrideRule> loadAllUnmodifiable(Context ctx) {
         return Collections.unmodifiableList(loadAll(ctx));
     }
