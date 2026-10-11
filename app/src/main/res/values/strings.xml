@@ -69,6 +69,7 @@
     <string name="add_tag">添加标签</string>
     <string name="edit_title">修改标题</string>
     <string name="link_history">浏览历史</string>
+    <string name="configure_override_rule">配置本页跳转</string>
 
     <!-- 搜索历史下拉 -->
     <string name="search_history_empty">暂无搜索历史</string>

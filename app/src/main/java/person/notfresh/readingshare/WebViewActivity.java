@@ -62,6 +62,10 @@ import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.links.strategy.XiaohongshuSkipStrategy;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.dialog.AddOverrideRuleDialog;
+import person.notfresh.readingshare.model.OverrideAction;
+import person.notfresh.readingshare.model.WebViewOverrideRule;
+import person.notfresh.readingshare.util.WebViewOverrideRules;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
@@ -69,10 +73,12 @@ import person.notfresh.readingshare.util.TagSuggestionHelper;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.graphics.drawable.DrawableCompat;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.snackbar.Snackbar;
 
-public class WebViewActivity extends AppCompatActivity {
+public class WebViewActivity extends AppCompatActivity implements AddOverrideRuleDialog.OnRuleSubmitListenerActivity {
     private WebView webView;
     private Toolbar toolbar;
     private String currentUrl;
@@ -475,6 +481,10 @@ public class WebViewActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.action_link_history) {
             startActivity(new Intent(this, LinksHistoryActivity.class));
             return true;
+        } else if (item.getItemId() == R.id.action_configure_override_rule) {
+            // 弹 AddOverrideRuleDialog,pattern 默认填充当前页面 URL
+            AddOverrideRuleDialog.showDialog(getSupportFragmentManager(), currentUrl);
+            return true;
         } else if (item.getItemId() == R.id.action_collapse_to_mini) {
             collapseToMiniPlayer();
             return true;
@@ -732,7 +742,43 @@ public class WebViewActivity extends AppCompatActivity {
         return XiaohongshuSkipStrategy.isXiaohongshuUrl(url);
     }
 
-    private boolean handleUrlOverride(WebView view, String url, boolean isMainFrame) {
+    /**
+         * AddOverrideRuleDialog 父 Activity 回调(WebViewActivity 入口):
+         * 写一条新规则到 SP,Snackbar 提示成功。
+         */
+        @Override
+        public void onRuleSubmittedFromActivity(WebViewOverrideRule rule) {
+            try {
+                WebViewOverrideRules.add(this, rule);
+                Snackbar.make(findViewById(android.R.id.content),
+                        "已添加拦截规则: " + rule.getPattern() + " (" + rule.getAction().name() + ")",
+                        Snackbar.LENGTH_SHORT).show();
+            } catch (IllegalArgumentException e) {
+                Snackbar.make(findViewById(android.R.id.content),
+                        e.getMessage(), Snackbar.LENGTH_SHORT).show();
+            }
+        }
+
+        /**
+         * 处理 WebView 跳转白名单。命中 OverrideAction 时复用既有处理路径
+         * (showExternalOpenConfirmDialog / openExternalUri / return true),未命中走原
+         * {@link #getExternalLinkMode()} 全局三档逻辑。
+         */
+        private void applyRuleAction(String url, OverrideAction action) {
+            switch (action) {
+                case ASK:
+                    showExternalOpenConfirmDialog(url);
+                    break;
+                case OPEN:
+                    openExternalUri(url);
+                    break;
+                case BLOCK:
+                    // mode=2 等价:什么都不做就 return true,见 handleUrlOverride 末尾行为
+                    break;
+            }
+        }
+
+        private boolean handleUrlOverride(WebView view, String url, boolean isMainFrame) {
         if (url == null ) {
             Log.d("WVUrlTrace", "handleUrlOverride early-return: url=" + url
                     + ", isMainFrame=" + isMainFrame);
@@ -750,6 +796,17 @@ public class WebViewActivity extends AppCompatActivity {
         //             + ", isMainFrame=" + isMainFrame);
         //     return false;
         // }
+
+        // 拦截名单(白名单)优先 —— 命中规则走 OverrideAction,未命中走原 global mode
+        Optional<WebViewOverrideRule> hit = WebViewOverrideRules.firstMatch(this, url);
+        if (hit.isPresent()) {
+            Log.d("WVUrlTrace", "handleUrlOverride rule hit url=" + url
+                    + " pattern=" + hit.get().getPattern()
+                    + " action=" + hit.get().getAction());
+            applyRuleAction(url, hit.get().getAction());
+            // ASK 弹窗时让 WebView 等待用户选择(等效于 global mode=0 的行为);BLOCK / OPEN 直接吃掉
+            return hit.get().getAction() == OverrideAction.ASK;
+        }
 
         // 获取外部链接打开模式：2=拦截所有（默认），0=弹窗确认，1=直接跳转
         int externalLinkMode = getExternalLinkMode();

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="子串匹配,如 xiaohongshu.com、t.cn">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/override_rule_pattern_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:inputType="textUri" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <RadioGroup
+        android:id="@+id/override_rule_action_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="16dp">
+
+        <RadioButton
+            android:id="@+id/override_rule_action_ask"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="弹窗确认(打开前每次询问)" />
+
+        <RadioButton
+            android:id="@+id/override_rule_action_open"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="直接跳转(自动打开外部应用)" />
+
+        <RadioButton
+            android:id="@+id/override_rule_action_block"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="全部拦截(禁止打开外部应用)" />
+    </RadioGroup>
+
+</LinearLayout>

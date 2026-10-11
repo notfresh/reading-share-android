@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -59,10 +60,17 @@ import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
 import person.notfresh.readingshare.util.SubjectUtil;
 import com.google.android.material.textfield.TextInputEditText;
+import person.notfresh.readingshare.adapter.OverrideRuleAdapter;
+import person.notfresh.readingshare.model.OverrideAction;
+import person.notfresh.readingshare.dialog.AddOverrideRuleDialog;
+import person.notfresh.readingshare.model.WebViewOverrideRule;
+import person.notfresh.readingshare.util.WebViewOverrideRules;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import person.notfresh.readingshare.sync.SimpleSyncManager;
 
-public class SettingFragment extends Fragment {
+public class SettingFragment extends Fragment implements AddOverrideRuleDialog.OnRuleSubmitListener {
 
     private static final int REQUEST_CODE_IMPORT_FILE = 1; // 改为通用文件导入
     private static final String DEFAULT_SERVER_URL = "https://duxiang.ai";
@@ -345,6 +353,9 @@ public class SettingFragment extends Fragment {
             }
             editor.apply();
         });
+
+        // 拦截名单(白名单)区块 —— 每行 = pattern + 3 选 1 + 删除 + 底部 +号新增
+        bindOverrideRulesSection(root);
 
         // 添加导入文件按钮
         root.findViewById(R.id.button_import_csv).setOnClickListener(v -> {
@@ -726,6 +737,81 @@ public class SettingFragment extends Fragment {
             Context.MODE_PRIVATE
         );
         return prefs.getString("server_url", DEFAULT_SERVER_URL);
+    }
+
+    /**
+     * 拦截名单(白名单)section 绑定:RecyclerView 渲染 + 增改删回调 + 复用
+     * {@link AddOverrideRuleDialog} 作为新增入口(SetFragment 是 DialogFragment 的 parent fragment)。
+     */
+    private void bindOverrideRulesSection(View root) {
+        RecyclerView recycler = root.findViewById(R.id.override_rule_recycler);
+        TextView emptyHint = root.findViewById(R.id.override_rule_empty_hint);
+        Button addBtn = root.findViewById(R.id.override_rule_add_btn);
+
+        recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
+        final Context ctx = requireContext();
+        // 主真相源在 adapter.rules(外部传入),但 LOAD 时从 SP 现读
+        // 提前 final 化让 inner anonymous OnRuleChangeListener 可以引用
+        final OverrideRuleAdapter[] adapterRef = new OverrideRuleAdapter[1];
+        adapterRef[0] = new OverrideRuleAdapter(new OverrideRuleAdapter.OnRuleChangeListener() {
+            @Override
+            public void onRuleActionChanged(int position, OverrideAction newAction) {
+                try {
+                    List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(ctx);
+                    if (position < 0 || position >= all.size()) return;
+                    WebViewOverrideRule old = all.get(position);
+                    WebViewOverrideRule updated = new WebViewOverrideRule(old.getPattern(), newAction);
+                    WebViewOverrideRules.update(ctx, position, updated);
+                    Snackbar.make(requireView(), "已更新: " + updated.getPattern(), Snackbar.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Snackbar.make(requireView(), "更新失败: " + e.getMessage(), Snackbar.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onRuleDeleteClicked(int position) {
+                try {
+                    List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(ctx);
+                    if (position < 0 || position >= all.size()) return;
+                    String deletedPattern = all.get(position).getPattern();
+                    WebViewOverrideRules.remove(ctx, position);
+                    refreshOverrideRulesList(adapterRef[0], emptyHint);
+                    Snackbar.make(requireView(), "已删除: " + deletedPattern, Snackbar.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Snackbar.make(requireView(), "删除失败: " + e.getMessage(), Snackbar.LENGTH_SHORT).show();
+                }
+            }
+        });
+        recycler.setAdapter(adapterRef[0]);
+        refreshOverrideRulesList(adapterRef[0], emptyHint);
+
+        addBtn.setOnClickListener(v ->
+                AddOverrideRuleDialog.showDialog(getChildFragmentManager(), null));
+    }
+
+    private void refreshOverrideRulesList(OverrideRuleAdapter adapter, TextView emptyHint) {
+        List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(requireContext());
+        adapter.setRules(all);
+        emptyHint.setVisibility(all.isEmpty() ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * AddOverrideRuleDialog 父 fragment 回调:抽屉入口(无 prefill URL)。
+     */
+    @Override
+    public void onRuleSubmitted(WebViewOverrideRule rule) {
+        try {
+            WebViewOverrideRules.add(requireContext(), rule);
+            Snackbar.make(requireView(), "已添加: " + rule.getPattern(), Snackbar.LENGTH_SHORT).show();
+            // 重新读 + 重绘
+            RecyclerView recycler = requireView().findViewById(R.id.override_rule_recycler);
+            TextView emptyHint = requireView().findViewById(R.id.override_rule_empty_hint);
+            if (recycler.getAdapter() instanceof OverrideRuleAdapter) {
+                refreshOverrideRulesList((OverrideRuleAdapter) recycler.getAdapter(), emptyHint);
+            }
+        } catch (IllegalArgumentException e) {
+            Snackbar.make(requireView(), e.getMessage(), Snackbar.LENGTH_SHORT).show();
+        }
     }
 
     /** 给一组 link 算出 linkId → subject 名字 映射,供 ExportUtil 带上 subject 列 */
