@@ -1,5 +1,55 @@
 ## B
 
+# 2.3.17.5
+特性:WebView 跳转白名单模式 —— 针对个别网址配置单独的跳转策略。
+
+## 数据模型
+- 新增 `model/WebViewOverrideRule.java`(不可变 record-like,JSON 序列化适配老数据)
+- 新增 `model/OverrideAction.java` 枚举 ASK / OPEN / BLOCK(与既有 externalLinkMode 三档一一对应)
+- 新增 `util/WebViewOverrideRules.java` 数据层(`loadAll` / `firstMatch` / `add` / `update` / `remove` / `recordRedirectedUrl`)
+  - 单一真相源:SharedPreferences("settings") / `override_rules_json`
+  - 复合字段(2.3.17.5 后):`contextUrl`(用户手填的原始 URL) + `redirectedUrl`(系统自动记录的重定向后 URL) + `action`
+- 兼容:老 2.3.17 之前的 pattern 字段在 `fromJson` 自动映射到新 contextUrl
+
+## 匹配语义(2.3.17.5 最终版,合并初版与 5 刀修复)
+- 候选 URL:`webView.getUrl()`(重定向后当前页) + `webView.getOriginalUrl()`(302 前的原始链)
+- 命中条件:任一 candidate 被规则的 `contextUrl` 或 `redirectedUrl` 子串包含(忽略大小写)即胜出
+- 首次命中且 `redirectedUrl` 为空 + 已发生重定向(候选 URL ≠ contextUrl) → 系统自动写 `redirectedUrl` 到 SP
+- 这样无论用户配的是原始短链(`xhslink.cn`)还是重定向后的真页(`xiaohongshu.com`),规则都能正确命中
+
+## UI 配置入口(两处共用一个 DialogFragment)
+1. **设置抽屉**(fragment_slideshow.xml)「拦截名单」区块:RecyclerView + 每行(`pattern + 3 选 1 + 删除`) + 底部「+」按钮 + 空态提示
+2. **WebView toolbar**:菜单项「配置本页跳转」(`action_configure_override_rule`);弹 dialog 时 `pattern` 预填 `webView.getOriginalUrl()`(若空回退 `getUrl()`,再回退 `currentUrl`)
+3. row 点击 TextView 区域 → 弹只读详情 dialog 显示完整 contextUrl + redirectedUrl + action
+4. item layout 重新设计(垂直 LinearLayout 包两层:主行 + 副 redirectedUrl 行);副行存在时显示,空时整行隐藏
+
+## WebView 拦截接入
+- `WebViewActivity.handleUrlOverride` 入口先 white-list 命中检查,命中走 `applyRuleAction(url, action)`,未命中走既有全局 mode 0/1/2 逻辑
+- 命中后**永远 return true** —— 避免 chrome 内核对 `xhsdiscover://` 等 scheme 触发 ERR_UNKNOWN_URL_SCHEME 渲染错误页
+- 三个 action 复用既有方法:
+  - ASK → `showExternalOpenConfirmDialog`
+  - OPEN → `openExternalUri`
+  - BLOCK → return true(静默不处理)
+
+## 踩坑记录(关键)
+1. **白名单匹配语义走错关键两步**(2.3.17.2/.3 反复纠偏):
+   - 初版用「跳出来的 url」子串匹配 → xhsdiscover:// 不含 xiaohongshu.com,误判
+   - 改用「webview 当前页 url」匹配 → 但 dialog 预填 currentUrl 变量是短链,与重定向后 webview 不符
+   - 最终用「webview 原 URL」+「webview 当前 URL」两条候选,匹配时一并查
+2. **shouldOverrideUrlLoading 应永远 return true**(2.3.17.4)
+   - 之前 return `action == ASK` 仅在 ASK 时返 true,OPEN/BLOCK 命中时 webview 仍尝试加载 scheme,ERR 错误页出现
+3. **row 点击区不传透 RadioGroup / 删除按钮**(2.3.17.5)
+   - 把 contextUrl 与 redirectedUrl 包成单独的 LinearLayout 给 click listener,RadioGroup / 删除按钮的 click 不触发
+
+## 数据与回滚
+- 老 2.3.17 之前 SP 里的 `pattern` 字段,反序列化时自动映射到 `contextUrl`(读优先读新字段,缺时回退老字段)
+- 回滚成本:单 commit revert,不改 schema 表结构,不引入新依赖
+- versionCode 36 → 40,versionName 2.3.17 → 2.3.17.5
+
+# 2.3.17
+特性:WebView 跳转白名单模式 —— 初版,简化版。详见后续修复 commit。
+- 初版字段命名 `pattern`(子串匹配,命中 web 跳出来的 url),后续发现「网页 JS 触发 scheme 跳转不命中问题」,后续 commit 改字段为 contextUrl + 加 redirectedUrl。
+
 # 2.3.16
 修复:数据库在「多任务一键全部关闭」(SIGKILL) 后出现"主库空 + journal 残留"的丢数据现象。
 - 根因:之前用 SQLite 默认 DELETE journal 模式,长连接(`SQLiteOpenHelper` 进程级持有)下,SIGKILL 会让 `links.db-journal` 残留成"未完成事务",下次启动 SQLite 走回滚 → 看起来"丢数据"。高频写入字段(`click_count`、追加型字段如 `remark`)受影响最明显,创建型字段(`title`/`url`/`timestamp`)相对稳定。
