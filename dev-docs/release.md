@@ -1,5 +1,27 @@
 ## B
 
+# 2.3.18
+特性:HomeFragment 中英双语 + 设置页语言切换(跟随系统 / 中文 / English)。
+
+## 范围
+- HomeFragment.java(57 处硬编码中文外提为 string resource)
+- LinksAdapter.java(80 处硬编码中文外提 — 只服务于 HomeFragment 列表)
+- fragment_home.xml + home_menu.xml(layout/menu 硬编码 → @string/)
+- values/strings.xml + values-en/strings.xml(新增 110+ 条双语条目)
+- SettingFragment.java — 新增语言切换区块(动态 inflate,不动 layout)
+
+## 切换机制
+- 用 androidx AppCompatDelegate.setApplicationLocales() —— 无自建 LocaleManager、无 attachBaseContext 改造
+- API 33+ 写系统设置;老版本由 androidx 1.6.1 自己持久化
+- 用户在设置页点选后,系统自动 recreate Activity
+
+## 字符串命名约定
+- `home_*` — HomeFragment 动态文案(toast/title/snackbar/dialog)
+- `home_action_*` — home_menu.xml 菜单项 title
+- `link_*` — LinksAdapter 显示相关(列表行 / dialog / popup)
+- `tag_op_*` — HomeFragment 标签操作 dialog 选项
+- `language_*` — 设置页语言区块
+
 # 2.3.17.5
 特性:WebView 跳转白名单模式 —— 针对个别网址配置单独的跳转策略。
 
