@@ -12,5 +12,7 @@
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
         <!-- Customize your theme here. -->
+    <!-- 关闭 Material Button 默认 ALL CAPS,英文按钮显示更自然的 sentence case (2.3.18.1 patch) -->
+        <item name="textAllCaps">false</item>
     </style>
 </resources>

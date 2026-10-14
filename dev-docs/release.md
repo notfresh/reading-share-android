@@ -1,5 +1,19 @@
 ## B
 
+# 2.3.18.2
+特性:全局关掉 Material Button 默认 ALL CAPS(2.3.18.1 patch 反馈:英文版按钮显示成 "BROWSE HISTORY" / "EXPORT ALL LINKS" / "+ ADD RULE" / "ABOUT" 等全大写,不符合 sentence case 美学)。
+
+## 改动
+- `values/themes.xml` + `values-night/themes.xml` Theme.MyApplication 加 `<item name="textAllCaps">false</item>`
+- 影响范围:整个 app 所有 MaterialButton(普通 Button / OutlinedButton / TextButton / icon button 等)
+- 不影响 RadioButton/Switch(各自有样式)
+- 中文 button 文字不变(中文无大小写概念,纯是渲染行为变化)
+
+## 设计原因
+- Android Material Components 默认 button textAllCaps=true → 英文按钮强制大写
+- Material Design 当前推荐 sentence case(只句首大写),与代码现状(string 已全部是 sentence case)对齐
+- 集中改 theme 不动 layout:避免给每个 Button 加 `android:textAllCaps="false"` 这种重复 boilerplate
+
 # 2.3.18.1
 特性:补完 Home 弹窗 / 设置页 中英双语(2.3.18 后续 patch,用户反馈添加弹窗内控件仍有中文)。
 
