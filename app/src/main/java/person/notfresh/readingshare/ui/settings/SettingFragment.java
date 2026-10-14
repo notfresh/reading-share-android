@@ -29,6 +29,8 @@ import android.widget.Toast;
 import android.app.AlertDialog;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.os.LocaleListCompat;
 import androidx.fragment.app.Fragment;
 
 import java.io.File;
@@ -388,7 +390,86 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
             }
         });
 
+        // 语言切换区块 (2.3.18 新增)：见 bindLanguageSection 方法。
+        bindLanguageSection(root);
+
         return root;
+    }
+
+    /**
+     * 语言切换区块：动态添加标题 + 3 选 1 RadioGroup 到设置页底部。
+     * 通过 AppCompatDelegate.setApplicationLocales() 切换；该 API 在 API 33+ 写系统设置，
+     * 老版本由 androidx 自己持久化。系统会自动 recreate 当前 Activity。
+     */
+    private void bindLanguageSection(View root) {
+        android.widget.ScrollView scroll = (root instanceof android.widget.ScrollView)
+                ? (android.widget.ScrollView) root : null;
+        android.view.ViewGroup container = null;
+        if (scroll != null && scroll.getChildCount() > 0) {
+            android.view.View child = scroll.getChildAt(0);
+            if (child instanceof android.view.ViewGroup) container = (android.view.ViewGroup) child;
+        }
+        if (container == null) return;
+
+        android.widget.TextView title = new android.widget.TextView(requireContext());
+        title.setText(R.string.language_section_title);
+        title.setTextSize(18f);
+        android.widget.LinearLayout.LayoutParams titleLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        titleLp.topMargin = (int) (24 * getResources().getDisplayMetrics().density);
+        titleLp.bottomMargin = (int) (8 * getResources().getDisplayMetrics().density);
+        title.setLayoutParams(titleLp);
+        container.addView(title);
+
+        android.widget.RadioGroup group = new android.widget.RadioGroup(requireContext());
+        group.setOrientation(android.widget.RadioGroup.VERTICAL);
+        android.widget.LinearLayout.LayoutParams groupLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        group.setLayoutParams(groupLp);
+
+        String[] labels = new String[]{
+                getString(R.string.language_option_system),
+                getString(R.string.language_option_chinese),
+                getString(R.string.language_option_english)
+        };
+        String[] tags = new String[]{"", "zh", "en"};
+        android.widget.RadioButton[] buttons = new android.widget.RadioButton[labels.length];
+
+        androidx.core.os.LocaleListCompat current = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales();
+        String currentTag = current.toLanguageTags().toLowerCase();
+        int currentIdx = 0;
+        if (currentTag.startsWith("zh")) {
+            currentIdx = 1;
+        } else if (currentTag.startsWith("en")) {
+            currentIdx = 2;
+        }
+
+        for (int i = 0; i < labels.length; i++) {
+            android.widget.RadioButton rb = new android.widget.RadioButton(requireContext());
+            rb.setText(labels[i]);
+            rb.setId(android.view.View.generateViewId());
+            rb.setTag(tags[i]);
+            rb.setChecked(i == currentIdx);
+            group.addView(rb);
+            buttons[i] = rb;
+        }
+
+        group.setOnCheckedChangeListener((g, checkedId) -> {
+            for (int i = 0; i < buttons.length; i++) {
+                if (buttons[i].getId() == checkedId) {
+                    String tag = (String) buttons[i].getTag();
+                    androidx.core.os.LocaleListCompat target = (tag == null || tag.isEmpty())
+                            ? androidx.core.os.LocaleListCompat.getEmptyLocaleList()
+                            : androidx.core.os.LocaleListCompat.forLanguageTags(tag);
+                    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(target);
+                    return;
+                }
+            }
+        });
+
+        container.addView(group);
     }
 
     @Override

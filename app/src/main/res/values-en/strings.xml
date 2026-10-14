@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Reading Share</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
@@ -9,4 +10,207 @@
 
     <string name="menu_home">Home</string>
     <string name="menu_gallery">Tags</string>
+    <string name="menu_rss">RSS</string>
+    <string name="menu_archive">Archive</string>
+    <string name="menu_documents">Documents</string>
+    <string name="menu_subject">Subjects</string>
+
+        <string name="menu_settings">Settings</string>
+
+    <string-array name="default_tabs_array">
+        <item>Subjects</item>
+        <item>Home</item>
+        <item>RSS</item>
+        <item>Random</item>
+    </string-array>
+
+    <string-array name="recent_tags_window_array">
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+    </string-array>
+
+    <string name="fragment_tags">Tags</string>
+
+    <string name="delete_tag">Delete tag</string>
+    <string name="publish_tag">Publish to website</string>
+    <string name="confirm_delete_tag">Confirm deleting this tag?</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="publishing">Publishing...</string>
+    <string name="publish_success">Published successfully</string>
+    <string name="publish_failed">Publish failed</string>
+
+    <string name="open_in_browser">Open in system browser</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="add_statistics">Add statistics</string>
+    <string name="read_statistics">Read statistics</string>
+
+    <string name="read_monthly_statistics">Monthly statistics</string>
+    <string name="read_weekly_statistics">Weekly statistics</string>
+    <string name="read_total_clicks">Total clicks</string>
+
+    <string name="statistics_title">Link click statistics</string>
+
+    <string name="no_data_available">No data available</string>
+
+    <string name="force_back">Force back</string>
+    <string name="archive_back">Archive and back</string>
+    <string name="webview_switch_out">Switch out temporarily</string>
+    <string name="webview_share">Share</string>
+    <string name="extract_web_content">Extract web content</string>
+    <string name="toggle_navigation">Show/hide navigation controls</string>
+    <string name="toggle_external_block">Toggle external link block mode</string>
+    <string name="add_tag">Add tag</string>
+    <string name="edit_title">Edit title</string>
+    <string name="link_history">Browse history</string>
+    <string name="configure_override_rule">Configure this page redirect</string>
+
+    <!-- Search history dropdown -->
+    <string name="search_history_empty">No search history</string>
+    <string name="search_history_pin">Pin</string>
+    <string name="search_history_unpin">Unpin</string>
+    <string name="search_history_delete">Delete</string>
+    <string name="search_history_max_count_label">Search history retention (non-pinned)</string>
+    <string name="search_history_max_count_hint">Default 10</string>
+    <string name="search_clear">Clear search</string>
+
+    <!-- ============================================================ -->
+    <!-- New HomeFragment bilingual additions (2.3.18, 2026-10-13) -->
+    <!-- ============================================================ -->
+
+    <!-- fragment_home.xml -->
+    <string name="home_search_hint">Search title or tag</string>
+    <string name="home_expand_more">Show more tags</string>
+    <string name="home_cd_expand">Expand</string>
+    <string name="home_cd_collapse">Collapse</string>
+    <string name="home_cd_expand_collapse_tags">Expand/collapse tags</string>
+    <string name="home_collapsing_tags">Collapse tags</string>
+
+    <!-- home_menu.xml -->
+    <string name="home_action_add_tag">Add tag</string>
+    <string name="home_action_pinned_tags">Pinned tags</string>
+    <string name="home_action_sort_tags">Sort</string>
+    <string name="home_action_exit_sort">Finish sort</string>
+    <string name="home_action_auto_sort">Auto sort</string>
+    <string name="home_action_similarity_config">Similarity config</string>
+    <string name="home_action_shuffle">Shuffle</string>
+    <string name="home_action_exit_shuffle">Exit shuffle</string>
+    <string name="home_action_close_selection">Exit selection</string>
+    <string name="home_action_select_all">Select all</string>
+    <string name="home_action_delete_selected">Batch delete</string>
+    <string name="home_action_share">Share</string>
+    <string name="home_action_share_text">Share as text</string>
+    <string name="home_action_share_json">Share as JSON</string>
+    <string name="home_action_share_csv">Share as CSV</string>
+    <string name="home_action_add_to_subject">Add to subject</string>
+    <string name="home_action_enter_selection">Multi-select</string>
+    <string name="home_action_subject">Subjects</string>
+
+    <!-- HomeFragment dynamic strings -->
+    <string name="home_title_select_to_share">Select links to share</string>
+    <string name="home_title_sort_tags">Drag to reorder tags</string>
+    <string name="home_toast_long_press_to_drag">Long-press a tag to drag</string>
+    <string name="home_toast_computing_similarity">Computing tag similarity…</string>
+    <string name="home_toast_similarity_done">Similarity sort done, fine-tune by drag</string>
+    <string name="home_toast_sort_failed">Sort failed: %1$s</string>
+    <string name="home_title_random">Picks for you</string>
+    <string name="home_toast_shuffled">Randomly shuffled</string>
+    <string name="home_toast_reshuffled">Shuffled again</string>
+    <string name="home_toast_deleted_shared_links">Shared links deleted</string>
+    <string name="home_toast_select_first_to_delete">Please select links to delete first</string>
+    <string name="home_dialog_title_batch_delete">Batch delete</string>
+    <string name="home_dialog_msg_batch_delete">Delete the %1$d selected links? This cannot be undone.</string>
+    <string name="home_toast_deleted_count">%1$d links deleted</string>
+    <string name="home_toast_select_first_to_add">Please select links to add first</string>
+    <string name="home_toast_added_count_to_subject">%1$d links added to subject</string>
+    <string name="home_toast_cannot_read_image">Cannot read the image</string>
+    <string name="home_toast_image_error">Error processing image: %1$s</string>
+    <string name="home_title_all_content">All content</string>
+    <string name="home_toast_tag_not_exist">Tag does not exist: %1$s</string>
+    <string name="home_toast_verify_tag_failed">Failed to verify tag: %1$s</string>
+    <string name="home_title_no_tag">No tag</string>
+    <string name="home_title_separator_plus"> + </string>
+    <string name="home_snackbar_tag_highlighted">Tag highlighted: %1$s</string>
+    <string name="home_snackbar_tag_unhighlighted">Highlight removed: %1$s</string>
+
+    <!-- PopupMenu items from home menu (LinksAdapter) -->
+    <string name="link_menu_edit_title">Edit title</string>
+    <string name="link_menu_delete">Delete</string>
+    <string name="link_menu_share_one">Share this link</string>
+    <string name="link_menu_toggle_pin">Toggle pin</string>
+    <string name="link_menu_enter_multi_select">Multi-select</string>
+    <string name="link_menu_get_summary">Fetch summary</string>
+    <string name="link_menu_add_to_desktop">Add to desktop</string>
+    <string name="link_menu_add_to_subject">Add to subject</string>
+
+    <!-- LinksAdapter summary/shortcut/remark/tag -->
+    <string name="link_progress_getting_summary">Fetching summary…</string>
+    <string name="link_toast_summary_success">Summary fetched</string>
+    <string name="link_toast_summary_failed_unparseable">Fetch failed: page content cannot be parsed</string>
+    <string name="link_toast_summary_failed_with_msg">Fetch failed: %1$s</string>
+    <string name="link_toast_login_or_unreachable">This link may require login or is not directly reachable</string>
+
+    <string name="link_icon_picker_use_website">Use website icon</string>
+    <string name="link_icon_picker_from_gallery">Pick from gallery</string>
+    <string name="link_icon_picker_use_default">Use default icon</string>
+    <string name="link_dialog_title_pick_icon">Choose shortcut icon</string>
+    <string name="link_toast_cannot_open_gallery">Cannot open gallery</string>
+    <string name="link_progress_getting_favicon">Fetching website icon…</string>
+    <string name="link_toast_shortcut_added">Shortcut added</string>
+    <string name="link_toast_shortcut_failed">Failed to create shortcut</string>
+    <string name="link_toast_shortcut_failed_with_msg">Failed to create shortcut: %1$s</string>
+
+    <string name="link_default_title">New link</string>
+
+    <string name="link_dialog_title_delete_confirm">Delete confirmation</string>
+    <string name="link_dialog_msg_delete_confirm">Are you sure you want to delete this link?</string>
+    <string name="link_dialog_ok">OK</string>
+
+    <string name="link_toast_cannot_open_link">Cannot open link: %1$s</string>
+    <string name="link_snackbar_cannot_open_link">Cannot open this link: %1$s</string>
+    <string name="link_click_count">%1$d reads</string>
+
+    <string name="link_show_more">Show more</string>
+    <string name="link_show_less">Show less</string>
+
+    <string name="link_remark_prefix">Note: %1$s</string>
+    <string name="link_view_full_remark">View full note</string>
+    <string name="link_dialog_title_full_remark">Full note</string>
+    <string name="link_dialog_title_edit_title">Edit title</string>
+    <string name="link_dialog_close">Close</string>
+
+    <string name="link_dialog_title_add_tag">Add tag</string>
+
+    <string name="link_dialog_title_add_remark">Add note</string>
+
+    <string name="pinned_header">Pinned</string>
+
+    <!-- HomeFragment showTagOptionsDialog items -->
+    <string name="tag_op_delete_tag">Delete tag</string>
+    <string name="tag_op_delete_tag_and_links">Delete tag and all related links</string>
+    <string name="tag_op_publish_to_website">Publish to website</string>
+    <string name="tag_op_toggle_highlight">Toggle highlight</string>
+    <string name="tag_op_dialog_title">Tag operations</string>
+    <string name="tag_op_confirm_delete_title">Confirm delete</string>
+    <string name="tag_op_confirm_delete_msg">Delete tag \"%1$s\"?</string>
+    <string name="tag_op_toast_tag_deleted">Tag deleted</string>
+    <string name="tag_op_toast_tag_delete_failed">Failed to delete tag: %1$s</string>
+    <string name="tag_op_toast_action_failed">Action failed: %1$s</string>
+    <string name="tag_op_snackbar_publish_pending">Publish feature pending migration to Sync module</string>
+    <string name="tag_op_dialog_title_add_new">Add new tag</string>
+    <string name="tag_op_button_add">Add</string>
+    <string name="tag_op_snackbar_tag_exists">Tag already exists</string>
+    <string name="tag_op_snackbar_tag_added">Tag added: %1$s</string>
+
+    <!-- Language settings (SettingFragment new section, 2.3.18) -->
+    <string name="language_section_title">Language</string>
+    <string name="language_option_system">Follow system</string>
+    <string name="language_option_chinese">中文</string>
+    <string name="language_option_english">English</string>
 </resources>

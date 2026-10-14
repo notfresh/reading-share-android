@@ -216,7 +216,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         
         // 首先添加置顶链接区域
         if (!pinnedLinks.isEmpty()) {
-            items.add("置顶");  // 添加置顶区域的标题
+            items.add(context.getString(R.string.pinned_header));  // 添加置顶区域的标题
             items.addAll(pinnedLinks);
         }
         
@@ -248,7 +248,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
         // 首先添加置顶链接区域
         if (!pinnedLinks.isEmpty()) {
-            items.add("置顶");  // 添加置顶区域的标题
+            items.add(context.getString(R.string.pinned_header));  // 添加置顶区域的标题
             items.addAll(pinnedLinks);
         }
 
@@ -614,14 +614,14 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     public void showActionDialog(View view, LinkItem item, int position) {
         Context wrapper = new ContextThemeWrapper(context, R.style.PopupMenuTheme);
         PopupMenu popup = new PopupMenu(wrapper, view);
-        popup.getMenu().add(0, 1, 0, "编辑标题");
-        popup.getMenu().add(0, 2, 0, "删除");
-        popup.getMenu().add(0, 3, 0, "分享单条");
-        popup.getMenu().add(0, 4, 0, "切换置顶");
-        popup.getMenu().add(0, 5, 0, "多选模式");
-        popup.getMenu().add(0, 6, 0, "获取摘要");
-        popup.getMenu().add(0, 7, 0, "添加到桌面");
-        popup.getMenu().add(0, 8, 0, "添加到主题");
+        popup.getMenu().add(0, 1, 0, context.getString(R.string.link_menu_edit_title));
+        popup.getMenu().add(0, 2, 0, context.getString(R.string.link_menu_delete));
+        popup.getMenu().add(0, 3, 0, context.getString(R.string.link_menu_share_one));
+        popup.getMenu().add(0, 4, 0, context.getString(R.string.link_menu_toggle_pin));
+        popup.getMenu().add(0, 5, 0, context.getString(R.string.link_menu_enter_multi_select));
+        popup.getMenu().add(0, 6, 0, context.getString(R.string.link_menu_get_summary));
+        popup.getMenu().add(0, 7, 0, context.getString(R.string.link_menu_add_to_desktop));
+        popup.getMenu().add(0, 8, 0, context.getString(R.string.link_menu_add_to_subject));
         
         popup.setOnMenuItemClickListener(menuItem -> {
             switch (menuItem.getItemId()) {
@@ -670,7 +670,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                     
                     // 显示加载对话框
                     ProgressDialog progressDialog = new ProgressDialog(view.getContext());
-                    progressDialog.setMessage("正在获取摘要...");
+                    progressDialog.setMessage(context.getString(R.string.link_progress_getting_summary));
                     progressDialog.setCancelable(true);
                     progressDialog.show();
                     
@@ -689,9 +689,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                                             System.currentTimeMillis(),
                                             LinkJson.toJsonString(item));
                                     notifyItemChanged(position);
-                                    Toast.makeText(view.getContext(), "摘要获取成功", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(view.getContext(), R.string.link_toast_summary_success, Toast.LENGTH_SHORT).show();
                                 } else {
-                                    Toast.makeText(view.getContext(), "获取摘要失败：网页内容无法解析", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(view.getContext(), R.string.link_toast_summary_failed_unparseable, Toast.LENGTH_SHORT).show();
                                 }
                                 // 重新启用菜单项
                                 popup.getMenu().findItem(6).setEnabled(true);
@@ -702,11 +702,11 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                                 String errorMsg = e.getMessage();
                                 // 处理特定错误情况
                                 if (errorMsg != null && errorMsg.contains("302")) {
-                                    errorMsg = "该链接可能需要登录或无法直接访问";
+                                    errorMsg = context.getString(R.string.link_toast_login_or_unreachable);
                                 }
                                 Log.e("LinksAdapter", "获取摘要失败: " + errorMsg);
-                                Toast.makeText(view.getContext(), 
-                                    "获取摘要失败：" + errorMsg, 
+                                Toast.makeText(view.getContext(),
+                                    context.getString(R.string.link_toast_summary_failed_with_msg, errorMsg),
                                     Toast.LENGTH_SHORT).show();
                                 // 重新启用菜单项
                                 popup.getMenu().findItem(6).setEnabled(true);
@@ -743,9 +743,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         input.setText(item.getTitle());
         
         new AlertDialog.Builder(view.getContext())
-                .setTitle("编辑标题")
+                .setTitle(R.string.link_dialog_title_edit_title)
                 .setView(input)
-                .setPositiveButton("确定", (dialog, which) -> {
+                .setPositiveButton(R.string.link_dialog_ok, (dialog, which) -> {
                     String newTitle = input.getText().toString();
                     if (!newTitle.isEmpty() && listener != null) {
                         listener.onUpdateLink(item, newTitle);
@@ -753,7 +753,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         notifyDataSetChanged();
                     }
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
@@ -761,10 +761,14 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
      * 显示图标选择对话框
      */
     private void showIconSelectionDialog(View view, LinkItem item, String url) {
-        String[] options = {"使用网站图标", "从相册选择", "使用默认图标"};
-        
+        String[] options = {
+                context.getString(R.string.link_icon_picker_use_website),
+                context.getString(R.string.link_icon_picker_from_gallery),
+                context.getString(R.string.link_icon_picker_use_default)
+        };
+
         new AlertDialog.Builder(view.getContext())
-                .setTitle("选择快捷方式图标")
+                .setTitle(R.string.link_dialog_title_pick_icon)
                 .setItems(options, (dialog, which) -> {
                     switch (which) {
                         case 0:
@@ -776,7 +780,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                             if (listener != null) {
                                 listener.onRequestCustomIcon(item, url);
                             } else {
-                                Toast.makeText(view.getContext(), "无法打开相册", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(view.getContext(), R.string.link_toast_cannot_open_gallery, Toast.LENGTH_SHORT).show();
                             }
                             break;
                         case 2:
@@ -785,7 +789,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                             break;
                     }
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
@@ -795,7 +799,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
     private void createShortcutWithWebsiteIcon(View view, LinkItem item, String url) {
         // 显示加载对话框
         ProgressDialog shortcutProgressDialog = new ProgressDialog(view.getContext());
-        shortcutProgressDialog.setMessage("正在获取网站图标...");
+        shortcutProgressDialog.setMessage(context.getString(R.string.link_progress_getting_favicon));
         shortcutProgressDialog.setCancelable(true);
         shortcutProgressDialog.show();
         
@@ -834,7 +838,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         finalFaviconBitmap
                     );
                     if (success) {
-                        Toast.makeText(view.getContext(), "已添加快捷方式", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(view.getContext(), R.string.link_toast_shortcut_added, Toast.LENGTH_SHORT).show();
                     }
                 });
                 
@@ -852,10 +856,10 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         null  // 使用默认图标
                     );
                     if (success) {
-                        Toast.makeText(view.getContext(), "已添加快捷方式", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(view.getContext(), R.string.link_toast_shortcut_added, Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(view.getContext(), 
-                            "创建快捷方式失败" + (finalErrorMessage != null ? ": " + finalErrorMessage : ""), 
+                        Toast.makeText(view.getContext(),
+                            context.getString(R.string.link_toast_shortcut_failed_with_msg, finalErrorMessage),
                             Toast.LENGTH_SHORT).show();
                     }
                 });
@@ -874,9 +878,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             null  // 使用默认图标
         );
         if (success) {
-            Toast.makeText(view.getContext(), "已添加快捷方式", Toast.LENGTH_SHORT).show();
+            Toast.makeText(view.getContext(), R.string.link_toast_shortcut_added, Toast.LENGTH_SHORT).show();
         } else {
-            Toast.makeText(view.getContext(), "创建快捷方式失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(view.getContext(), R.string.link_toast_shortcut_failed, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -885,15 +889,15 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
      */
     public void createShortcutWithCustomIcon(Context context, LinkItem item, String url, android.graphics.Bitmap customIcon) {
         boolean success = ShortcutUtil.createShortcut(
-            context, 
-            item.getTitle(), 
+            context,
+            item.getTitle(),
             url,
             customIcon
         );
         if (success) {
-            Toast.makeText(context, "已添加快捷方式", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.link_toast_shortcut_added, Toast.LENGTH_SHORT).show();
         } else {
-            Toast.makeText(context, "创建快捷方式失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.link_toast_shortcut_failed, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -936,7 +940,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         } catch (Exception e) {
             Log.e("ExtractTitle", "Error extracting title from URL", e);
         }
-        return "新链接";
+        return context.getString(R.string.link_default_title);
     }
 
     private String formatDate(long timestamp) {
@@ -950,14 +954,14 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     private void showDeleteConfirmDialog(LinkItem item) {
         new AlertDialog.Builder(context)
-                .setTitle("删除确认")
-                .setMessage("确定要删除这个链接吗？")
-                .setPositiveButton("确定", (dialog, which) -> {
+                .setTitle(R.string.link_dialog_title_delete_confirm)
+                .setMessage(context.getString(R.string.link_dialog_msg_delete_confirm))
+                .setPositiveButton(R.string.link_dialog_ok, (dialog, which) -> {
                     if (listener != null) {
                         listener.onDeleteLink(item);
                     }
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1122,7 +1126,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
         } catch (Exception e) {
             Log.e("LinksAdapter", "Error in openLink: " + e.getMessage(), e);
-            Toast.makeText(context, "无法打开链接: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, context.getString(R.string.link_toast_cannot_open_link, e.getMessage()), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1225,7 +1229,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             addTagButton.setOnClickListener(v -> showAddTagDialog(v.getContext(), item));
 
             // 显示阅读次数
-            clickCountText.setText("阅读 " + item.getClickCount() + " 次");  // 设置阅读次数
+            clickCountText.setText(context.getString(R.string.link_click_count, item.getClickCount()));  // 设置阅读次数
 
             // 添加选择模式的视觉反馈
             if (adapter.isSelectionMode) {
@@ -1272,7 +1276,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         //     adapter.openLink(v.getContext(), url, getAdapterPosition());
                         // }
                     } catch (Exception e) {
-                        Snackbar.make(v, "无法打开此链接: " + e.getMessage(), 
+                        Snackbar.make(v, context.getString(R.string.link_snackbar_cannot_open_link, e.getMessage()),
                                 Snackbar.LENGTH_LONG).show();
                     }
                 });
@@ -1294,14 +1298,14 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 summaryText.setMaxLines(1);
                 summaryText.setText(summary);
                 
-                showMoreText.setText("显示更多");
+                showMoreText.setText(R.string.link_show_more);
                 showMoreText.setOnClickListener(v -> {
                     if (summaryText.getMaxLines() == 1) {
                         summaryText.setMaxLines(Integer.MAX_VALUE);
-                        showMoreText.setText("收起");
+                        showMoreText.setText(R.string.link_show_less);
                     } else {
                         summaryText.setMaxLines(1);
-                        showMoreText.setText("显示更多");
+                        showMoreText.setText(R.string.link_show_more);
                     }
                 });
             } else {
@@ -1331,7 +1335,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                 }
 
                 remarkText.setVisibility(View.VISIBLE);
-                remarkText.setText("备注: " + remark);
+                remarkText.setText(context.getString(R.string.link_remark_prefix, remark));
                 remarkText.setMaxLines(5); // 列表里最多显示 5 行
                 remarkText.setEllipsize(android.text.TextUtils.TruncateAt.END);
 
@@ -1348,7 +1352,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
                     if (needsExpansion) {
                         showMoreRemarkText.setVisibility(View.VISIBLE);
-                        showMoreRemarkText.setText("查看完整备注");
+                        showMoreRemarkText.setText(R.string.link_view_full_remark);
                         // 点击 → 弹窗展示全文(不撑爆列表)
                         showMoreRemarkText.setOnClickListener(v ->
                                 showFullRemarkDialog(v.getContext(), finalRemark));
@@ -1376,9 +1380,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             tv.setTextIsSelectable(true); // 允许长按选中复制
             scroll.addView(tv);
             new android.app.AlertDialog.Builder(ctx)
-                    .setTitle("完整备注")
+                    .setTitle(R.string.link_dialog_title_full_remark)
                     .setView(scroll)
-                    .setPositiveButton("关闭", null)
+                    .setPositiveButton(R.string.link_dialog_close, null)
                     .show();
         }
 
@@ -1464,9 +1468,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
 
             AlertDialog dialog = new AlertDialog.Builder(context)
-                    .setTitle("添加标签")
+                    .setTitle(R.string.link_dialog_title_add_tag)
                     .setView(dialogView)
-                    .setPositiveButton("确定", (dialogInterface, which) -> {
+                    .setPositiveButton(R.string.link_dialog_ok, (dialogInterface, which) -> {
                         String tagName = input.getText().toString().trim();
                         String[] tags = tagName.split("[,，]");
                         List<String> tagList = new ArrayList<>();
@@ -1486,7 +1490,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         // adapter.listener.addTagToLink(item, ); //@mark.3
 
                     })
-                    .setNegativeButton("取消", null)
+                    .setNegativeButton(R.string.cancel, null)
                     .create();
             
             dialog.show();
@@ -1494,7 +1498,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
         private void showTagOptionsDialog(Context context, String tag, LinkItem item) {
             new AlertDialog.Builder(context)
-                    .setItems(new String[]{"删除标签"}, (dialog, which) -> {
+                    .setItems(new String[]{context.getString(R.string.tag_op_delete_tag)}, (dialog, which) -> {
                         item.removeTag(tag);
                         adapter.notifyItemChanged(getAdapterPosition());
                         // 同时更新数据库
@@ -1515,9 +1519,9 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             }
 
             AlertDialog dialog = new AlertDialog.Builder(context)
-                    .setTitle("添加备注")
+                    .setTitle(R.string.link_dialog_title_add_remark)
                     .setView(dialogView)
-                    .setPositiveButton("确定", (dialogInterface, which) -> {
+                    .setPositiveButton(R.string.link_dialog_ok, (dialogInterface, which) -> {
                         String remarkText = input.getText().toString();
                         
                         // 清理文本，移除多余空行
@@ -1532,7 +1536,7 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
                         // 刷新视图
                         adapter.notifyItemChanged(getAdapterPosition());
                     })
-                    .setNegativeButton("取消", null)
+                    .setNegativeButton(R.string.cancel, null)
                     .create();
             
             dialog.show();
