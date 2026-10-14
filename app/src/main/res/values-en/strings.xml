@@ -208,6 +208,62 @@
     <string name="tag_op_snackbar_tag_exists">Tag already exists</string>
     <string name="tag_op_snackbar_tag_added">Tag added: %1$s</string>
 
+    <!-- Setting page (fragment_slideshow.xml) -->
+    <string name="setting_default_launcher_title">Default starting tab</string>
+    <string name="setting_show_mail_entry">Show mail entry</string>
+    <string name="setting_show_random_entry">Show random entry</string>
+    <string name="setting_fab_position_title">FAB area position</string>
+    <string name="setting_fab_position_right">Right-handed (default, bottom-right)</string>
+    <string name="setting_fab_position_left">Left-handed (bottom-left)</string>
+    <string name="setting_browse_history_button">Browse history</string>
+    <string name="setting_export_button">Export all links</string>
+    <string name="setting_csv_format_hint">CSV format must match the export format</string>
+    <string name="setting_import_button">Import share links from CSV</string>
+    <string name="setting_event_log_button">Event log</string>
+    <string name="setting_server_config_title">Backend server settings</string>
+    <string name="setting_server_config_subtitle">Used for syncing link data</string>
+    <string name="setting_server_address_hint">Server address</string>
+    <string name="setting_sync_settings_title">Sync settings</string>
+    <string name="setting_sync_secret_hint">Sync secret</string>
+    <string name="setting_reading_mode_title">Reading mode</string>
+    <string name="setting_reading_mode_normal">Normal (control bar hidden)</string>
+    <string name="setting_reading_mode_smooth">Smooth (auto-hide control bar)</string>
+    <string name="setting_page_button_title">Page-turn button layout</string>
+    <string name="setting_page_button_bottom">Bottom row (prev/next only)</string>
+    <string name="setting_page_button_floating">Floating on the right (up/down arrows only)</string>
+    <string name="setting_page_button_both">Show both (default)</string>
+    <string name="setting_external_link_mode_title">External link open mode</string>
+    <string name="setting_external_link_ask">Confirm in dialog (default)</string>
+    <string name="setting_external_link_open">Open directly (auto-launch external app)</string>
+    <string name="setting_external_link_block">Block all (no external app opens)</string>
+    <string name="setting_override_rules_title">Override rules (per-URL open behavior)</string>
+    <string name="setting_override_rules_empty">No rules yet — all URLs fall back to the global mode</string>
+    <string name="setting_override_rules_add">+ Add rule</string>
+    <string name="setting_recent_tags_title">Recent tags window size</string>
+    <string name="setting_about_button">About</string>
+
+    <!-- Setting page runtime strings (SettingFragment.java) -->
+    <string name="setting_snackbar_saved_history">Saved: keep the most recent %1$d entries</string>
+    <string name="setting_sync_status_syncing">Syncing…</string>
+    <string name="setting_sync_status_ok">Synced: uploaded %1$d, downloaded %2$d</string>
+    <string name="setting_sync_status_failed">Sync failed: %1$s</string>
+    <string name="setting_chooser_csv_or_json">Choose a CSV or JSON file</string>
+    <string name="setting_import_dedup_checkbox">Skip duplicates (existing links are kept)</string>
+    <string name="setting_import_dialog_title">Import options</string>
+    <string name="setting_import_no_links">No links to import</string>
+    <string name="setting_import_summary">%1$s import done: %2$d added, %3$d duplicates skipped, %4$d failed</string>
+    <string name="setting_export_chooser_title">Choose export option</string>
+
+    <!-- Home dialog internals (dialog_add_tag.xml / dialog_add_remark.xml / item_link.xml) -->
+    <string name="home_dialog_add_tag_hint">Enter tag names, separate with commas</string>
+    <string name="home_dialog_add_tag_suggestion_label">Existing tags (auto-suggest as you type):</string>
+    <string name="home_dialog_add_tag_current_label">Current tags (tap to remove):</string>
+    <string name="home_dialog_add_tag_recent_label">Recently used tags:</string>
+    <string name="home_dialog_add_remark_hint">Add note content</string>
+    <string name="link_button_add_tag">Add tag</string>
+    <string name="link_button_add_remark">Note</string>
+    <string name="link_click_count_zero">0 reads</string>
+
     <!-- Language settings (SettingFragment new section, 2.3.18) -->
     <string name="language_section_title">Language</string>
     <string name="language_option_system">Follow system</string>

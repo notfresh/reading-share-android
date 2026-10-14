@@ -1,5 +1,30 @@
 ## B
 
+# 2.3.18.1
+特性:补完 Home 弹窗 / 设置页 中英双语(2.3.18 后续 patch,用户反馈添加弹窗内控件仍有中文)。
+
+## 范围
+- `dialog_add_tag.xml` 4 处 hint/label 外提(`home_dialog_add_tag_*`)
+- `dialog_add_remark.xml` 1 处 hint 外提(`home_dialog_add_remark_hint`)
+- `item_link.xml` 5 处:阅读 0 次默认 / 显示更多 / 添加标签按钮 / 备注按钮 / 查看完整备注
+  - "添加标签" → `link_button_add_tag`("Add tag")
+  - "备注" → `link_button_add_remark`("Note")
+  - "阅读 0 次" → `link_click_count_zero`("0 reads")
+  - "显示更多" / "查看完整备注" 复用 2.3.18 已有的 `link_show_more` / `link_view_full_remark`
+- `fragment_slideshow.xml`(设置页)32 处全部外提,新增 `setting_*` 30+ 个 string
+- `SettingFragment.java` 运行时 dialog/toast 全部外提:
+  - Snackbar "已保存：保留 N 条历史"
+  - 同步状态文本:正在同步 / 同步成功 / 同步失败
+  - 文件选择器 / 导入对话框 / 导出对话框的 title + 确定/取消 + 去重 checkbox + 导入结果摘要
+
+## 命名约定补充
+- `home_dialog_add_tag_*` — 添加标签 dialog 内部
+- `home_dialog_add_remark_hint` — 添加备注 dialog 内部
+- `link_button_*` — 列表项内按钮文字(独立于 `link_menu_*` / `link_dialog_*`)
+- `link_click_count_zero` — 布局默认 "0 reads"(运行时真实值走 `link_click_count` + `%1$d`)
+- `setting_*` — 设置页区块
+- `setting_import_summary` 占位:`%1$s`=格式(CSV/JSON)、`%2$d`=导入成功、`%3$d`=跳过重复、`%4$d`=失败
+
 # 2.3.18
 特性:HomeFragment 中英双语 + 设置页语言切换(跟随系统 / 中文 / English)。
 

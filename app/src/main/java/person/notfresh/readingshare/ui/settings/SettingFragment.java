@@ -386,7 +386,7 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
                 if (count > 100) count = 100;
                 historyManager.setMaxCount(count);
                 maxCountInput.setText(String.valueOf(count));
-                Snackbar.make(requireView(), "已保存：保留 " + count + " 条历史", Snackbar.LENGTH_SHORT).show();
+                Snackbar.make(requireView(), getString(R.string.setting_snackbar_saved_history, count), Snackbar.LENGTH_SHORT).show();
             }
         });
 
@@ -487,18 +487,18 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
      * 执行同步操作
      */
     private void performSync() {
-        syncStatusText.setText("正在同步...");
+        syncStatusText.setText(R.string.setting_sync_status_syncing);
 
         new Thread(() -> {
             SimpleSyncManager.SyncResult result = syncManager.sync();
 
             requireActivity().runOnUiThread(() -> {
                 if (result.success) {
-                    String status = String.format("同步成功: 上传 %d 条, 下载 %d 条",
-                        result.uploadedCount, result.downloadedCount);
+                    String status = getString(R.string.setting_sync_status_ok,
+                            result.uploadedCount, result.downloadedCount);
                     syncStatusText.setText(status);
                 } else {
-                    syncStatusText.setText("同步失败: " + result.message);
+                    syncStatusText.setText(getString(R.string.setting_sync_status_failed, result.message));
                 }
             });
         }).start();
@@ -510,7 +510,7 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         // 使用通配符，支持多种文件类型
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(Intent.createChooser(intent, "选择 CSV 或 JSON 文件"), REQUEST_CODE_IMPORT_FILE);
+        startActivityForResult(Intent.createChooser(intent, getString(R.string.setting_chooser_csv_or_json)), REQUEST_CODE_IMPORT_FILE);
     }
 
     private Uri pendingImportUri; // 待导入的文件 URI
@@ -534,23 +534,23 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
     private void showImportOptionsDialog() {
         // 创建复选框
         CheckBox checkBox = new CheckBox(requireContext());
-        checkBox.setText("去重（跳过已存在的链接）");
+        checkBox.setText(R.string.setting_import_dedup_checkbox);
         checkBox.setChecked(true); // 默认勾选去重
-        
+
         // 创建布局容器
         LinearLayout layout = new LinearLayout(requireContext());
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(50, 40, 50, 10);
         layout.addView(checkBox);
-        
+
         new AlertDialog.Builder(requireContext())
-            .setTitle("导入选项")
+            .setTitle(R.string.setting_import_dialog_title)
             .setView(layout)
-            .setPositiveButton("确定", (dialog, which) -> {
+            .setPositiveButton(R.string.link_dialog_ok, (dialog, which) -> {
                 boolean removeDuplicates = checkBox.isChecked();
                 performImport(removeDuplicates);
             })
-            .setNegativeButton("取消", null)
+            .setNegativeButton(R.string.cancel, null)
             .show();
     }
 
@@ -567,7 +567,7 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         ImportUtil.ImportResult result = ImportUtil.importFromUri(requireContext(), pendingImportUri);
         
         if (result.items == null || result.items.isEmpty()) {
-            Snackbar.make(requireView(), "没有可导入的链接", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(requireView(), R.string.setting_import_no_links, Snackbar.LENGTH_SHORT).show();
             return;
         }
         
@@ -624,22 +624,13 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         }
         
         // 显示导入结果
-        StringBuilder message = new StringBuilder();
-        message.append(result.format).append(" 导入完成");
-        
-        if (importedCount > 0) {
-            message.append("，成功导入 ").append(importedCount).append(" 条");
-        }
-        
-        if (removeDuplicates && duplicateCount > 0) {
-            message.append("，跳过 ").append(duplicateCount).append(" 条重复链接");
-        }
-        
-        if (result.errorCount > 0) {
-            message.append("，失败 ").append(result.errorCount).append(" 条");
-        }
-        
-        Snackbar.make(requireView(), message.toString(), Snackbar.LENGTH_LONG).show();
+        Snackbar.make(requireView(),
+                getString(R.string.setting_import_summary,
+                        result.format,
+                        importedCount,
+                        removeDuplicates ? duplicateCount : 0,
+                        result.errorCount),
+                Snackbar.LENGTH_LONG).show();
         
         // 清空待导入的 URI
         pendingImportUri = null;
@@ -658,19 +649,19 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         RadioButton saveRadio = dialogView.findViewById(R.id.radio_save);
         
         AlertDialog dialog = new AlertDialog.Builder(requireContext())
-            .setTitle("选择导出方式")
+            .setTitle(R.string.setting_export_chooser_title)
             .setView(dialogView)
-            .setPositiveButton("确定", (d, which) -> {
+            .setPositiveButton(R.string.link_dialog_ok, (d, which) -> {
                 boolean isJson = (formatGroup.getCheckedRadioButtonId() == jsonRadio.getId());
                 boolean isSave = (actionGroup.getCheckedRadioButtonId() == saveRadio.getId());
-                
+
                 if (isSave) {
                     exportAndSave(isJson);
                 } else {
                     exportAndShare(isJson);
                 }
             })
-            .setNegativeButton("取消", null)
+            .setNegativeButton(R.string.cancel, null)
             .create();
         
         dialog.show();

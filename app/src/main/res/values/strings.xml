@@ -209,6 +209,62 @@
     <string name="tag_op_snackbar_tag_exists">标签已存在</string>
     <string name="tag_op_snackbar_tag_added">已添加标签：%1$s</string>
 
+    <!-- 设置页 (fragment_slideshow.xml) -->
+    <string name="setting_default_launcher_title">选择默认启动页</string>
+    <string name="setting_show_mail_entry">显示邮件入口</string>
+    <string name="setting_show_random_entry">显示随机入口</string>
+    <string name="setting_fab_position_title">FAB 区域位置</string>
+    <string name="setting_fab_position_right">右手模式(默认,右下角)</string>
+    <string name="setting_fab_position_left">左手模式(左下角)</string>
+    <string name="setting_browse_history_button">浏览历史</string>
+    <string name="setting_export_button">导出所有链接</string>
+    <string name="setting_csv_format_hint">CSV的格式需要与导出格式匹配</string>
+    <string name="setting_import_button">从CSV导入分享链接</string>
+    <string name="setting_event_log_button">事件日志</string>
+    <string name="setting_server_config_title">后台服务器设置</string>
+    <string name="setting_server_config_subtitle">用于同步链接数据</string>
+    <string name="setting_server_address_hint">服务器地址</string>
+    <string name="setting_sync_settings_title">同步设置</string>
+    <string name="setting_sync_secret_hint">同步密钥</string>
+    <string name="setting_reading_mode_title">阅读模式</string>
+    <string name="setting_reading_mode_normal">常规（不显示控制层）</string>
+    <string name="setting_reading_mode_smooth">平滑（自动隐藏控制层）</string>
+    <string name="setting_page_button_title">翻页按钮显示方式</string>
+    <string name="setting_page_button_bottom">底部横排（仅上一篇/下一篇）</string>
+    <string name="setting_page_button_floating">右侧悬浮（仅上下箭头）</string>
+    <string name="setting_page_button_both">都显示（默认）</string>
+    <string name="setting_external_link_mode_title">外部链接打开模式</string>
+    <string name="setting_external_link_ask">弹窗确认（默认）</string>
+    <string name="setting_external_link_open">直接跳转（自动打开外部应用）</string>
+    <string name="setting_external_link_block">全部拦截（禁止打开外部应用）</string>
+    <string name="setting_override_rules_title">拦截名单(对部分网址单独配置跳转规则)</string>
+    <string name="setting_override_rules_empty">暂无拦截名单,所有 URL 走全局模式</string>
+    <string name="setting_override_rules_add">+ 添加规则</string>
+    <string name="setting_recent_tags_title">最近使用的标签窗口大小</string>
+    <string name="setting_about_button">关于</string>
+
+    <!-- 设置页 (SettingFragment.java 运行时 dialog/toast) -->
+    <string name="setting_snackbar_saved_history">已保存：保留 %1$d 条历史</string>
+    <string name="setting_sync_status_syncing">正在同步...</string>
+    <string name="setting_sync_status_ok">同步成功: 上传 %1$d 条, 下载 %2$d 条</string>
+    <string name="setting_sync_status_failed">同步失败: %1$s</string>
+    <string name="setting_chooser_csv_or_json">选择 CSV 或 JSON 文件</string>
+    <string name="setting_import_dedup_checkbox">去重（跳过已存在的链接）</string>
+    <string name="setting_import_dialog_title">导入选项</string>
+    <string name="setting_import_no_links">没有可导入的链接</string>
+    <string name="setting_import_summary">%1$s 导入完成，成功导入 %2$d 条，跳过 %3$d 条重复链接，失败 %4$d 条</string>
+    <string name="setting_export_chooser_title">选择导出方式</string>
+
+    <!-- Home 弹窗内部文案 (dialog_add_tag.xml / dialog_add_remark.xml / item_link.xml) -->
+    <string name="home_dialog_add_tag_hint">输入标签名称,可以使用逗号隔开</string>
+    <string name="home_dialog_add_tag_suggestion_label">已有标签(输入即联想):</string>
+    <string name="home_dialog_add_tag_current_label">当前标签（点击可删除）:</string>
+    <string name="home_dialog_add_tag_recent_label">最近使用的标签:</string>
+    <string name="home_dialog_add_remark_hint">添加备注内容</string>
+    <string name="link_button_add_tag">添加标签</string>
+    <string name="link_button_add_remark">备注</string>
+    <string name="link_click_count_zero">阅读 0 次</string>
+
     <!-- 语言设置 (SettingFragment 新增区域, 2.3.18) -->
     <string name="language_section_title">语言</string>
     <string name="language_option_system">跟随系统</string>
