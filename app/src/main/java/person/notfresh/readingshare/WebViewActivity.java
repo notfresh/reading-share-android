@@ -85,8 +85,6 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     private String currentUrl;
     private boolean audioPlaying = false;
     private boolean isAppInForeground = true;
-    private boolean isCollapsedToMini = false;
-    private CollapsedPlaybackSession.PlaybackController playbackController;
     private MediaSessionCompat mediaSession;
     private PowerManager.WakeLock wakeLock;
     private AudioManager audioManager;
@@ -234,40 +232,25 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
 
     @Override
     protected void onDestroy() {
-        Log.d("WVCollapse", "onDestroy 进入,isCollapsedToMini=" + isCollapsedToMini + ", webView=" + (webView == null ? "null" : "not null"));
-        if (!isCollapsedToMini) {
-            // 清理 WebView 实例;但**不清**磁盘/HTTP 缓存 —— 那是"下次打开快"的唯一来源
-            if (webView != null) {
-                webView.stopLoading();
-                webView.clearHistory();
-                webView.destroy();
-            }
+        Log.d("WebViewActivity", "onDestroy webView=" + (webView == null ? "null" : "not null"));
+        // 清理 WebView 实例;但**不清**磁盘/HTTP 缓存 —— 那是"下次打开快"的唯一来源
+        if (webView != null) {
+            webView.stopLoading();
+            webView.clearHistory();
+            webView.destroy();
         }
-
-        // 折叠到 mini 场景下不拆毁音频链路:service 继续保活,MediaCallback/媒体会话/音频焦点都不动
-        if (!isCollapsedToMini) {
-            // 有 mini 在悬浮(有折叠页存活)时,Service 和 MediaCallback 是全局音频链路,
-            // 归折叠页所有,本 Activity 退出不该碰 —— 否则折叠页的通知栏控制断、mini 被卸载.
-            if (!CollapsedPlaybackSession.getInstance().isActive()) {
-                stopService(new Intent(this, WebViewBackgroundService.class));
-            }
-            // 以下是本 Activity 自己的资源,无论是否有 mini 都正常释放
-            if (audioManager != null && audioFocusRequest != null) {
-                audioManager.abandonAudioFocusRequest(audioFocusRequest);
-            }
-            if (mediaSession != null) {
-                mediaSession.setActive(false);
-                mediaSession.release();
-                mediaSession = null;
-            }
-            if (wakeLock != null && wakeLock.isHeld()) {
-                wakeLock.release();
-                wakeLock = null;
-            }
-        } else {
-            // 折叠场景仅清 Activity 持有的引用,但 service 与 mediaSession 都还在
-            webView = null;
-            isCollapsedToMini = false; // 重置,下次 onDestroy 是正常路径
+        stopService(new Intent(this, WebViewBackgroundService.class));
+        if (audioManager != null && audioFocusRequest != null) {
+            audioManager.abandonAudioFocusRequest(audioFocusRequest);
+        }
+        if (mediaSession != null) {
+            mediaSession.setActive(false);
+            mediaSession.release();
+            mediaSession = null;
+        }
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+            wakeLock = null;
         }
         super.onDestroy();
     }
@@ -311,16 +294,10 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
             webView.onResume();
             webView.resumeTimers();
         }
-        if (ownsCollapsedSession()) {
-            CollapsedPlaybackSession.getInstance().clear();
-            isCollapsedToMini = false;
-            stopService(new Intent(this, WebViewBackgroundService.class));
-        } else if (!CollapsedPlaybackSession.getInstance().isActive()) {
-            // 回到前台，前台服务不再需要（进程已安全）
-            stopService(new Intent(this, WebViewBackgroundService.class));
-            if (wakeLock != null && wakeLock.isHeld()) {
-                wakeLock.release();
-            }
+        // 回到前台,前台保活服务不再需要(进程已在前台)
+        stopService(new Intent(this, WebViewBackgroundService.class));
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
         }
     }
 
@@ -420,57 +397,9 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
             }
             AddOverrideRuleDialog.showDialog(getSupportFragmentManager(), contextUrlForDialog);
             return true;
-        } else if (item.getItemId() == R.id.action_collapse_to_mini) {
-            collapseToMiniPlayer();
-            return true;
         }
         return super.onOptionsItemSelected(item);
     }
-
-    private void collapseToMiniPlayer() {
-        Log.d("WVCollapse", "collapseToMiniPlayer 进入,currentUrl=" + currentUrl + ", webView null? " + (webView == null));
-        if (currentUrl == null || webView == null) {
-            Toast.makeText(this, "无内容可折叠", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (!android.provider.Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "请授予悬浮窗权限以使用折叠播放", Toast.LENGTH_SHORT).show();
-            Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    android.net.Uri.parse("package:" + getPackageName()));
-            try {
-                startActivity(intent);
-            } catch (Exception e) {
-                Log.e("WVCollapse", "跳悬浮窗权限失败", e);
-            }
-            return;
-        }
-        Log.d("WVCollapse", "权限 OK,开始折叠流程");
-        CollapsedPlaybackSession session = CollapsedPlaybackSession.getInstance();
-        if (session.isActive() && session.getOwnerController() != playbackController) {
-            session.getOwnerController().stop();
-            session.clear();
-            stopService(new Intent(this, WebViewBackgroundService.class));
-        }
-        isCollapsedToMini = session.activate(getTaskId(), currentUrl, playbackController);
-        if (!isCollapsedToMini) {
-            Toast.makeText(this, "折叠播放初始化失败", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        // 不摘 WebView、不 finish。整个 task 退到后台,WebView 挂在原窗口上只是不可见,
-        // 走 BackgroundAudioWebView 拦截 onWindowVisibilityChanged(GONE) 的路径,音频继续.
-        // 记录 taskId,mini 展开时把整个 task 拉回前台.
-        // 启动 Service 显示 mini
-        Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
-        serviceIntent.setAction(WebViewBackgroundService.ACTION_SHOW_MINI);
-        startForegroundService(serviceIntent);
-        // 折叠时也要拿 WakeLock,防止 CPU 休眠导致音频断.
-        if (wakeLock != null && !wakeLock.isHeld()) {
-            wakeLock.acquire(30 * 60 * 1000L);
-        }
-        moveTaskToBack(true);
-        Log.d("WVCollapse", "Service 已启动,task 退后台,taskId=" + getTaskId() + ",音频继续");
-    }
-
 
     private void setupWebView() {
         attachControlRevealTouchListener();
@@ -1081,14 +1010,12 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     protected void onPause() {
         isAppInForeground = false;
         saveReadingPosition();
-        // 普通页面不能触碰当前折叠 session 的 Service.
-        if (!isCollapsedToMini && !CollapsedPlaybackSession.getInstance().isActive()) {
-            // 无条件启动前台服务保活进程，不请求 AudioFocus（WebView 自己管理焦点）
-            Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
-            startForegroundService(serviceIntent);
-            if (wakeLock != null && !wakeLock.isHeld()) {
-                wakeLock.acquire(30 * 60 * 1000L);
-            }
+        // 退后台/锁屏期间由前台服务 + WakeLock 保活,保证 WebView 里的音频不断。
+        // 不请求 AudioFocus(WebView 自己管理焦点)。
+        Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
+        startForegroundService(serviceIntent);
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            wakeLock.acquire(30 * 60 * 1000L);
         }
         super.onPause();
     }
@@ -1194,35 +1121,6 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
                         PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
                 .build());
 
-        playbackController = new CollapsedPlaybackSession.PlaybackController() {
-            @Override
-            public void play() {
-                runOnUiThread(() -> evaluateMediaCommand("if(window.__playMedia)window.__playMedia()"));
-            }
-
-            @Override
-            public void pause() {
-                runOnUiThread(() -> evaluateMediaCommand("if(window.__pauseMedia)window.__pauseMedia()"));
-            }
-
-            @Override
-            public void stop() {
-                runOnUiThread(() -> evaluateMediaCommand("if(window.__stopMedia)window.__stopMedia()"));
-            }
-        };
-    }
-
-    private void evaluateMediaCommand(String script) {
-        if (webView != null) {
-            webView.evaluateJavascript(script, null);
-        }
-    }
-
-    private boolean ownsCollapsedSession() {
-        CollapsedPlaybackSession session = CollapsedPlaybackSession.getInstance();
-        return session.isActive()
-                && session.getOwnerTaskId() == getTaskId()
-                && session.getOwnerController() == playbackController;
     }
 
     private void onMediaPlayingChanged(boolean isPlaying) {
@@ -1240,8 +1138,7 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
         // 不在这里请求/放弃 AudioFocus，WebView 自己管理音频焦点。
         // 不在后台时因为播放状态变化停止服务，防止瞬时波动导致服务被杀。
         // 服务的停止统一由 onResume 和 onDestroy 管理。
-        // 有 mini 在悬浮(有折叠页)时不能停 Service,否则 mini 被卸载,入口丢失
-        if (!isPlaying && isAppInForeground && !CollapsedPlaybackSession.getInstance().isActive()) {
+        if (!isPlaying && isAppInForeground) {
             // 前台音频停止播放时，可以停止服务
             stopService(new Intent(WebViewActivity.this, WebViewBackgroundService.class));
             if (wakeLock != null && wakeLock.isHeld()) {

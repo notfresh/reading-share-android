@@ -49,14 +49,7 @@
         android:id="@+id/action_link_history"
         android:title="@string/link_history"
         app:showAsAction="never"/>
-
-    <item
-        android:id="@+id/action_collapse_to_mini"
-        android:title="折叠"
-        android:icon="@android:drawable/ic_menu_revert"
-        app:showAsAction="ifRoom"/>
-
-    <item
+<item
         android:id="@+id/action_configure_override_rule"
         android:title="@string/configure_override_rule"
         app:showAsAction="never"/>

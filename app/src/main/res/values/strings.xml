@@ -311,4 +311,6 @@
     <string name="language_option_system">跟随系统</string>
     <string name="language_option_chinese">中文</string>
     <string name="language_option_english">English</string>
+    <string name="webview_bg_service_title">后台播放</string>
+    <string name="webview_bg_service_text">点击返回应用</string>
 </resources>

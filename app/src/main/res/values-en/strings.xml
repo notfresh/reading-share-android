@@ -310,4 +310,6 @@
     <string name="language_option_system">Follow system</string>
     <string name="language_option_chinese">中文</string>
     <string name="language_option_english">English</string>
+    <string name="webview_bg_service_title">Playing in background</string>
+    <string name="webview_bg_service_text">Tap to return to the app</string>
 </resources>
