@@ -10,12 +10,12 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.webkit.WebView;
 import android.widget.Toast;
 
 import androidx.appcompat.content.res.AppCompatResources;
+import androidx.appcompat.view.SupportMenuInflater;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 
@@ -99,7 +99,9 @@ public final class WebViewMenuActions {
 
     public void inflate(Menu menu) {
         if (menu == null) return;
-        new MenuInflater(host.context()).inflate(R.menu.webview_menu, menu);
+        // 必须用 SupportMenuInflater(读 app:showAsAction),不能用平台 android.view.MenuInflater(只读 android:showAsAction)。
+        // 平台那个会把 webview_menu.xml 里的 app:showAsAction="always" 当没写 = NEVER,三项常驻按钮全被塞进溢出菜单(2.3.21.10)。
+        new SupportMenuInflater(host.context()).inflate(R.menu.webview_menu, menu);
         applyVisibility(menu);
         tintBlockIcon(menu);
     }

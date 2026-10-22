@@ -1,3 +1,51 @@
+# 2.3.21.10
+
+修复：阅读页 toolbar 的三个常驻按钮（加标签 / 改标题 / 切换拦截）仍不显示，只剩 ⋮。
+2.3.21.7 / 2.3.21.9 两次都修错了地方。
+
+## 真根因：inflater 类型不对，不是 setHasOptionsMenu 位置
+
+`WebViewMenuActions.inflate()` 用的是**平台** `android.view.MenuInflater`：
+
+```java
+new MenuInflater(host.context()).inflate(R.menu.webview_menu, menu);
+```
+
+`webview_menu.xml` 三项写的是 `app:showAsAction="always"`，而平台
+`MenuInflater` 只读 `android:showAsAction`（框架内部 attr），**不认 `app:` 命名空间**
+→ 三项 showAsAction 落到默认 0 = NEVER → 全进溢出菜单。
+
+项目内其余 8 个 fragment 用宿主注入的 `inflater.inflate(...)`（AppCompatActivity 传的
+是 `SupportMenuInflater`，它读 `app:showAsAction`），所以只有走
+`WebViewMenuActions` 的阅读页翻车。WebViewActivity 自己 `getMenuInflater()`
+拿到的也是 SupportMenuInflater，因此那条路一直是对的。
+
+## 改动
+
+- `WebViewMenuActions.inflate()`：`new MenuInflater` → `new SupportMenuInflater`
+- 版本 2.3.21.9 → 2.3.21.10（versionCode 67 → 68）
+
+## 教训
+
+- **两次错误修复的共同点**：都在"宿主时序 / 菜单合并顺序"这条路上找，
+  因为症状（按钮不见了）确实像时序问题。真正该先验证的是
+  **"这个 XML 属性到底被谁读、读到没有"** —— 症状是"属性没生效"时，
+  先查消费方用什么 API 解析，比查声明时机便宜得多。
+  验证手段：`javap` 解 framework/appcompat 的 `MenuInflater$MenuState`，
+  看它 `getstatic R$styleable.MenuItem_showAsAction` —— SupportMenuInflater 读
+  `app:` 那份，平台那个读不到同名 attr。
+- 判别速查：项目内**只有一处** `new MenuInflater(...)`（其余全用注入的
+  `inflater.inflate`）——这种"同 app 内两种 inflater 混用"就是本题的特征指纹。
+- aapt2 dump XML 只能证明**资源编对了**，证明不了**运行时有没有被读**。
+  2.3.21.9 的排查正是被这条误导的。
+
+## 验证
+
+- `./gradlew clean assembleDebug` → 36 actionable tasks: 36 executed，BUILD SUCCESSFUL
+- APK sha256 `d36d1c7697b3fe6ea4b0437cf2efbb6799d56c1e6f28438924f309ad966f9ede`
+- dex 反查：`classes14.dex` 里 `WebViewMenuActions` 段含 `SupportMenuInflater` 引用
+  （改前只有平台 `MenuInflater`）
+
 # 2.3.21.9
 
 修复：阅读页 toolbar 的三个常驻按钮（加标签 / 改标题 / 切换拦截）仍不显示，只剩 ⋮。
