@@ -214,6 +214,14 @@ public class MainActivity extends AppCompatActivity {
                 updateFabExpandState();
             });
 
+            // 槽位 2:打开阅读页(2.3.19.9)。已在阅读页则不再压栈
+            binding.appBarMain.fabSlot2.setOnClickListener(view -> {
+                if (navController == null) return;
+                NavDestination dest = navController.getCurrentDestination();
+                if (dest != null && dest.getId() == R.id.nav_reader) return;
+                navigateTo(R.id.nav_reader);
+            });
+
             // 槽位 1:切换 链接/主题(跨 fragment 一直显示)
             binding.appBarMain.fabSlot1.setOnClickListener(view -> {
                 if (navController == null) return;
@@ -223,9 +231,10 @@ public class MainActivity extends AppCompatActivity {
                 navigateTo(targetId);
             });
 
-            // destination 变化时同步 fab_random 显隐
+            // destination 变化时同步 fab_random 显隐 + 槽位 2(打开阅读)显隐
             navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
                 updateRandomFabVisibility();
+                updateFabExpandState();
             });
 
             updateRandomFabVisibility();
@@ -295,6 +304,13 @@ public class MainActivity extends AppCompatActivity {
         return id == R.id.nav_home || id == R.id.nav_subject;
     }
 
+    /** 当前是否已经在阅读页(用于收起"打开阅读"槽位)。 */
+    private boolean isOnReaderDestination() {
+        if (navController == null) return false;
+        NavDestination dest = navController.getCurrentDestination();
+        return dest != null && dest.getId() == R.id.nav_reader;
+    }
+
     public void updateRandomFabVisibility() {
         if (binding == null || binding.appBarMain == null || binding.appBarMain.fabRandom == null) {
             return;
@@ -317,7 +333,8 @@ public class MainActivity extends AppCompatActivity {
     private void updateFabExpandState() {
         if (binding == null || binding.appBarMain == null) return;
         binding.appBarMain.fabSlot1.setVisibility(View.VISIBLE);  // 始终显示
-        int vis = isFabExpanded ? View.VISIBLE : View.GONE;
+        // 槽位 2 = 打开阅读;已经在阅读页就没有意义,直接收起
+        int vis = (isFabExpanded && !isOnReaderDestination()) ? View.VISIBLE : View.GONE;
         binding.appBarMain.fabSlot2.setVisibility(vis);
     }
 

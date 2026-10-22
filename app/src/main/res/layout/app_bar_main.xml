@@ -42,7 +42,7 @@
             app:srcCompat="@drawable/ic_switch_page"
             android:contentDescription="切换链接/主题" />
 
-        <!-- 槽位 2:预留次级功能(目前空) -->
+        <!-- 槽位 2:打开阅读页(2.3.19.9),随折叠展开显隐 -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fab_slot_2"
             android:layout_width="wrap_content"
@@ -50,7 +50,8 @@
             android:layout_marginBottom="8dp"
             android:visibility="gone"
             android:alpha="0.5"
-            android:contentDescription="槽位2" />
+            app:srcCompat="@drawable/ic_reader"
+            android:contentDescription="@string/fab_open_reader" />
 
         <!-- 展开/折叠 toggle:在主按钮正上方 -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton

@@ -1,3 +1,23 @@
+# 2.3.19.9
+FAB 空槽位接上阅读页 + 阅读图标重绘。
+
+## 改动
+- `fab_slot_2`(原预留空槽,`gone`)→「打开阅读」:图标 `ic_reader`,点击 `navigateTo(nav_reader)`;
+  已在阅读页时该槽位自动收起、重复点击不压栈
+- 新增 `drawable/ic_reader.xml`:摊开的书 + 右上角翻起的一页(半透明)。
+  轮廓是"打开的书",与 `ic_switch_page`(来回箭头,槽位 1 用)完全不同,不再撞脸
+- 抽屉菜单「阅读」的 icon 从 `ic_switch_page` 换成 `ic_reader`
+- 新增文案 `fab_open_reader`(打开阅读 / Open reader),中英同步
+
+## 槽位语义(未变)
+- `fab_slot_1` 恒显示(切换 链接/主题)
+- `fab_slot_2` 随 `isFabExpanded` 显隐;`isFabExpanded` 由 `fab_expand_toggle` 切换,
+  而该 toggle 只在 首页/主题 页出现(主随机 fab 同进退),所以在其它 Tab 下展不开属预期
+
+## 验证
+图标用 SVG 复渲染核对 24/36/48/56px 与深色、白底两种情况,24dp 下仍可辨识;
+`./gradlew clean assembleDebug` BUILD SUCCESSFUL,36/36 executed
+
 # 2.3.19.8
 设置页下拉风格统一：默认Tab / 最近标签窗口 从裸 Spinner 换成 Material exposed dropdown。
 

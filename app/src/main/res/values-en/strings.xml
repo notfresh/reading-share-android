@@ -40,6 +40,7 @@
     <string name="reader_external_open_failed">Cannot open this link: %1$s</string>
     <string name="reader_source_section_title">Reader data source</string>
     <string name="reader_source_hint_type">Source type</string>
+    <string name="fab_open_reader">Open reader</string>
     <string name="setting_default_tab_hint">Start page</string>
     <string name="setting_recent_tags_window_hint">Window size</string>
     <string name="reader_source_no_options">No options available for this type</string>
