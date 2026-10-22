@@ -1,15 +1,10 @@
 package person.notfresh.readingshare;
 
 
-import android.content.ClipboardManager;
-import android.content.ClipData;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -48,8 +43,6 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import android.widget.EditText;
 import android.widget.TextView;
@@ -63,27 +56,23 @@ import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.dialog.AddOverrideRuleDialog;
 import person.notfresh.readingshare.model.OverrideAction;
 import person.notfresh.readingshare.model.WebViewOverrideRule;
-import person.notfresh.readingshare.ui.webview.AddTagDialog;
-import person.notfresh.readingshare.ui.webview.EditTitleDialog;
-import person.notfresh.readingshare.ui.webview.PageTarget;
+import person.notfresh.readingshare.ui.webview.WebViewMenuActions;
 import person.notfresh.readingshare.ui.webview.WebViewNavControls;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ReadingPositionStore;
 import person.notfresh.readingshare.util.WebViewDefaults;
 import person.notfresh.readingshare.util.WebViewOverrideRules;
-import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
-import person.notfresh.readingshare.util.ShareUtil;
 import person.notfresh.readingshare.util.TagSuggestionHelper;
-import androidx.appcompat.content.res.AppCompatResources;
-import androidx.core.graphics.drawable.DrawableCompat;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.snackbar.Snackbar;
 
-public class WebViewActivity extends AppCompatActivity implements AddOverrideRuleDialog.OnRuleSubmitListenerActivity {
+public class WebViewActivity extends AppCompatActivity
+        implements AddOverrideRuleDialog.OnRuleSubmitListenerActivity,
+        WebViewMenuActions.Host, WebViewMenuActions.Page {
     private WebView webView;
     private Toolbar toolbar;
     private String currentUrl;
@@ -109,6 +98,8 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     private Random random = new Random();
     private static final int CONTROLS_AUTO_HIDE_MS = 3000;
     private WebViewNavControls navControls;
+    /** 菜单动作统一走这一份(目标2);菜单资源 res/menu/webview_menu.xml。 */
+    private WebViewMenuActions menuActions;
 
     private static final String PREFS_NAME = "settings";
     private static final String KEY_NAV_CONTROLS_HIDDEN = "nav_controls_hidden";
@@ -121,6 +112,7 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
         parseNavigationContext();
         setupNavigationControls();
         initControlsIfNeeded();
+        menuActions = new WebViewMenuActions(this, this);
 
         // 初始化 Toolbar
         toolbar = findViewById(R.id.toolbar);
@@ -188,21 +180,13 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
         getMenuInflater().inflate(R.menu.webview_menu, menu);
 
         // 普通模式不显示"显示/隐藏导航控件"菜单项
-        if (!isSmoothReadingMode()) {
-            MenuItem toggleItem = menu.findItem(R.id.action_toggle_navigation);
-            if (toggleItem != null) {
-                toggleItem.setVisible(false);
-            }
-        }
-
-        // 添加调试代码
-        MenuItem item = menu.findItem(R.id.action_open_browser);
-        if (item == null) {
-            Log.e("WebViewActivityMenu", "菜单项加载失败");
+        MenuItem toggleItem = menu.findItem(R.id.action_wv_toggle_navigation);
+        if (toggleItem != null && !isSmoothReadingMode()) {
+            toggleItem.setVisible(false);
         }
 
         // 拦截模式图标染色:红=拦截 / 白=跳转 / 灰=弹窗
-        applyExternalBlockIconTint(menu);
+        menuActions.tintBlockIcon(menu);
 
         return true;
     }
@@ -306,101 +290,75 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_refresh) {
-            if (webView != null) webView.reload();
-            return true;
-        } else if (item.getItemId() == R.id.action_open_browser) {
-            // 添加日志打印
-            String menuTitle = item.getTitle().toString();
-            Log.d("WebViewActivityMenu", "点击了菜单项: " + menuTitle);
-            
-            try {
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setData(Uri.parse(webView.getUrl()));
-                startActivity(intent);
-                return true;
-            } catch (Exception e) {
-                Toast.makeText(this, "无法打开浏览器", Toast.LENGTH_SHORT).show();
-                return true;
-            }
-        } else if (item.getItemId() == R.id.webview_share) {
-            Log.d("WebViewActivityMenu", "点击了分享");
-            String title = (pageTitleCache != null && !pageTitleCache.isEmpty()) ? pageTitleCache : (webView != null ? webView.getTitle() : "");
-            String url = webView != null ? webView.getUrl() : "";
-            Log.d("ShareUtil", "WebViewActivityMenu share title=" + title + ", url=" + url);
-            ShareUtil.shareText(this, title, null, url);
-            return true;
-        } else if (item.getItemId() == R.id.action_extract_content) {
-            Log.d("WebViewActivityMenu", "click extract");
-            String url = webView != null ? webView.getUrl() : "";
-            if(url.equals("")){
-                Log.d("WebViewActivityMenu", "null url");
-                Toast.makeText(this, "Url为空", Toast.LENGTH_SHORT).show();
-                return true;
-            }
-            
-            // 使用后台线程执行网络请求，避免NetworkOnMainThreadException
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            Handler handler = new Handler(Looper.getMainLooper());
-            
-            executor.execute(() -> {
-                try {
-                    Log.d("WebViewActivityMenu", "@1.01");
-                    String content = CrawlUtil.getArticleByUrl(url);
-                    Log.d("WebViewActivityMenu", "@2");
-                    // 切换回主线程更新UI
-                    handler.post(() -> {
-                        try {
-                            // 将提取的内容写入剪贴板
-                            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                            ClipData clip = ClipData.newPlainText("extracted_content", content);
-                            clipboard.setPrimaryClip(clip);
-                            Log.d("WebViewActivityMenu", "@3");
-                            Toast.makeText(this, "提取Web内容完成，已经写入剪切板", Toast.LENGTH_SHORT).show();
-                        } catch (Exception e) {
-                            Toast.makeText(this, "提取失败", Toast.LENGTH_SHORT).show();
-                            Log.d("WebViewActivityMenu", e.toString());
-                        }
-                    });
-                } catch (Exception e) {
-                    // 切换回主线程显示错误信息
-                    handler.post(() -> {
-                        Toast.makeText(this, "提取失败", Toast.LENGTH_SHORT).show();
-                        Log.d("WebViewActivityMenu", e.toString());
-                    });
-                }
-            });
-            
-            return true;
-        } else if (item.getItemId() == R.id.action_toggle_navigation) {
+        // 翻页控件开关只有 WebView 页有(阅读页那份在 ReaderFragment 自己处理)
+        if (item.getItemId() == R.id.action_wv_toggle_navigation) {
             toggleNavigationControls();
             return true;
-        } else if (item.getItemId() == R.id.action_toggle_external_block) {
-            toggleExternalBlockMode();
-            return true;
-        } else if (item.getItemId() == R.id.action_add_tag) {
-            showAddTagDialog();
-            return true;
-        } else if (item.getItemId() == R.id.action_edit_title) {
-            showEditTitleDialog();
-            return true;
-        } else if (item.getItemId() == R.id.action_link_history) {
-            startActivity(new Intent(this, LinksHistoryActivity.class));
-            return true;
-        } else if (item.getItemId() == R.id.action_configure_override_rule) {
-            // 弹 AddOverrideRuleDialog,contextUrl 优先预填 webview 跟重定向前的原 URL(用户原始意图)
-            // 回退到 currentUrl 是为了兼容老代码路径
-            String contextUrlForDialog;
-            if (webView != null) {
-                String originalUrl = webView.getOriginalUrl();
-                contextUrlForDialog = (originalUrl != null && !originalUrl.isEmpty()) ? originalUrl : webView.getUrl();
-            } else {
-                contextUrlForDialog = currentUrl;
-            }
-            AddOverrideRuleDialog.showDialog(getSupportFragmentManager(), contextUrlForDialog);
+        }
+        if (menuActions != null && menuActions.handle(item.getItemId())) {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    // ---- WebViewMenuActions.Host ----
+
+    @Override
+    public Context context() {
+        return this;
+    }
+
+    @Override
+    public void showOverrideRuleDialog(String contextUrl) {
+        AddOverrideRuleDialog.showDialog(getSupportFragmentManager(), contextUrl);
+    }
+
+    @Override
+    public void invalidateMenu() {
+        invalidateOptionsMenu();
+    }
+
+    // ---- WebViewMenuActions.Page ----
+
+    @Override
+    public WebView webView() {
+        return webView;
+    }
+
+    /** Activity 侧没有"队列链接"概念,恒为 null = 按 URL 解析(AddTagDialog 会查 url 索引)。 */
+    @Override
+    public Long linkId() {
+        return null;
+    }
+
+    @Override
+    public String url() {
+        if (webView != null && webView.getUrl() != null && !webView.getUrl().isEmpty()) {
+            return webView.getUrl();
+        }
+        return currentUrl;
+    }
+
+    /** 重定向前原 URL 优先(§27.4),退回 currentUrl。 */
+    @Override
+    public String originalUrl() {
+        if (webView != null && webView.getOriginalUrl() != null
+                && !webView.getOriginalUrl().isEmpty()) {
+            return webView.getOriginalUrl();
+        }
+        return currentUrl;
+    }
+
+    @Override
+    public String title() {
+        if (pageTitleCache != null && !pageTitleCache.isEmpty()) return pageTitleCache;
+        return webView != null ? webView.getTitle() : "";
+    }
+
+    /** 改标题成功后同步回 pageTitleCache,分享/再次编辑时不再显示旧标题。 */
+    @Override
+    public void onTitleUpdated(String newTitle) {
+        pageTitleCache = newTitle;
     }
 
     private void setupWebView() {
@@ -707,116 +665,12 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
         }
     }
 
-    /**
-     * 根据当前拦截模式返回 toolbar 图标应染的颜色。
-     * 红=直接拦截 / 白=允许跳转 / 灰=弹窗确认
-     */
-    private int tintColorForMode(int mode) {
-        switch (mode) {
-            case 1: return ContextCompat.getColor(this, android.R.color.white); // 直接跳转
-            case 0: return ContextCompat.getColor(this, android.R.color.darker_gray); // 弹窗确认
-            default: return ContextCompat.getColor(this, android.R.color.holo_red_dark); // 拦截(2)
-        }
-    }
-
-    /** 给 toolbar 上的拦截模式菜单项染色,反映当前生效模式 */
-    private void applyExternalBlockIconTint(Menu menu) {
-        MenuItem item = menu.findItem(R.id.action_toggle_external_block);
-        if (item == null) return;
-        Drawable d = AppCompatResources.getDrawable(this, R.drawable.ic_external_block);
-        if (d == null) return;
-        d = DrawableCompat.wrap(d).mutate();
-        DrawableCompat.setTint(d, tintColorForMode(getExternalLinkMode()));
-        item.setIcon(d);
-    }
-
-    private void toggleExternalBlockMode() {
-        SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
-        int currentMode = prefs.getInt("external_link_mode", 2);
-        // 三种模式循环：0(弹窗) -> 2(拦截) -> 1(直接跳转) -> 0(弹窗)
-        int newMode;
-        String message;
-        if (currentMode == 0) {
-            newMode = 2;
-            message = "已切换为：拦截所有外部链接";
-        } else if (currentMode == 2) {
-            newMode = 1;
-            message = "已切换为：直接跳转";
-        } else {
-            newMode = 0;
-            message = "已切换为：弹窗确认";
-        }
-        prefs.edit().putInt("external_link_mode", newMode).apply();
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        invalidateOptionsMenu(); // 让 toolbar 图标跟着刷新颜色
-    }
-
     /** 直接 set 拦截模式到指定 mode(不走循环)。被弹窗「拒绝并禁止弹窗」调用 setExternalLinkMode(2)。 */
     private void setExternalLinkMode(int mode) {
         SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
         prefs.edit().putInt("external_link_mode", mode).apply();
         Toast.makeText(this, "已切换为:拦截所有外部链接", Toast.LENGTH_SHORT).show();
         invalidateOptionsMenu();
-    }
-
-    /** 改标题：走共享实现（目标2）。Activity 无 linkId，按 URL 改，重定向前原 URL 兜底。 */
-    private void showEditTitleDialog() {
-        if (webView == null) {
-            Toast.makeText(this, R.string.reader_action_page_not_loaded, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        final String url = webView.getUrl();
-        final String originalUrl = currentUrl;
-        final String title = pageTitleCache != null && !pageTitleCache.isEmpty()
-                ? pageTitleCache : webView.getTitle();
-        EditTitleDialog.show(this, new PageTarget() {
-            @Override
-            public Long linkId() {
-                return null;
-            }
-
-            @Override
-            public String url() {
-                return url;
-            }
-
-            @Override
-            public String originalUrl() {
-                return originalUrl;
-            }
-
-            @Override
-            public String title() {
-                return title;
-            }
-        }, newTitle -> pageTitleCache = newTitle);
-    }
-
-    /** 加标签：走共享实现（目标2）。Activity 侧没有 linkId 概念，按当前页面 URL 解析/新建。 */
-    private void showAddTagDialog() {
-        if (webView == null) return;
-        final String url = webView.getUrl() != null ? webView.getUrl() : currentUrl;
-        AddTagDialog.show(this, new PageTarget() {
-            @Override
-            public Long linkId() {
-                return null;
-            }
-
-            @Override
-            public String url() {
-                return url;
-            }
-
-            @Override
-            public String originalUrl() {
-                return currentUrl;
-            }
-
-            @Override
-            public String title() {
-                return pageTitleCache;
-            }
-        });
     }
 
     private void showExternalOpenConfirmDialog(String url) {

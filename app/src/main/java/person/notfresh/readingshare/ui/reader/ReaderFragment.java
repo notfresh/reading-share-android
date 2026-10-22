@@ -36,6 +36,7 @@ import person.notfresh.readingshare.core.reader.ReaderQueue;
 import person.notfresh.readingshare.core.reader.ReaderSource;
 import person.notfresh.readingshare.core.reader.UrlRoute;
 import person.notfresh.readingshare.db.DbConnection;
+import person.notfresh.readingshare.dialog.AddOverrideRuleDialog;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.ReaderSourceSpec;
@@ -43,6 +44,7 @@ import person.notfresh.readingshare.model.WebViewOverrideRule;
 import person.notfresh.readingshare.reader.ReaderSources;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ReaderSourceStore;
+import person.notfresh.readingshare.ui.webview.WebViewMenuActions;
 import person.notfresh.readingshare.ui.webview.WebViewNavControls;
 import person.notfresh.readingshare.util.WebViewDefaults;
 import person.notfresh.readingshare.util.WebViewOverrideRules;
@@ -57,7 +59,7 @@ import person.notfresh.readingshare.util.WebViewOverrideRules;
  *   <li>本类只做 UI 接线：WebView 生命周期、把内核结果 loadUrl、按钮可用状态</li>
  * </ul>
  */
-public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
+public class ReaderFragment extends Fragment implements WebViewMenuActions.Page, WebViewMenuActions.Host {
 
     private static final String TAG = "ReaderFragment";
 
@@ -73,7 +75,7 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
 
     private ReaderQueue queue;
     private LinkDao linkDao;
-    private ReaderMenuActions menuActions;
+    private WebViewMenuActions menuActions;
 
     /** 当前页面所属的队列链接 id；用户点了页内链接后置空，避免误给别的链接打标签。 */
     private Long currentLinkId;
@@ -107,7 +109,7 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         randomButton = view.findViewById(R.id.reader_floating_random);
 
         linkDao = new LinkDao(DbConnection.get(requireContext()).writable());
-        menuActions = new ReaderMenuActions(this, this);
+        menuActions = new WebViewMenuActions(this, this);
 
         WebViewDefaults.apply(webView);
         webView.setWebChromeClient(new WebChromeClient());
@@ -184,17 +186,13 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
-        inflater.inflate(R.menu.reader_menu, menu);
-        menuActions.tintBlockIcon(menu);
-        MenuItem toggleItem = menu.findItem(R.id.action_reader_toggle_navigation);
-        if (toggleItem != null && controlsController != null) {
-            toggleItem.setVisible(controlsController.isSmoothMode(requireContext()));
-        }
+        menuActions.inflate(menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == R.id.action_reader_toggle_navigation) {
+        // 翻页控件开关只有阅读页有(Activity 那份由 Activity 自己处理)
+        if (item.getItemId() == R.id.action_wv_toggle_navigation) {
             if (controlsController != null) {
                 controlsController.toggleManually(requireContext());
                 requireActivity().invalidateOptionsMenu();
@@ -207,7 +205,24 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         return super.onOptionsItemSelected(item);
     }
 
-    // ---- ReaderMenuActions.Page ----
+    // ---- WebViewMenuActions.Host ----
+
+    @Override
+    public android.content.Context context() {
+        return requireContext();
+    }
+
+    @Override
+    public void showOverrideRuleDialog(String contextUrl) {
+        AddOverrideRuleDialog.showDialog(getParentFragmentManager(), contextUrl);
+    }
+
+    @Override
+    public void invalidateMenu() {
+        if (isAdded()) requireActivity().invalidateOptionsMenu();
+    }
+
+    // ---- WebViewMenuActions.Page ----
 
     @Override
     public WebView webView() {
@@ -217,6 +232,15 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
     @Override
     public Long linkId() {
         return currentLinkId;
+    }
+
+    @Override
+    public String originalUrl() {
+        if (webView != null && webView.getOriginalUrl() != null
+                && !webView.getOriginalUrl().isEmpty()) {
+            return webView.getOriginalUrl();
+        }
+        return currentLinkUrl;
     }
 
     @Override

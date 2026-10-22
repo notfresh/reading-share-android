@@ -1,3 +1,49 @@
+# 2.3.21 ~ 2.3.21.3
+
+重构：WebView 页（`WebViewActivity`）与阅读页（`ReaderFragment`）三处重复实现收敛，
+删掉「折叠成 mini 播放器」功能。四个版本一个批次，共 4 个 commit。
+
+## 2.3.21 — 删折叠成 mini 播放器（`c1a45b6`，−450 行）
+
+- 删除 `CollapsedPlaybackSession`(57) / `FloatingMiniPlayerView`(146) / `CollapsedWebViewHolder`(44)
+- `WebViewBackgroundService` 237 → 90 行（只留前台通知 + WakeLock 保活，不再管折叠态）
+- 菜单「折叠」项删除
+
+## 2.3.21.1 — 加标签/改标题弹窗收敛成共享实现（`6424f91`，−190 行）
+
+- 新增 `ui/webview/AddTagDialog`(207) / `EditTitleDialog`(103) / `PageTarget`(22)
+- `WebViewActivity` 删掉硬编码中文弹窗和 `getAllLinks()` 线性查找
+- 顺带修掉实质问题：加标签不再 `getAllLinks()` 线性扫 3000 条，
+  改走新增的 `LinkDao.getLinkIdByUrl`（命中 url 索引）
+
+## 2.3.21.2 — 翻页控件显隐策略收敛（`c896cfa`，−151 行）
+
+- `ReaderControlsController` → `ui/webview/WebViewNavControls`
+- Activity 里 151 行显隐策略删除，改委托同一份
+
+## 2.3.21.3 — 菜单统一（目标2 第4步）
+
+- `webview_menu.xml` 成为 WebView 页唯一菜单资源，id 统一 `action_wv_*` 前缀
+  （原先两套：`action_*` 10 项 / `action_reader_*` 10 项）
+- 新增 `ui/webview/WebViewMenuActions` 一份实现，替换 `ReaderMenuActions`（459 → 299 行）
+- 两个宿主各自只提供 `Host`（context / 弹对话框 / 刷菜单）+ `Page`（webview / linkId /
+  url / originalUrl / title）事实，动作本身不再关心自己是 Activity 还是 Fragment
+- `WebViewActivity` 1161 → 1015 行，`ReaderMenuActions` 整类删除
+
+### 两个必须记住的实现约束
+
+1. **菜单 id 不能用 `switch (itemId) { case R.id.xxx: }`** —— 本项目 R 字段不是
+   `final`（解 `R.jar` 确认 `public static int action_wv_refresh = ...`），编译报
+   `constant expression required`。项目内既有 8 个 Activity/Fragment 也全是
+   `getItemId() ==` 写法，跟随既有约定。
+2. **`Context` 没有 `getMenuInflater()`** —— `WebViewMenuActions` 拿的是宿主 Context，
+   要 `new MenuInflater(host.context())`。
+
+### 影响面
+
+- Activity 的加标签/改标题从硬编码中文变成中英双语（走共享弹窗）
+- 「配置跳转规则」dialog 的 contextUrl 仍是「重定向前原 URL 优先」（§27.4 不变）
+- 行为等价，菜单项集合 = 原两份的并集（10 项，无删减）
 # 2.3.20.3
 修复：阅读页翻页后页面自动重定向，导致「加标签 / 改标题」失效（提示 This page is not a link from the reader queue）。
 

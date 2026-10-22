@@ -1,56 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  WebView 页共用菜单(目标2 唯一菜单资源)。WebViewActivity 与 ReaderFragment 都 inflate 这一份。
+
+  id 统一为 action_wv_* 前缀(原先两套 id:action_* / action_reader_*),
+  由 ui/webview/WebViewMenuActions 一个类分发,两个宿主不再各写 if-else。
+
+  个别项按宿主隐藏(见 WebViewMenuActions.applyVisibility):
+  - action_wv_toggle_navigation:仅丝滑模式可见
+  - action_wv_override_rule 等无差异项两个宿主都显示
+-->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    
+
     <item
-        android:id="@+id/action_refresh"
+        android:id="@+id/action_wv_refresh"
         android:title="@string/action_refresh"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
+
     <item
-        android:id="@+id/action_open_browser"
+        android:id="@+id/action_wv_open_browser"
         android:title="@string/open_in_browser"
-        android:textColor="@android:color/black"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
 
     <item
-        android:id="@+id/webview_share"
-        android:title="@string/webview_share"
-        android:icon="@drawable/ic_archive"
-        app:showAsAction="never"/>
-
-    <item
-        android:id="@+id/action_extract_content"
+        android:id="@+id/action_wv_extract"
         android:title="@string/extract_web_content"
-        android:icon="@drawable/ic_share"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
 
     <item
-        android:id="@+id/action_toggle_navigation"
+        android:id="@+id/action_wv_share"
+        android:title="@string/webview_share"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_wv_toggle_navigation"
         android:title="@string/toggle_navigation"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
 
     <item
-        android:id="@+id/action_toggle_external_block"
+        android:id="@+id/action_wv_toggle_block"
         android:title="@string/toggle_external_block"
         android:icon="@drawable/ic_external_block"
-        app:showAsAction="always"/>
+        app:showAsAction="always" />
 
     <item
-        android:id="@+id/action_add_tag"
+        android:id="@+id/action_wv_add_tag"
         android:title="@string/add_tag"
-        app:showAsAction="always"/>
+        app:showAsAction="always" />
 
     <item
-        android:id="@+id/action_edit_title"
+        android:id="@+id/action_wv_edit_title"
         android:title="@string/edit_title"
-        app:showAsAction="always"/>
+        app:showAsAction="always" />
 
     <item
-        android:id="@+id/action_link_history"
+        android:id="@+id/action_wv_history"
         android:title="@string/link_history"
-        app:showAsAction="never"/>
-<item
-        android:id="@+id/action_configure_override_rule"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_wv_override_rule"
         android:title="@string/configure_override_rule"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
 </menu>
