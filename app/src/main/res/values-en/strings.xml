@@ -39,6 +39,8 @@
     <string name="reader_external_confirm_open">Open</string>
     <string name="reader_external_open_failed">Cannot open this link: %1$s</string>
     <string name="reader_source_section_title">Reader data source</string>
+    <string name="reader_source_hint_type">Source type</string>
+    <string name="reader_source_hint_param">Specific item</string>
     <string name="reader_source_type_all">All links</string>
     <string name="reader_source_type_pinned">Pinned links</string>
     <string name="reader_source_type_tag">A tag</string>

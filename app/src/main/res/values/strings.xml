@@ -39,6 +39,8 @@
     <string name="reader_external_confirm_open">继续打开</string>
     <string name="reader_external_open_failed">无法打开此链接: %1$s</string>
     <string name="reader_source_section_title">阅读页数据来源</string>
+    <string name="reader_source_hint_type">来源类型</string>
+    <string name="reader_source_hint_param">具体项</string>
     <string name="reader_source_type_all">全部链接</string>
     <string name="reader_source_type_pinned">置顶链接</string>
     <string name="reader_source_type_tag">某个标签</string>

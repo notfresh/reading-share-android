@@ -1,3 +1,15 @@
+# 2.3.19.4
+优化:阅读页数据来源的两个下拉换成 Material exposed dropdown(原 Spinner 是 Holo 观感,丑)。
+
+## 改动
+- 新增 `ui/settings/SettingDropdown.java`:Material 填充框 + 展开菜单,封装成"挂上去就能用"的小件;
+  只在用户选中时回调,程序化 setText 不触发(内部 suppress),避免联动死循环
+- 新增 `res/layout/view_setting_dropdown.xml`(FilledBox.ExposedDropdownMenu) +
+  `res/layout/item_dropdown_option.xml`(统一 16dp 内边距、16sp)
+- 阅读页数据来源区块:类型 / 参数两个下拉都用它,hint 分别为「来源类型」「具体项」
+- 参数下拉在「全部链接 / 置顶链接」时整块隐藏,不再摆「（无需选择）」这种占位项
+- 与项目既有 TextInputLayout 输入框同一套视觉(填充框),不引入新风格
+
 # 2.3.19.3
 修复:阅读页选「某个主题」来源时显示「该来源暂无链接」,即使该主题里确有链接。
 

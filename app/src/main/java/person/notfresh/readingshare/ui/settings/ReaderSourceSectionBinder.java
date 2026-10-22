@@ -3,11 +3,8 @@ package person.notfresh.readingshare.ui.settings;
 import android.content.Context;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.fragment.app.Fragment;
@@ -29,6 +26,9 @@ import person.notfresh.readingshare.util.ReaderSourceStore;
  * <p>为什么独立成类：SettingFragment 已经 970 行，再塞 150 行 UI 拉线只会让它更不可读。
  * 本类只负责"类型 + 参数"两个下拉的联动与持久化，读写全部走
  * {@link ReaderSourceStore}（单一真相源），自己不碰 SharedPreferences。</p>
+ *
+ * <p>2.3.19.4：两个下拉从裸 Spinner 换成 Material exposed dropdown
+ * （{@link SettingDropdown}），与项目里既有的 TextInputLayout 输入框同一套视觉。</p>
  */
 public final class ReaderSourceSectionBinder {
 
@@ -68,85 +68,49 @@ public final class ReaderSourceSectionBinder {
 
         container.addView(sectionTitle(ctx));
 
-        final Spinner typeSpinner = newSpinner(ctx);
-        final Spinner paramSpinner = newSpinner(ctx);
-        container.addView(typeSpinner);
-        container.addView(paramSpinner);
+        final SettingDropdown typeDropdown = SettingDropdown.attach(ctx, container)
+                .setHint(R.string.reader_source_hint_type);
+        final SettingDropdown paramDropdown = SettingDropdown.attach(ctx, container)
+                .setHint(R.string.reader_source_hint_param);
 
         List<String> typeLabels = new ArrayList<>(TYPE_LABELS.length);
         for (int labelRes : TYPE_LABELS) {
             typeLabels.add(ctx.getString(labelRes));
         }
-        typeSpinner.setAdapter(spinnerAdapter(ctx, typeLabels));
 
         ReaderSourceSpec current = ReaderSourceStore.load(app);
-        final boolean[] suppress = {true};
-        setParamOptions(ctx, paramSpinner, current, tags, subjectTitles, subjectIds);
-        typeSpinner.setSelection(typeIndex(current.getType()), false);
+        typeDropdown.setOptions(typeLabels, typeIndex(current.getType()));
+        applyParamOptions(paramDropdown, current, tags, subjectTitles, subjectIds);
 
-        typeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (suppress[0]) return;
-                ReaderSourceSpec next = specForType(TYPES[position], tags, subjectIds);
-                ReaderSourceStore.save(app, next);
-                suppress[0] = true;
-                setParamOptions(ctx, paramSpinner, next, tags, subjectTitles, subjectIds);
-                suppress[0] = false;
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
+        typeDropdown.setOnSelected(position -> {
+            ReaderSourceSpec next = specForType(TYPES[position], tags, subjectIds);
+            ReaderSourceStore.save(app, next);
+            applyParamOptions(paramDropdown, next, tags, subjectTitles, subjectIds);
         });
 
-        paramSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (suppress[0]) return;
-                ReaderSourceSpec spec = ReaderSourceStore.load(app);
-                if (ReaderSourceSpec.TYPE_TAG.equals(spec.getType()) && position < tags.size()) {
-                    ReaderSourceStore.save(app, ReaderSourceSpec.tag(tags.get(position)));
-                } else if (ReaderSourceSpec.TYPE_SUBJECT.equals(spec.getType()) && position < subjectIds.size()) {
-                    ReaderSourceStore.save(app, ReaderSourceSpec.subject(subjectIds.get(position)));
-                }
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
+        paramDropdown.setOnSelected(position -> {
+            ReaderSourceSpec spec = ReaderSourceStore.load(app);
+            if (ReaderSourceSpec.TYPE_TAG.equals(spec.getType()) && position < tags.size()) {
+                ReaderSourceStore.save(app, ReaderSourceSpec.tag(tags.get(position)));
+            } else if (ReaderSourceSpec.TYPE_SUBJECT.equals(spec.getType()) && position < subjectIds.size()) {
+                ReaderSourceStore.save(app, ReaderSourceSpec.subject(subjectIds.get(position)));
             }
         });
-
-        suppress[0] = false;
     }
 
-    /** 参数下拉的内容随类型变化：标签列表 / 主题列表 / 占位提示。 */
-    private static void setParamOptions(Context ctx, Spinner paramSpinner, ReaderSourceSpec spec,
-                                       List<String> tags, List<String> subjectTitles,
-                                       List<Long> subjectIds) {
-        List<String> options = new ArrayList<>();
-        int selected = 0;
+    /** 参数下拉随类型切换：标签列表 / 主题列表 / 不适用则整块隐藏（不摆"（无需选择）"占位）。 */
+    private static void applyParamOptions(SettingDropdown paramDropdown, ReaderSourceSpec spec,
+                                          List<String> tags, List<String> subjectTitles,
+                                          List<Long> subjectIds) {
         String type = spec == null ? ReaderSourceSpec.TYPE_ALL : spec.getType();
         if (ReaderSourceSpec.TYPE_TAG.equals(type)) {
-            if (tags.isEmpty()) {
-                options.add(ctx.getString(R.string.reader_source_empty_tags));
-            } else {
-                options.addAll(tags);
-                selected = Math.max(0, tags.indexOf(spec.getParam()));
-            }
+            paramDropdown.setOptions(tags, Math.max(0, tags.indexOf(spec.getParam())));
         } else if (ReaderSourceSpec.TYPE_SUBJECT.equals(type)) {
-            if (subjectIds.isEmpty()) {
-                options.add(ctx.getString(R.string.reader_source_empty_subjects));
-            } else {
-                options.addAll(subjectTitles);
-                int idx = subjectIds.indexOf(parseLong(spec.getParam()));
-                selected = Math.max(0, idx);
-            }
+            int index = subjectIds.indexOf(parseLong(spec.getParam()));
+            paramDropdown.setOptions(subjectTitles, Math.max(0, index));
         } else {
-            options.add(ctx.getString(R.string.reader_source_param_none));
+            paramDropdown.setOptions(new ArrayList<>(), 0);
         }
-        paramSpinner.setAdapter(spinnerAdapter(ctx, options));
-        paramSpinner.setSelection(selected, false);
     }
 
     private static ReaderSourceSpec specForType(String type, List<String> tags, List<Long> subjectIds) {
@@ -201,17 +165,6 @@ public final class ReaderSourceSectionBinder {
         lp.bottomMargin = 8 * dp;
         title.setLayoutParams(lp);
         return title;
-    }
-
-    private static Spinner newSpinner(Context ctx) {
-        Spinner spinner = new Spinner(ctx);
-        spinner.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        return spinner;
-    }
-
-    private static ArrayAdapter<String> spinnerAdapter(Context ctx, List<String> options) {
-        return new ArrayAdapter<>(ctx, android.R.layout.simple_spinner_item, options);
     }
 
     private static ViewGroup sectionContainer(View root) {
