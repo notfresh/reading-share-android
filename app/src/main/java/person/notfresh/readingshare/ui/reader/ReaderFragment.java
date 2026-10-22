@@ -6,6 +6,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebChromeClient;
@@ -52,7 +55,7 @@ import person.notfresh.readingshare.util.WebViewOverrideRules;
  *   <li>本类只做 UI 接线：WebView 生命周期、把内核结果 loadUrl、按钮可用状态</li>
  * </ul>
  */
-public class ReaderFragment extends Fragment {
+public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
 
     private static final String TAG = "ReaderFragment";
 
@@ -65,6 +68,12 @@ public class ReaderFragment extends Fragment {
 
     private ReaderQueue queue;
     private LinkDao linkDao;
+    private ReaderMenuActions menuActions;
+
+    /** 当前页面所属的队列链接 id；用户点了页内链接后置空，避免误给别的链接打标签。 */
+    private Long currentLinkId;
+    private String currentLinkUrl;
+    private String pageTitle = "";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean moving = new AtomicBoolean(false);
@@ -79,6 +88,8 @@ public class ReaderFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        setHasOptionsMenu(true);
+
         webView = view.findViewById(R.id.reader_webview);
         progress = view.findViewById(R.id.reader_progress);
         emptyView = view.findViewById(R.id.reader_empty);
@@ -87,6 +98,7 @@ public class ReaderFragment extends Fragment {
         randomButton = view.findViewById(R.id.reader_random);
 
         linkDao = new LinkDao(DbConnection.get(requireContext()).writable());
+        menuActions = new ReaderMenuActions(this, this);
 
         WebViewDefaults.apply(webView);
         webView.setWebChromeClient(new WebChromeClient());
@@ -123,7 +135,53 @@ public class ReaderFragment extends Fragment {
             webView = null;
         }
         queue = null;
+        currentLinkId = null;
+        currentLinkUrl = null;
         super.onDestroyView();
+    }
+
+    // ---- 顶部菜单 ----
+
+    @Override
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+        inflater.inflate(R.menu.reader_menu, menu);
+        menuActions.tintBlockIcon(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (menuActions != null && menuActions.handle(item.getItemId())) {
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    // ---- ReaderMenuActions.Page ----
+
+    @Override
+    public WebView webView() {
+        return webView;
+    }
+
+    @Override
+    public Long linkId() {
+        return currentLinkId;
+    }
+
+    @Override
+    public String url() {
+        if (webView != null && webView.getUrl() != null && !webView.getUrl().isEmpty()) {
+            return webView.getUrl();
+        }
+        return currentLinkUrl;
+    }
+
+    @Override
+    public String title() {
+        if (pageTitle != null && !pageTitle.isEmpty()) return pageTitle;
+        if (webView != null && webView.getTitle() != null) return webView.getTitle();
+        return "";
     }
 
     // ---- 队列装配 ----
@@ -186,6 +244,9 @@ public class ReaderFragment extends Fragment {
                     return;
                 }
                 showEmpty(false);
+                currentLinkId = linkId;
+                currentLinkUrl = targetUrl;
+                pageTitle = "";
                 webView.loadUrl(targetUrl);
                 updateControls();
             });
@@ -237,6 +298,9 @@ public class ReaderFragment extends Fragment {
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             showProgress(false);
+            if (view.getTitle() != null && !view.getTitle().trim().isEmpty()) {
+                pageTitle = view.getTitle().trim();
+            }
         }
 
         /**
@@ -245,7 +309,12 @@ public class ReaderFragment extends Fragment {
          */
         private boolean route(WebView view, String url) {
             if (url == null || url.isEmpty()) return false;
-            if (UrlRoute.isHttp(url)) return false;
+            if (UrlRoute.isHttp(url)) {
+                // 页内跳转：当前页面已不是队列里那条链接，清掉 linkId 防止误打标签
+                currentLinkId = null;
+                currentLinkUrl = url;
+                return false;
+            }
 
             Optional<WebViewOverrideRule> hit = WebViewOverrideRules.firstMatch(requireContext(), pageCandidates(view));
             if (hit.isPresent()) {

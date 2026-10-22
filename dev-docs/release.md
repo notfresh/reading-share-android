@@ -1,3 +1,24 @@
+# 2.3.19.1
+特性:阅读页补上顶部菜单(对齐 WebViewActivity 的 webview_menu,刻意去掉 Activity 专属项)。
+
+## 菜单项(9 个)
+- 刷新 / 浏览器打开 / 分享 / 提取正文到剪贴板 / 配置跳转规则 / 链接历史
+- 加标签(复用 dialog_add_tag + TagSuggestionHelper 联想)
+- 改标题(按当前 URL 更新 links 表)
+- 拦截模式切换(0 弹窗 → 2 拦截 → 1 跳转,循环;图标红/白/灰染色与 Activity 一致)
+
+## 刻意不做
+- 强制返回 / 存档返回(Activity finish 语义,Fragment 无对应)
+- 折叠 mini player、丝滑模式的导航控件开关(阅读页已有固定底部控件)
+
+## 实现
+- `ui/reader/ReaderMenuActions.java`:9 个动作各自命名方法;ReaderFragment 只实现 `Page`
+  接口(webView/linkId/url/title)并委托,不再往 Fragment 里堆 if-else
+- `res/menu/reader_menu.xml`:独立菜单,不动 `webview_menu.xml`
+- 加标签/改标题只对"队列链接"生效:用户点进页内别的链接后 `linkId` 置空,
+  避免把标签打到错误的链接上(Activity 那版是 URL 全表线性查找,这里按 id 直取)
+- 新增 14 条中英文案
+
 # 2.3.19
 特性:新增「阅读」Tab —— 内嵌 WebView 的阅读页,按可配置数据来源成队列,支持上一条 / 下一条 / 随机。
 

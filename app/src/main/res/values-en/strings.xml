@@ -46,6 +46,20 @@
     <string name="reader_source_param_none">(not required)</string>
     <string name="reader_source_empty_tags">No tags yet</string>
     <string name="reader_source_empty_subjects">No subjects yet</string>
+    <string name="reader_action_page_loading">Page not loaded</string>
+    <string name="reader_action_no_url">Cannot get page URL</string>
+    <string name="reader_action_open_browser_failed">Cannot open browser</string>
+    <string name="reader_action_extract_ok">Content extracted to clipboard</string>
+    <string name="reader_action_extract_failed">Extraction failed</string>
+    <string name="reader_action_not_in_queue">This page is not a link from the reader queue</string>
+    <string name="reader_action_tag_saved">Tags saved: %1$s</string>
+    <string name="reader_action_tag_failed">Failed to save tags</string>
+    <string name="reader_action_title_empty">Title cannot be empty</string>
+    <string name="reader_action_title_updated">Title updated</string>
+    <string name="reader_action_title_not_saved">This page is not saved as a link</string>
+    <string name="reader_action_mode_block">Switched to: block all external links</string>
+    <string name="reader_action_mode_open">Switched to: open directly</string>
+    <string name="reader_action_mode_ask">Switched to: ask before opening</string>
 
     <string-array name="recent_tags_window_array">
         <item>3</item>

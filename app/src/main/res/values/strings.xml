@@ -46,6 +46,20 @@
     <string name="reader_source_param_none">（无需选择）</string>
     <string name="reader_source_empty_tags">暂无标签</string>
     <string name="reader_source_empty_subjects">暂无主题</string>
+    <string name="reader_action_page_loading">页面未加载</string>
+    <string name="reader_action_no_url">无法获取页面 URL</string>
+    <string name="reader_action_open_browser_failed">无法打开浏览器</string>
+    <string name="reader_action_extract_ok">正文已提取并复制到剪贴板</string>
+    <string name="reader_action_extract_failed">提取失败</string>
+    <string name="reader_action_not_in_queue">当前页面不属于阅读队列中的链接</string>
+    <string name="reader_action_tag_saved">已保存标签: %1$s</string>
+    <string name="reader_action_tag_failed">保存标签失败</string>
+    <string name="reader_action_title_empty">标题不能为空</string>
+    <string name="reader_action_title_updated">标题已更新</string>
+    <string name="reader_action_title_not_saved">当前页面未保存为链接</string>
+    <string name="reader_action_mode_block">已切换为：拦截所有外部链接</string>
+    <string name="reader_action_mode_open">已切换为：直接跳转</string>
+    <string name="reader_action_mode_ask">已切换为：弹窗确认</string>
 
     <string-array name="recent_tags_window_array">
         <item>3</item>

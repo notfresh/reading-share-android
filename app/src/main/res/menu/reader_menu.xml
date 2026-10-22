@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_reader_refresh"
+        android:title="@string/action_refresh"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_reader_open_browser"
+        android:title="@string/open_in_browser"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_reader_extract"
+        android:title="@string/extract_web_content"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_reader_share"
+        android:title="@string/webview_share"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_reader_override_rule"
+        android:title="@string/configure_override_rule"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_reader_history"
+        android:title="@string/link_history"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_reader_add_tag"
+        android:title="@string/add_tag"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_reader_edit_title"
+        android:title="@string/edit_title"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_reader_toggle_block"
+        android:title="@string/toggle_external_block"
+        android:icon="@drawable/ic_external_block"
+        app:showAsAction="always" />
+</menu>
