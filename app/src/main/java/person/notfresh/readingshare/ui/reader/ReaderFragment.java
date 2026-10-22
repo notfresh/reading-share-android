@@ -62,9 +62,12 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
     private WebView webView;
     private ProgressBar progress;
     private TextView emptyView;
+    private View bottomControls;
+    private View floatingControls;
     private Button prevButton;
     private Button nextButton;
     private Button randomButton;
+    private ReaderControlsController controlsController;
 
     private ReaderQueue queue;
     private LinkDao linkDao;
@@ -93,9 +96,11 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         webView = view.findViewById(R.id.reader_webview);
         progress = view.findViewById(R.id.reader_progress);
         emptyView = view.findViewById(R.id.reader_empty);
-        prevButton = view.findViewById(R.id.reader_prev);
-        nextButton = view.findViewById(R.id.reader_next);
-        randomButton = view.findViewById(R.id.reader_random);
+        bottomControls = view.findViewById(R.id.reader_navigation_controls);
+        floatingControls = view.findViewById(R.id.reader_floating_nav_controls);
+        prevButton = view.findViewById(R.id.reader_button_previous);
+        nextButton = view.findViewById(R.id.reader_button_next);
+        randomButton = view.findViewById(R.id.reader_floating_random);
 
         linkDao = new LinkDao(DbConnection.get(requireContext()).writable());
         menuActions = new ReaderMenuActions(this, this);
@@ -107,6 +112,18 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         prevButton.setOnClickListener(v -> step(Move.PREVIOUS));
         nextButton.setOnClickListener(v -> step(Move.NEXT));
         randomButton.setOnClickListener(v -> step(Move.RANDOM));
+        View floatingPrev = view.findViewById(R.id.reader_floating_previous);
+        View floatingNext = view.findViewById(R.id.reader_floating_next);
+        if (floatingPrev != null) floatingPrev.setOnClickListener(v -> step(Move.PREVIOUS));
+        if (floatingNext != null) floatingNext.setOnClickListener(v -> step(Move.NEXT));
+
+        controlsController = new ReaderControlsController(bottomControls, floatingControls);
+        webView.setOnTouchListener((v, event) -> {
+            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                controlsController.onWebViewTouched(requireContext());
+            }
+            return false;
+        });
 
         installBackHandling();
         loadQueue();
@@ -137,6 +154,10 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         queue = null;
         currentLinkId = null;
         currentLinkUrl = null;
+        if (controlsController != null) {
+            controlsController.detach();
+            controlsController = null;
+        }
         super.onDestroyView();
     }
 
@@ -147,10 +168,21 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         super.onCreateOptionsMenu(menu, inflater);
         inflater.inflate(R.menu.reader_menu, menu);
         menuActions.tintBlockIcon(menu);
+        MenuItem toggleItem = menu.findItem(R.id.action_reader_toggle_navigation);
+        if (toggleItem != null && controlsController != null) {
+            toggleItem.setVisible(controlsController.isSmoothMode(requireContext()));
+        }
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.action_reader_toggle_navigation) {
+            if (controlsController != null) {
+                controlsController.toggleManually(requireContext());
+                requireActivity().invalidateOptionsMenu();
+            }
+            return true;
+        }
         if (menuActions != null && menuActions.handle(item.getItemId())) {
             return true;
         }
@@ -300,6 +332,9 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
             showProgress(false);
             if (view.getTitle() != null && !view.getTitle().trim().isEmpty()) {
                 pageTitle = view.getTitle().trim();
+                if (isAdded()) {
+                    requireActivity().setTitle(pageTitle);
+                }
             }
         }
 
@@ -378,6 +413,9 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         if (prevButton != null) prevButton.setEnabled(available);
         if (nextButton != null) nextButton.setEnabled(available);
         if (randomButton != null) randomButton.setEnabled(available);
+        if (controlsController != null && isAdded()) {
+            controlsController.setContentAvailable(requireContext(), available);
+        }
     }
 
     private void showProgress(boolean visible) {

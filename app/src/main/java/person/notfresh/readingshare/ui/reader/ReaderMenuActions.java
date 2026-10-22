@@ -27,6 +27,8 @@ import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.flexbox.FlexboxLayout;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +43,7 @@ import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ShareUtil;
+import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.TagSuggestionHelper;
 
 /**
@@ -231,34 +234,109 @@ public final class ReaderMenuActions {
         host.requireActivity().invalidateOptionsMenu();
     }
 
+    /**
+     * 加标签弹窗：与 Activity / Home 的 dialog_add_tag 体验一致 ——
+     * 输入框 + 联想 + 「当前标签」(可点删) + 「最近标签」(点击填入)。
+     */
     private void showAddTagDialog() {
         final Long linkId = page.linkId();
         if (linkId == null) {
             toast(R.string.reader_action_not_in_queue);
             return;
         }
+        final Context app = requireContext().getApplicationContext();
+        new Thread(() -> {
+            List<String> existing = new ArrayList<>();
+            try {
+                existing.addAll(new LinkDao(DbConnection.get(app).writable()).getLinkTags(linkId));
+            } catch (Exception e) {
+                Log.e(TAG, "loadTags failed linkId=" + linkId, e);
+            }
+            final List<String> loaded = existing;
+            mainHandler.post(() -> {
+                if (host.isAdded()) buildTagDialog(linkId, loaded);
+            });
+        }, "reader-load-tags").start();
+    }
+
+    private void buildTagDialog(final long linkId, List<String> existingTags) {
         final Context ctx = requireContext();
         View dialogView = LayoutInflater.from(ctx).inflate(R.layout.dialog_add_tag, null);
         final EditText input = dialogView.findViewById(R.id.edit_tag_input);
         RecyclerView suggestionRecycler = dialogView.findViewById(R.id.suggestion_recycler);
         TextView suggestionLabel = dialogView.findViewById(R.id.text_suggestion_label);
+        final FlexboxLayout currentContainer = dialogView.findViewById(R.id.current_tags_container);
+        TextView currentLabel = dialogView.findViewById(R.id.text_current_tags_label);
+        FlexboxLayout recentContainer = dialogView.findViewById(R.id.recent_tags_container);
+        TextView recentLabel = dialogView.findViewById(R.id.text_recent_tags_label);
+
+        final List<String> current = new ArrayList<>(existingTags);
+        final Set<String> excluded = new HashSet<>(existingTags);
+
+        // 当前标签：点一下从列表移除（保存时按剩余集合整体替换）
+        if (!current.isEmpty()) {
+            currentLabel.setVisibility(View.VISIBLE);
+            for (String tag : new ArrayList<>(current)) {
+                addChip(ctx, currentContainer, tag, v -> {
+                    currentContainer.removeView((View) v.getParent());
+                    current.remove(tag);
+                    excluded.remove(tag);
+                });
+            }
+        }
+
+        // 最近标签：点击填进输入框（不给空输入直接落库，保持与 Home 一致的手感）
+        List<String> recent = new ArrayList<>();
+        for (String tag : RecentTagsManager.getRecentTags(ctx)) {
+            if (!excluded.contains(tag)) recent.add(tag);
+        }
+        if (!recent.isEmpty()) {
+            recentLabel.setVisibility(View.VISIBLE);
+            for (String tag : recent) {
+                addChip(ctx, recentContainer, tag, v -> {
+                    String text = input.getText().toString().trim();
+                    if (text.isEmpty()) {
+                        input.setText(tag);
+                    } else if (!text.endsWith(",") && !text.endsWith("，")) {
+                        input.setText(text + ", " + tag);
+                    } else {
+                        input.setText(text + " " + tag);
+                    }
+                    input.setSelection(input.getText().length());
+                });
+            }
+        }
+
         final TagSuggestionHelper.Binder binder = TagSuggestionHelper.attach(
-                input, suggestionRecycler, suggestionLabel, ctx, new HashSet<>());
+                input, suggestionRecycler, suggestionLabel, ctx, excluded);
 
         new AlertDialog.Builder(ctx)
                 .setTitle(R.string.link_dialog_title_add_tag)
                 .setView(dialogView)
                 .setPositiveButton(R.string.link_dialog_ok, (dialog, which) -> {
                     binder.detach();
-                    List<String> tags = splitTags(input.getText().toString());
+                    List<String> tags = new ArrayList<>(current);
+                    for (String tag : splitTags(input.getText().toString())) {
+                        if (!tags.contains(tag)) tags.add(tag);
+                    }
                     if (tags.isEmpty()) return;
-                    saveTags(linkId, tags);
+                    saveTags(linkId, tags, new ArrayList<>(current));
                 })
                 .setNegativeButton(R.string.cancel, (dialog, which) -> binder.detach())
                 .show();
     }
 
-    private void saveTags(final long linkId, final List<String> tags) {
+    private void addChip(Context ctx, FlexboxLayout container, String text, View.OnClickListener onClick) {
+        if (container == null) return;
+        TextView chip = (TextView) LayoutInflater.from(ctx)
+                .inflate(R.layout.item_tag, container, false);
+        chip.setText(text);
+        chip.setOnClickListener(onClick);
+        container.addView(chip);
+    }
+
+    /** 整体替换该链接的标签集合（与 LinkDao.updateLinkTags 的"删除后重插"语义一致）。 */
+    private void saveTags(final long linkId, final List<String> tags, final List<String> previousTags) {
         final Context app = requireContext().getApplicationContext();
         new Thread(() -> {
             String message = null;
@@ -266,8 +344,13 @@ public final class ReaderMenuActions {
                 LinkDao dao = new LinkDao(DbConnection.get(app).writable());
                 LinkItem item = dao.getLinkById(linkId);
                 if (item != null) {
-                    for (String tag : tags) item.addTag(tag);
+                    item.setTags(new ArrayList<>(tags));
                     dao.updateLinkTags(item);
+                    List<String> added = new ArrayList<>(tags);
+                    added.removeAll(previousTags);
+                    if (!added.isEmpty()) {
+                        RecentTagsManager.addRecentTags(app, added);
+                    }
                     message = app.getString(R.string.reader_action_tag_saved, String.join(", ", tags));
                 }
             } catch (Exception e) {
@@ -298,7 +381,7 @@ public final class ReaderMenuActions {
         input.setSelectAllOnFocus(true);
 
         new AlertDialog.Builder(ctx)
-                .setTitle(R.string.link_dialog_title_edit_title)
+                .setTitle(R.string.edit_title)
                 .setView(input)
                 .setPositiveButton(R.string.link_dialog_ok, (dialog, which) -> {
                     String newTitle = input.getText().toString().trim();

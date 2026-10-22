@@ -1,3 +1,23 @@
+# 2.3.19.2
+特性:阅读页体验对齐 WebViewActivity(第二轮反馈:页面布局 / 导航条 / 弹窗按钮要一致)。
+
+## 导航控件(先复制同款,第二刀与 Activity 合并成同一份 include)
+- 底部条:半透明黑底 `#66000000` + padding 12dp + 「上一篇 / 下一篇」,按钮 `backgroundTint=darker_gray`
+- 悬浮层:右侧竖排 3 个 48dp 图标按钮(`floating_arrow_bg` + ic_expand_less/more/random)
+- 显隐策略逐条对齐:`reading_mode=normal` 不显示;`smooth` 按 `nav_button_style`(bottom/floating/both) 显示;
+  显示后 3 秒自动隐藏;触摸网页临时唤起;手动隐藏持久化到 `settings/nav_controls_hidden`
+- 菜单项「显示/隐藏导航控件」仅丝滑模式可见(同 Activity)
+- 新增 `ui/reader/ReaderControlsController.java`,注释标明"Activity 的复制版,第二刀合并"
+
+## 弹窗与文案对齐
+- 加标签:补「当前标签」(点删) + 「最近标签」(点击填入),保存时整体替换,并把新增标签写入最近标签
+- 改标题:弹窗标题改回「修改标题」(`edit_title`),与 Activity 一致
+- 提取正文 toast 改为 Activity 原文「提取Web内容完成，已经写入剪切板」
+- 导航按钮文案改「上一篇 / 下一篇 / 随机跳转」
+
+## toolbar
+- 页面标题跟随时更新(与 WebViewActivity 一致);离开阅读页由 NavigationUI 恢复各页 label
+
 # 2.3.19.1
 特性:阅读页补上顶部菜单(对齐 WebViewActivity 的 webview_menu,刻意去掉 Activity 专属项)。
 

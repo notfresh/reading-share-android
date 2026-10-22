@@ -43,6 +43,11 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/action_reader_toggle_navigation"
+        android:title="@string/toggle_navigation"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_reader_toggle_block"
         android:title="@string/toggle_external_block"
         android:icon="@drawable/ic_external_block"
