@@ -1,3 +1,30 @@
+# 2.3.21.5
+
+改动：阅读页「修改标题 / 添加标签 / 切换拦截模式」三项常驻 toolbar，不再折叠进 ⋮ 溢出菜单。
+
+## 根因
+
+这三项在共享菜单 `webview_menu.xml` 里**本来就是 `app:showAsAction="always"`**，
+但 `add_tag` 和 `edit_title` **没有 android:icon**。没有图标的 `always` 项只能以文字形式
+渲染，toolbar 一挤就被推进溢出菜单 —— 表现就是"配了 always 却还是看不见"。
+`toggle_block` 有 `ic_external_block` 所以能常驻，这也印证了判断。
+
+## 改动
+
+- 新增 `res/drawable/ic_tag.xml`（标签挂绳 + 标签牌，Material 标签图标路径）
+- 新增 `res/drawable/ic_edit_title.xml`（铅笔，Material edit 图标路径）
+- `webview_menu.xml` 给 `action_wv_add_tag` / `action_wv_edit_title` 挂上这两个图标
+
+## 教训
+
+**`showAsAction="always"` 不等于一定显示 —— 没有 icon 的项会退化成文字，宽度不够就进溢出菜单。**
+判别：想让某个菜单项常驻，`always` + **有图标**两个条件缺一不可。只改 `showAsAction`
+发现"没生效"时，先看那一项有没有 `android:icon`。
+
+## 验证
+
+`./gradlew clean assembleDebug assembleDebugUnitTest` → 36 actionable tasks: 36 executed，BUILD SUCCESSFUL
+
 # 2.3.21.4
 
 修复：删除「折叠 mini 播放器」时漏删测试导致单测源码树编译失败；补回异步回调的宿主存活守卫。
