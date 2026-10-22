@@ -6,6 +6,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.fragment.app.Fragment;
 
@@ -85,6 +86,11 @@ public final class ReaderSourceSectionBinder {
         typeDropdown.setOnSelected(position -> {
             ReaderSourceSpec next = specForType(TYPES[position], tags, subjectIds);
             ReaderSourceStore.save(app, next);
+            if (!TYPES[position].equals(next.getType())) {
+                // 该类型下没有任何可选项(没标签/没主题):不能"显示标签、实际存全部",把类型回滚并提示
+                typeDropdown.setOptions(typeLabels, typeIndex(next.getType()));
+                Toast.makeText(ctx, R.string.reader_source_no_options, Toast.LENGTH_SHORT).show();
+            }
             applyParamOptions(paramDropdown, next, tags, subjectTitles, subjectIds);
         });
 

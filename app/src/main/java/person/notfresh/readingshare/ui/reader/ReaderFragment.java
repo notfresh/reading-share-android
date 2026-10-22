@@ -77,6 +77,8 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
     /** 当前页面所属的队列链接 id；用户点了页内链接后置空，避免误给别的链接打标签。 */
     private Long currentLinkId;
     private String currentLinkUrl;
+    /** 本次队列实际使用的来源指纹(type|param)；用于 onResume 发现设置变更后重建队列。 */
+    private String appliedSourceKey;
     private String pageTitle = "";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -134,6 +136,20 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
     public void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
+        reloadQueueIfSourceChanged();
+    }
+
+    /**
+     * 设置页改了数据来源后,切回阅读 Tab 要立刻按新来源重建队列(2.3.19.7)。
+     * Fragment view 不会因为切 Tab 重建,所以只能在这里比对已应用的来源指纹。
+     */
+    private void reloadQueueIfSourceChanged() {
+        if (!isAdded() || appliedSourceKey == null) return;
+        ReaderSourceSpec spec = ReaderSourceStore.load(requireContext().getApplicationContext());
+        String currentKey = spec.getType() + "|" + spec.getParam();
+        if (!currentKey.equals(appliedSourceKey)) {
+            loadQueue();
+        }
     }
 
     @Override
@@ -227,8 +243,10 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         new Thread(() -> {
             ReaderQueue loaded = null;
             Long firstId = null;
+            String sourceKey = null;
             try {
                 ReaderSourceSpec spec = ReaderSourceStore.load(app);
+                sourceKey = spec.getType() + "|" + spec.getParam();
                 ReaderSource source = ReaderSources.create(app, spec);
                 loaded = new ReaderQueue(source);
                 if (loaded.load()) {
@@ -239,9 +257,11 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
             }
             final ReaderQueue resolvedQueue = loaded;
             final Long id = firstId;
+            final String key = sourceKey;
             mainHandler.post(() -> {
                 if (!isAdded()) return;
                 queue = resolvedQueue;
+                appliedSourceKey = key;
                 if (id == null) {
                     showProgress(false);
                     showEmpty(true);

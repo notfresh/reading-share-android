@@ -33,7 +33,12 @@ public final class SettingDropdown {
     private final List<String> options = new ArrayList<>();
 
     private OnSelected listener;
-    private boolean suppress = true;
+    /**
+     * 程序化 setText 期间为 true，避免误触发回调。
+     * 初值必须是 false：若从 true 起步，用户点选第一项时会被这里吞掉，
+     * 表现为"下拉能展开但选了没反应、二级下拉永远不出现"。
+     */
+    private boolean suppress = false;
 
     private SettingDropdown(Context ctx, TextInputLayout layout, MaterialAutoCompleteTextView input) {
         this.ctx = ctx;
