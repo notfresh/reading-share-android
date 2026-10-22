@@ -102,8 +102,6 @@
 
     <string name="no_data_available">暂无数据</string>
 
-    <string name="force_back">强制返回</string>
-    <string name="archive_back">存档返回</string>
     <string name="webview_switch_out">临时切出</string>
     <string name="webview_share">分享</string>
     <string name="extract_web_content">提取Web内容</string>

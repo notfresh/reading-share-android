@@ -34,7 +34,6 @@ public class Config {
         public static final String ACCEPT_LANGUAGE = "zh-CN,zh;q=0.9,en;q=0.8";
         public static final String ACCEPT_ENCODING = "gzip, deflate, br";
         public static final String CONNECTION = "keep-alive";
-        public static final String CACHE_CONTROL = "max-age=0";
         public static final String CONTENT_TYPE_JSON = "application/json";
     }
     

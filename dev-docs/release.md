@@ -1,3 +1,32 @@
+# 2.3.20
+简化 WebView 缓存：删掉「寄存页面实例」，换成「系统缓存 + 记住读到哪」。
+
+## 为什么删
+`WebViewManager` 那套 URL → WebView 实例寄存有 5 个硬伤：
+1. 命中后不重建 WebViewClient/WebChromeClient/JS 接口 → 回调全绑在已销毁的 Activity
+2. 命中的实例没从 Map 摘掉 → 同 URL 第三次打开可能拿到正在用/已销毁的实例
+3. WebView 持有 Activity Context → 最多泄漏 5 个 Activity 及其 View 树
+4. 只有「存档返回」一条入口能进缓存，「强制返回」/普通返回一律清，命中率极低
+5. 淘汰是 FIFO 不是 LRU；同 URL 重复 store 会覆盖且不 destroy 旧实例
+
+## 改动
+- **删除** `WebViewManager.java`(92 行) 及其 3 处调用、`preserveCache` 字段与相关分支、
+  `WebViewActivity.finish()` 覆写、`import static`
+- **菜单**：删除「强制返回」「存档返回」两项（`webview_menu.xml` + 两个 handler 分支 +
+  中英文案 `force_back`/`archive_back`）。合并后无差别，统一用系统返回键/手势
+- **缓存策略**：`WebViewDefaults.apply` 增加 `LOAD_CACHE_ELSE_NETWORK`（Activity 与阅读页共用一份，
+  `setupWebView` 的 6 行 settings 改为调它）；`WebViewActivity.onDestroy` **不再** `clearCache(true)`
+  —— 那是"下次打开快"的唯一来源
+- **去掉主动绕缓存**：`CrawlUtil` 不再发 `Cache-Control: max-age=0`（`Config.Headers.CACHE_CONTROL` 一并删除）
+- **新增** `util/ReadingPositionStore`(约 130 行)：URL → 滚动比例，SharedPreferences 里存最近 50 条（FIFO）。
+  `onPause` 记录，`onPageFinished` 恢复 —— 跨杀进程有效
+- `WebViewDesc.md` 顶部标注旧实现已废弃
+
+## 效果边界
+- 秒开程度取决于站点缓存头，不再有"寄存实例"那种零加载，但也不会再出现坏页面/泄漏
+- 离线正文仍然做不到（那需要另存 HTML/文本，是另一件事）
+- 音频清理逻辑原本就在 `onDestroy`，「存档返回」里那段是重复代码，随分支一起删掉
+
 # 2.3.19.9
 FAB 空槽位接上阅读页 + 阅读图标重绘。
 

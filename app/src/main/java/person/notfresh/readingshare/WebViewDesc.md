@@ -1,3 +1,8 @@
+> **状态(2.3.20)**:本文描述的是旧实现。`WebViewManager`(URL→WebView 实例寄存)已**整体删除**,
+> 原因:命中后回调绑死已销毁 Activity、泄漏 Activity、只有「存档返回」一条入口。
+> 现在改为「系统 HTTP 缓存(`LOAD_CACHE_ELSE_NETWORK`)+ `util/ReadingPositionStore` 记住滚动位置」。
+> 下文涉及 `WebViewManager` / `存档返回` / `preserveCache` 的部分仅作历史参考。
+
 ### 范围
 - 涉及文件：`WebViewActivity`, `WebViewManager`, 相关服务 `WebViewBackgroundService`（间接）、适配器入口 `LinksAdapter`（打开页面）
 

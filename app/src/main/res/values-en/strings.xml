@@ -102,8 +102,6 @@
 
     <string name="no_data_available">No data available</string>
 
-    <string name="force_back">Force back</string>
-    <string name="archive_back">Archive and back</string>
     <string name="webview_switch_out">Switch out temporarily</string>
     <string name="webview_share">Share</string>
     <string name="extract_web_content">Extract web content</string>

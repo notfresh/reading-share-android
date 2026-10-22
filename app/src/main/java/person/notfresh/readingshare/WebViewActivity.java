@@ -1,6 +1,5 @@
 package person.notfresh.readingshare;
 
-import static person.notfresh.readingshare.WebViewManager.*;
 
 import android.content.ClipboardManager;
 import android.content.ClipData;
@@ -17,7 +16,6 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
-import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
@@ -65,6 +63,8 @@ import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.dialog.AddOverrideRuleDialog;
 import person.notfresh.readingshare.model.OverrideAction;
 import person.notfresh.readingshare.model.WebViewOverrideRule;
+import person.notfresh.readingshare.util.ReadingPositionStore;
+import person.notfresh.readingshare.util.WebViewDefaults;
 import person.notfresh.readingshare.util.WebViewOverrideRules;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
@@ -90,7 +90,6 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     private PowerManager.WakeLock wakeLock;
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
-    private boolean preserveCache = false;
     private String pageTitleCache = "";
     private boolean historyRecordedForPageLoad;
     private boolean isExternalOpen = false; // 是否从外部打开
@@ -164,25 +163,12 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
             return;
         }
 
-        // 检查是否有缓存的WebView实例
-        WebView cachedWebView = getInstance().getWebView(currentUrl);
-        ViewGroup webViewContainer = findViewById(R.id.webview_container);
-
-        if (cachedWebView != null) {
-            // 使用缓存的WebView
-            webView = cachedWebView;
-            if (webView.getParent() != null) {
-                ((ViewGroup) webView.getParent()).removeView(webView);
-            }
-            webViewContainer.addView(webView, 0);
-            attachControlRevealTouchListener();
-            Toast.makeText(this, "已恢复存档页面", Toast.LENGTH_SHORT).show();
-        } else {
-            // 创建新的WebView
-            webView = findViewById(R.id.webview);
-            setupWebView();
-            webView.loadUrl(currentUrl);
-        }
+        // 2.3.20:不再寄存 WebView 实例(见 WebViewManager 删除说明),
+        // 每次打开都是新实例 + 系统缓存策略(WebViewDefaults.LOAD_CACHE_ELSE_NETWORK),
+        // 阅读位置由 ReadingPositionStore 记住并在 onPageFinished 里恢复。
+        webView = findViewById(R.id.webview);
+        setupWebView();
+        webView.loadUrl(currentUrl);
 
         initAudio();
 
@@ -221,27 +207,6 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     }
 
     @Override
-    public void finish() {
-        if (preserveCache) {
-            // 如果需要保留缓存，只处理WebView部分
-            if (webView != null) {
-                webView.stopLoading();
-                // 不清除历史和缓存，但停止WebView
-                webView.destroy();
-            }
-            // 不在这里释放mediaSession和wakeLock
-        } else {
-            // 不需要保留缓存时，检查WebViewManager中是否有当前URL的缓存
-            if (currentUrl != null && getInstance().hasCache(currentUrl)) {
-                // 清除WebViewManager中的缓存
-                Log.d("WebViewActivity", "清除URL缓存: " + currentUrl);
-                getInstance().removeWebView(currentUrl);
-            }
-        }
-        super.finish();  // 调用原始的finish方法
-    }
-
-    @Override
     public void onBackPressed() {
         // 如果 WebView 可以后退，则后退
         if (webView.canGoBack()) {
@@ -268,18 +233,14 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
 
     @Override
     protected void onDestroy() {
-        Log.d("WVCollapse", "onDestroy 进入,isCollapsedToMini=" + isCollapsedToMini + ", preserveCache=" + preserveCache + ", webView=" + (webView == null ? "null" : "not null"));
-        if (!preserveCache && !isCollapsedToMini) {  // 只有在不保留缓存时才清除WebView缓存
-            // 清理 WebView
+        Log.d("WVCollapse", "onDestroy 进入,isCollapsedToMini=" + isCollapsedToMini + ", webView=" + (webView == null ? "null" : "not null"));
+        if (!isCollapsedToMini) {
+            // 清理 WebView 实例;但**不清**磁盘/HTTP 缓存 —— 那是"下次打开快"的唯一来源
             if (webView != null) {
                 webView.stopLoading();
                 webView.clearHistory();
-                webView.clearCache(true);
                 webView.destroy();
             }
-        }
-        if(preserveCache){  // 只生效一次,反转回来
-           preserveCache = false;
         }
 
         // 折叠到 mini 场景下不拆毁音频链路:service 继续保活,MediaCallback/媒体会话/音频焦点都不动
@@ -382,41 +343,6 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
                 Toast.makeText(this, "无法打开浏览器", Toast.LENGTH_SHORT).show();
                 return true;
             }
-        } else if (item.getItemId() == R.id.action_force_back) {
-            // 强制返回，直接关闭当前 WebView
-            Log.d("WebViewActivityMenu", "点击了强制返回");
-            finish();
-            return true;
-        } else if (item.getItemId() == R.id.action_archive_back) {
-            // 存档返回，保存整个WebView实例
-            Log.d("WebViewActivityMenu", "点击了存档返回");
-            Toast.makeText(this, "页面已存档", Toast.LENGTH_SHORT).show();
-
-            // 释放音频资源
-            if (audioManager != null && audioFocusRequest != null) {
-                audioManager.abandonAudioFocusRequest(audioFocusRequest);
-            }
-            stopService(new Intent(this, WebViewBackgroundService.class));
-            if (wakeLock != null && wakeLock.isHeld()) {
-                wakeLock.release();
-            }
-            if (mediaSession != null) {
-                mediaSession.setActive(false);
-                mediaSession.release();
-                mediaSession = null;
-            }
-
-            // 从布局中移除WebView以保持其状态
-            if (webView != null && webView.getParent() != null) {
-                ((ViewGroup) webView.getParent()).removeView(webView);
-                // 存储WebView实例
-                getInstance().storeWebView(currentUrl, webView);
-                // 设置webView为null以防止在onDestroy中被销毁
-                webView = null;
-            }
-            preserveCache = true;  // 保留其他标记
-            finish();
-            return true;
         } else if (item.getItemId() == R.id.webview_share) {
             Log.d("WebViewActivityMenu", "点击了分享");
             String title = (pageTitleCache != null && !pageTitleCache.isEmpty()) ? pageTitleCache : (webView != null ? webView.getTitle() : "");
@@ -548,21 +474,8 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     private void setupWebView() {
         attachControlRevealTouchListener();
 
-        // 启用 JavaScript
-        webView.getSettings().setJavaScriptEnabled(true);
-
-        // 设置缩放控制
-        webView.getSettings().setBuiltInZoomControls(true);
-        webView.getSettings().setDisplayZoomControls(false);
-
-        // 启用 DOM storage
-        webView.getSettings().setDomStorageEnabled(true);
-
-        // 允许混合内容（HTTP和HTTPS）
-        webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-
-        // 允许自动播放媒体
-        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        // 基础设置 + 缓存策略统一在 WebViewDefaults（阅读页也用这一份，2.3.20）
+        WebViewDefaults.apply(webView);
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -609,6 +522,7 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 recordLinkHistory(view, url);
+                restoreReadingPosition(view, url);
                 try {
                     String t = view.getTitle();
                     if (t != null && !t.trim().isEmpty()) {
@@ -1172,6 +1086,7 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     @Override
     protected void onPause() {
         isAppInForeground = false;
+        saveReadingPosition();
         // 普通页面不能触碰当前折叠 session 的 Service.
         if (!isCollapsedToMini && !CollapsedPlaybackSession.getInstance().isActive()) {
             // 无条件启动前台服务保活进程，不请求 AudioFocus（WebView 自己管理焦点）
@@ -1182,6 +1097,43 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
             }
         }
         super.onPause();
+    }
+
+    /** 记录当前页面的阅读进度(0..1)，onPause 时调用。 */
+    private void saveReadingPosition() {
+        try {
+            if (webView == null) return;
+            String url = webView.getUrl();
+            if (url == null || url.isEmpty()) return;
+            float contentHeight = webView.getContentHeight() * getResources().getDisplayMetrics().density;
+            if (contentHeight <= 0f) return;
+            float percent = Math.max(0f, Math.min(1f, webView.getScrollY() / contentHeight));
+            ReadingPositionStore.save(this, url, percent);
+        } catch (Exception e) {
+            Log.w("WVPosition", "save reading position failed", e);
+        }
+    }
+
+    /** 页面加载完成后滚回上次位置；没有记录就不动。 */
+    private void restoreReadingPosition(WebView view, String url) {
+        try {
+            if (view == null || url == null || url.isEmpty()) return;
+            float percent = ReadingPositionStore.load(this, url);
+            if (percent <= 0f) return;
+            // 图片懒加载在 onPageFinished 之后还会长高，用 getContentHeight 现算再滚
+            view.post(() -> {
+                try {
+                    float contentHeight = view.getContentHeight() * getResources().getDisplayMetrics().density;
+                    if (contentHeight > 0f) {
+                        view.scrollTo(0, (int) (contentHeight * percent));
+                    }
+                } catch (Exception ignored) {
+                    // 恢复失败不影响阅读
+                }
+            });
+        } catch (Exception e) {
+            Log.w("WVPosition", "restore reading position failed", e);
+        }
     }
 
     private void initAudio() {
