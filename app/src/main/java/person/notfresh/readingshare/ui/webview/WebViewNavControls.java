@@ -1,4 +1,4 @@
-package person.notfresh.readingshare.ui.reader;
+package person.notfresh.readingshare.ui.webview;
 
 import android.content.Context;
 import android.os.Handler;
@@ -6,17 +6,18 @@ import android.os.Looper;
 import android.view.View;
 
 /**
- * 阅读页翻页控件的显隐策略（2.3.19.2）。
+ * 翻页控件（底部横排 + 右侧悬浮层）的显隐策略 —— 目标2 唯一实现。
  *
- * <p><b>这是 WebViewActivity:1332-1444 的复制版</b> —— 语义逐条对齐：
  * <ul>
  *   <li>reading_mode=normal → 控件永不显示</li>
- *   <li>reading_mode=smooth → 底部条/悬浮层按 nav_button_style(bottom|floating|both) 显示</li>
+ *   <li>reading_mode=smooth → 按 nav_button_style(bottom|floating|both) 显示</li>
  *   <li>显示后 3 秒自动隐藏；触摸网页临时唤起；手动隐藏状态持久化(nav_controls_hidden)</li>
  * </ul>
- * 抽公共留到第二刀（与 Activity 合并成同一个类），见 2.3.19 第一轮的报告。</p>
+ *
+ * <p>原来 Activity 与阅读页各写一份(语义相同但代码两份),现由本类统一,
+ * 两个宿主只负责提供 View 与翻页动作。</p>
  */
-public final class ReaderControlsController {
+public final class WebViewNavControls {
 
     /** 与 WebViewActivity.CONTROLS_AUTO_HIDE_MS 对齐。 */
     private static final int AUTO_HIDE_MS = 3000;
@@ -39,7 +40,7 @@ public final class ReaderControlsController {
 
     private boolean hasContent = false;
 
-    public ReaderControlsController(View bottomControls, View floatingControls) {
+    public WebViewNavControls(View bottomControls, View floatingControls) {
         this.bottomControls = bottomControls;
         this.floatingControls = floatingControls;
     }

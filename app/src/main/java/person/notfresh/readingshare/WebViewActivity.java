@@ -66,6 +66,7 @@ import person.notfresh.readingshare.model.WebViewOverrideRule;
 import person.notfresh.readingshare.ui.webview.AddTagDialog;
 import person.notfresh.readingshare.ui.webview.EditTitleDialog;
 import person.notfresh.readingshare.ui.webview.PageTarget;
+import person.notfresh.readingshare.ui.webview.WebViewNavControls;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ReadingPositionStore;
 import person.notfresh.readingshare.util.WebViewDefaults;
@@ -106,10 +107,8 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     private ImageButton buttonFloatingNext;
     private ImageButton buttonFloatingRandom;
     private Random random = new Random();
-    private Handler controlsHandler = new Handler(Looper.getMainLooper());
-    private Runnable hideControlsRunnable;
     private static final int CONTROLS_AUTO_HIDE_MS = 3000;
-    private boolean navigationControlsManuallyHidden = false; // 用户手动隐藏状态
+    private WebViewNavControls navControls;
 
     private static final String PREFS_NAME = "settings";
     private static final String KEY_NAV_CONTROLS_HIDDEN = "nav_controls_hidden";
@@ -1028,7 +1027,6 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
                 buttonNext = navigationControls.findViewById(R.id.button_next);
                 if (buttonPrevious != null) buttonPrevious.setOnClickListener(v -> navigateToPrevious());
                 if (buttonNext != null) buttonNext.setOnClickListener(v -> navigateToNext());
-                navigationControls.setVisibility(hasValidNavigationContext() ? View.VISIBLE : View.GONE);
             }
 
             floatingNavControls = findViewById(R.id.floating_nav_controls);
@@ -1039,99 +1037,28 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
                 if (buttonFloatingPrevious != null) buttonFloatingPrevious.setOnClickListener(v -> navigateToPrevious());
                 if (buttonFloatingNext != null) buttonFloatingNext.setOnClickListener(v -> navigateToNext());
                 if (buttonFloatingRandom != null) buttonFloatingRandom.setOnClickListener(v -> navigateToRandom());
-                floatingNavControls.setVisibility(hasValidNavigationContext() ? View.VISIBLE : View.GONE);
             }
 
-            hideControlsRunnable = () -> runOnUiThread(() -> {
-                if (navigationControls != null) navigationControls.setVisibility(View.GONE);
-                if (floatingNavControls != null) floatingNavControls.setVisibility(View.GONE);
-            });
+            // 显隐策略统一由 WebViewNavControls 负责(与阅读页同一份实现)
+            navControls = new WebViewNavControls(navigationControls, floatingNavControls);
         } catch (Exception e) {
             Log.w("WebViewActivity", "setupNavigationControls failed: " + e.getMessage());
         }
     }
 
     private void initControlsIfNeeded() {
-        if (navigationControls == null) setupNavigationControls();
-        if (!hasValidNavigationContext()) {
-            if (navigationControls != null) navigationControls.setVisibility(View.GONE);
-            if (floatingNavControls != null) floatingNavControls.setVisibility(View.GONE);
-            return;
+        if (navControls == null) setupNavigationControls();
+        if (navControls != null) {
+            navControls.setContentAvailable(this, hasValidNavigationContext());
         }
-        // 读取用户手动隐藏的状态
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        navigationControlsManuallyHidden = prefs.getBoolean(KEY_NAV_CONTROLS_HIDDEN, false);
-
-        boolean smoothMode = isSmoothReadingMode();
-        boolean showBottom = shouldShowBottomNav();
-        boolean showFloating = shouldShowFloatingNav();
-
-        if (navigationControls != null && !showBottom) {
-            navigationControls.setVisibility(View.GONE);
-        }
-        if (floatingNavControls != null && !showFloating) {
-            floatingNavControls.setVisibility(View.GONE);
-        }
-        if (!smoothMode) {
-            // 普通模式：完全不显示导航控件
-            if (navigationControls != null) navigationControls.setVisibility(View.GONE);
-            if (floatingNavControls != null) floatingNavControls.setVisibility(View.GONE);
-            return;
-        }
-        if (navigationControlsManuallyHidden) {
-            // 丝滑模式但用户手动隐藏了底部横排，悬浮按原规则显示
-            if (navigationControls != null) navigationControls.setVisibility(View.GONE);
-            if (showFloating && floatingNavControls != null) {
-                floatingNavControls.setVisibility(View.VISIBLE);
-                controlsHandler.removeCallbacks(hideControlsRunnable);
-                controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
-            }
-            return;
-        }
-        // 丝滑模式且未手动隐藏：底部横排与悬浮按设置项显示，3秒后自动隐藏
-        if (showBottom && navigationControls != null) {
-            navigationControls.setVisibility(View.VISIBLE);
-        }
-        if (showFloating && floatingNavControls != null) {
-            floatingNavControls.setVisibility(View.VISIBLE);
-        }
-        controlsHandler.removeCallbacks(hideControlsRunnable);
-        controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
     }
 
     private void showControlsTemporarily() {
-        if (!hasValidNavigationContext()) return;
-        if (navigationControlsManuallyHidden) return;
-        boolean anyShown = false;
-        if (shouldShowBottomNav() && navigationControls != null) {
-            navigationControls.setVisibility(View.VISIBLE);
-            anyShown = true;
-        }
-        if (shouldShowFloatingNav() && floatingNavControls != null) {
-            floatingNavControls.setVisibility(View.VISIBLE);
-            anyShown = true;
-        }
-        if (anyShown) {
-            controlsHandler.removeCallbacks(hideControlsRunnable);
-            controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
-        }
+        if (navControls != null) navControls.onWebViewTouched(this);
     }
 
     private void toggleNavigationControls() {
-        // 设置项为 FLOATING 时,底部横排永久 GONE,菜单项 action_toggle_navigation 变成 no-op
-        if (shouldShowFloatingNav() && !shouldShowBottomNav()) return;
-        if (navigationControls == null || !hasValidNavigationContext()) return;
-        navigationControlsManuallyHidden = !navigationControlsManuallyHidden;
-        // 保存状态到 SharedPreferences
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putBoolean(KEY_NAV_CONTROLS_HIDDEN, navigationControlsManuallyHidden).apply();
-        if (navigationControlsManuallyHidden) {
-            navigationControls.setVisibility(View.GONE);
-            controlsHandler.removeCallbacks(hideControlsRunnable);
-        } else {
-            navigationControls.setVisibility(View.VISIBLE);
-            controlsHandler.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS);
-        }
+        if (navControls != null) navControls.toggleManually(this);
     }
 
     private boolean isSmoothReadingMode() {
@@ -1144,22 +1071,8 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
         }
     }
 
-    private boolean shouldShowBottomNav() {
-        String style = getSharedPreferences("settings", MODE_PRIVATE)
-                .getString("nav_button_style", "both");
-        return "bottom".equals(style) || "both".equals(style);
-    }
-
-    private boolean shouldShowFloatingNav() {
-        String style = getSharedPreferences("settings", MODE_PRIVATE)
-                .getString("nav_button_style", "both");
-        return "floating".equals(style) || "both".equals(style);
-    }
-
     private void attachControlRevealTouchListener() {
-        if (webView == null) {
-            return;
-        }
+        if (webView == null) return;
         webView.setOnTouchListener((view, event) -> {
             if (event.getAction() == MotionEvent.ACTION_DOWN
                     && hasValidNavigationContext()

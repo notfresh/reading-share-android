@@ -43,6 +43,7 @@ import person.notfresh.readingshare.model.WebViewOverrideRule;
 import person.notfresh.readingshare.reader.ReaderSources;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ReaderSourceStore;
+import person.notfresh.readingshare.ui.webview.WebViewNavControls;
 import person.notfresh.readingshare.util.WebViewDefaults;
 import person.notfresh.readingshare.util.WebViewOverrideRules;
 
@@ -68,7 +69,7 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
     private Button prevButton;
     private Button nextButton;
     private ImageButton randomButton;
-    private ReaderControlsController controlsController;
+    private WebViewNavControls controlsController;
 
     private ReaderQueue queue;
     private LinkDao linkDao;
@@ -120,7 +121,7 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         if (floatingPrev != null) floatingPrev.setOnClickListener(v -> step(Move.PREVIOUS));
         if (floatingNext != null) floatingNext.setOnClickListener(v -> step(Move.NEXT));
 
-        controlsController = new ReaderControlsController(bottomControls, floatingControls);
+        controlsController = new WebViewNavControls(bottomControls, floatingControls);
         webView.setOnTouchListener((v, event) -> {
             if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
                 controlsController.onWebViewTouched(requireContext());
