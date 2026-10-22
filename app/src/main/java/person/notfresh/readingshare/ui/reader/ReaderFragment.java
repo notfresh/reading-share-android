@@ -95,9 +95,17 @@ public class ReaderFragment extends Fragment implements WebViewMenuActions.Page,
     }
 
     @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // 与 HomeFragment / SubjectFragment / TagsFragment 等其余 8 个 fragment 一致:
+        // 必须放 onCreate,不能放 onViewCreated —— 后者在 nav_reader destination
+        // 的某些时序下已经错过 ActionBar 建菜单的窗口,声明被丢弃,菜单项进不了 toolbar。
+        setHasOptionsMenu(true);
+    }
+
+    @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        setHasOptionsMenu(true);
 
         webView = view.findViewById(R.id.reader_webview);
         progress = view.findViewById(R.id.reader_progress);

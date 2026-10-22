@@ -1,3 +1,42 @@
+# 2.3.21.9
+
+修复：阅读页 toolbar 的三个常驻按钮（加标签 / 改标题 / 切换拦截）仍不显示，只剩 ⋮。
+
+## 排查过程（都排除了）
+
+1. 菜单资源已验证正确 —— 用 `aapt2 dump xmltree` 解 APK，三项都是
+   `showAsAction=0x2`(ALWAYS) 且 `icon` 指向真实存在的 drawable 资源
+2. 2.3.21.7 加的 `menu.clear()`（照抄 HomeFragment）无效
+3. 图标已存在（2.3.21.5 加的 `ic_tag` / `ic_edit_title`），不是"没图标所以折叠"
+
+## 真根因
+
+**`setHasOptionsMenu(true)` 的调用位置错了。**
+
+- `HomeFragment` 等其余 8 个 fragment：都在 `onCreate()` 里调
+- `ReaderFragment`：放在 `onViewCreated()` 里
+
+`nav_reader` 这个 destination 的 view 时序下，`onViewCreated` 已经错过 ActionBar
+建立菜单的窗口期，声明被丢弃 → 菜单项根本没进宿主 ActionBar。
+这也解释了为什么 `menu.clear()` 无效：不是被挤，是压根没进来。
+
+## 改动
+
+- `ReaderFragment`：新增 `onCreate()`，`setHasOptionsMenu(true)` 从 `onViewCreated` 挪进来
+- 顺带 `ic_external_block` 36dp → 24dp（toolbar action icon 标准尺寸，
+  原来比同排另两个图标大 50%）
+
+## 教训
+
+**这个题我连错三次**：「没图标所以折叠」→「toolbar 放不下」→「menu.clear 就能解决」。
+三次都在没拿到实际证据的情况下下结论。第三次才学会用 `aapt2 dump xmltree` 去解 APK
+确认资源是否真的编译进去了 —— 这个手段应该在第一次就用。
+**涉及 UI 呈现：先取证（dump APK / 看截图 / 查数据源在哪），再下结论。**
+
+## 验证
+
+`./gradlew clean assembleDebug assembleDebugUnitTest` → 36 actionable tasks: 36 executed，BUILD SUCCESSFUL
+
 # 2.3.21.8
 
 修复：WebViewActivity 的「添加标签」弹窗不显示该链接已有的标签（整块「当前标签」缺失）。
