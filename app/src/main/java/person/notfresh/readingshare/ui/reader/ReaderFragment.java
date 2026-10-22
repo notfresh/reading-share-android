@@ -16,6 +16,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -66,7 +67,7 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
     private View floatingControls;
     private Button prevButton;
     private Button nextButton;
-    private Button randomButton;
+    private ImageButton randomButton;
     private ReaderControlsController controlsController;
 
     private ReaderQueue queue;
