@@ -7,7 +7,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.util.Log;
-import android.widget.CheckBox;
 import android.widget.Toast;
 
 import person.notfresh.readingshare.R;
@@ -76,31 +75,24 @@ public final class ExternalLinkOpener {
     }
 
     /**
-     * 确认弹窗：留在网页 / 继续打开，外加一个"以后都留在网页"勾选框。
+     * 三档确认弹窗：留在网页 / 拒绝并禁止弹窗 / 继续打开。
      *
-     * <p>为什么不是三个按钮（2.3.20.1）：切英文后「Stay on page / Deny and stop asking / Open」
-     * 三个按钮一行放不下，系统会把按钮竖排，样式直接变形。三个动作里"以后别再问"本质是
-     * 对"留在网页"的修饰，不是平级动作 —— 改成勾选框后按钮只剩两个，中英都不会溢出。</p>
+     * <p>样式保持三按钮原样(2.3.20.2 用户要求)。英文文案必须短 ——
+     * 「Stay on page / Deny and stop asking / Open」超宽会让系统把按钮竖排,
+     * 所以英文用 Stay / Never ask / Open(见 values-en/strings.xml),
+     * 不用"改布局/框定宽度"这种侵入手段。</p>
      *
-     * @param onForbidAll 勾选"以后都留在网页"并选择留下时的回调（由调用方决定要不要持久化）
+     * @param onForbidAll 用户选"拒绝并禁止弹窗"时的回调（由调用方决定要不要持久化）
      */
     public static void confirm(Context ctx, String url, Runnable onForbidAll) {
         if (ctx == null || url == null || url.isEmpty()) return;
-
-        CheckBox forbidCheckBox = new CheckBox(ctx);
-        forbidCheckBox.setText(R.string.reader_external_confirm_forbid);
-        int padding = Math.round(20 * ctx.getResources().getDisplayMetrics().density);
-        forbidCheckBox.setPadding(padding, padding / 2, padding, 0);
-
         new AlertDialog.Builder(ctx)
                 .setTitle(R.string.reader_external_confirm_title)
                 .setMessage(ctx.getString(R.string.reader_external_confirm_message, url))
-                .setView(forbidCheckBox)
-                .setNegativeButton(R.string.reader_external_confirm_stay, (dialog, which) -> {
-                    if (forbidCheckBox.isChecked()) {
-                        forbidAll(ctx);
-                        if (onForbidAll != null) onForbidAll.run();
-                    }
+                .setNegativeButton(R.string.reader_external_confirm_stay, null)
+                .setNeutralButton(R.string.reader_external_confirm_forbid, (dialog, which) -> {
+                    forbidAll(ctx);
+                    if (onForbidAll != null) onForbidAll.run();
                 })
                 .setPositiveButton(R.string.reader_external_confirm_open,
                         (dialog, which) -> open(ctx, url))

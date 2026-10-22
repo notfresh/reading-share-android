@@ -1,3 +1,32 @@
+# 2.3.20.2
+回退 2.3.20.1 的弹窗改动：样式保持原样（三个按钮），只缩短英文文案。
+
+## 背景
+2.3.20.1 把「打开外部应用」确认弹窗改成"两按钮 + 勾选框"，用户明确不要这种样式改动。
+本版恢复 `setNegativeButton + setNeutralButton + setPositiveButton` 三按钮原样。
+
+## 真正的原因与修法
+按钮竖排不是样式问题，是**文案超宽**：英文原来写的是
+`Stay on page` / `Deny and stop asking` / `Open`，三个加起来超过屏幕宽度，
+Android 的 button bar 就自动改成竖排。修法是缩短文案，不动布局：
+
+| key | 中文 | 英文（新） | 英文（旧） |
+|---|---|---|---|
+| `reader_external_confirm_stay` | 留在网页 | Stay | Stay on page |
+| `reader_external_confirm_forbid` | 拒绝并禁止弹窗 | Never ask | Deny and stop asking |
+| `reader_external_confirm_open` | 继续打开 | Open | Open |
+
+中文文案完全不变。
+
+## 保留（非样式改动）
+`WebViewActivity.showExternalOpenConfirmDialog` 仍调用共享实现
+`ExternalLinkOpener.confirm`，不再保留自己那份硬编码中文弹窗 —— 否则英文界面下这里还是弹中文。
+
+## 为什么不"强制设宽度"
+AlertDialog 的 button bar 是 LinearLayout，超宽就竖排；要强行横排只能自定义布局或
+`setView` 手撸视图，属于侵入式改动、且以后文案再长又会挤。
+缩短文案是零布局风险的做法。
+
 # 2.3.20.1
 修复：切英文后「打开外部应用」确认弹窗的三个按钮挤不开，系统把按钮竖排、样式变形。
 
