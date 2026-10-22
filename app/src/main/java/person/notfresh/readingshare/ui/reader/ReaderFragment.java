@@ -186,6 +186,9 @@ public class ReaderFragment extends Fragment implements WebViewMenuActions.Page,
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
+        // 与 HomeFragment 一致:先清空宿主已有菜单(MainActivity 的 ActionBar 里
+        // 可能有 NavigationUI 注入的项),再 inflate 自己这份,否则常驻项被挤进溢出。
+        menu.clear();
         menuActions.inflate(menu);
     }
 

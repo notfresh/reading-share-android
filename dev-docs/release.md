@@ -1,3 +1,33 @@
+# 2.3.21.7
+
+修复：阅读页 toolbar 的「加标签 / 改标题 / 切换拦截模式」明明配了 `showAsAction="always"`
+且都有图标，却被挤进 ⋮ 溢出菜单（WebViewActivity 同一份菜单正常显示）。
+
+## 根因
+
+Fragment 的 `onCreateOptionsMenu(Menu, MenuInflater)` 是 deprecated 老 API，菜单是**合并进**
+宿主 Activity 的 ActionBar。`MainActivity` 的 ActionBar 里已有 `NavigationUI.setupActionBarWithNavController`
+注入的项，`ReaderFragment` 只调了 `super.onCreateOptionsMenu(menu, inflater)` 没清空，
+宿主那份叠在前面把自己的项挤进溢出。
+
+`HomeFragment` 同一套老 API 但第一行就 `menu.clear()`（`HomeFragment.java:201`），所以正常。
+照抄那一行即可。
+
+## 改动
+
+`ReaderFragment.onCreateOptionsMenu` 加 `menu.clear()`（放在 `super` 之后、`menuActions.inflate` 之前）。
+
+## 教训
+
+- **同一份菜单资源 + 同一个动作类，两个宿主行为不同 → 差异必在宿主侧**，
+  不要再往菜单资源 / 图标上找原因。
+- 我连续两次在阅读页这题上给出未验证的结论（先说"没图标所以折叠"、又说"toolbar 放不下"），
+  两次都被用户截图否掉。**涉及 UI 呈现的问题，先看用户截图/实际渲染，不要靠代码推测下结论。**
+
+## 验证
+
+`./gradlew clean assembleDebug assembleDebugUnitTest` → 36 actionable tasks: 36 executed，BUILD SUCCESSFUL
+
 # 2.3.21.6
 
 重构：「给链接打标签」弹窗收敛成全 app 唯一实现；同时修掉 WebView 页重定向后「当前标签」不显示。
