@@ -40,6 +40,8 @@
     <string name="reader_external_open_failed">无法打开此链接: %1$s</string>
     <string name="reader_source_section_title">阅读页数据来源</string>
     <string name="reader_source_hint_type">来源类型</string>
+    <string name="setting_default_tab_hint">启动页</string>
+    <string name="setting_recent_tags_window_hint">窗口大小</string>
     <string name="reader_source_no_options">该类型下还没有可选项</string>
     <string name="reader_source_hint_param">具体项</string>
     <string name="reader_source_type_all">全部链接</string>

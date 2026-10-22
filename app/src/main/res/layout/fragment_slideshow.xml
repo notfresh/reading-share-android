@@ -17,11 +17,12 @@
             android:textSize="18sp"
             android:layout_marginBottom="8dp"/>
 
-        <Spinner
-            android:id="@+id/default_tab_spinner"
+        <!-- 2.3.19.8: 下拉统一走 SettingDropdown(Material exposed dropdown),此处只留宿主容器 -->
+        <LinearLayout
+            android:id="@+id/default_tab_dropdown_host"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="8dp"/>
+            android:orientation="vertical"/>
 
         <CheckBox
             android:id="@+id/show_mail_fab_checkbox"
@@ -305,11 +306,11 @@
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"/>
 
-        <Spinner
-            android:id="@+id/recent_tags_window_spinner"
+        <LinearLayout
+            android:id="@+id/recent_tags_window_dropdown_host"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="8dp"/>
+            android:orientation="vertical"/>
 
         <TextView
             android:layout_width="wrap_content"

@@ -17,14 +17,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
-import android.widget.Spinner;
 import android.widget.Toast;
 import android.app.AlertDialog;
 
@@ -35,6 +32,7 @@ import androidx.fragment.app.Fragment;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -82,8 +80,8 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
     private static final int REQUEST_CODE_IMPORT_FILE = 1; // 改为通用文件导入
     private static final String DEFAULT_SERVER_URL = "https://duxiang.ai";
 
-    private Spinner defaultTabSpinner;
-    private Spinner recentTagsWindowSpinner;
+    private SettingDropdown defaultTabDropdown;
+    private SettingDropdown recentTagsWindowDropdown;
     private LinkDao linkDao; // 声明 LinkDao
     private TextInputEditText serverUrlInput;
     private TextInputEditText syncSecretKeyInput;
@@ -102,18 +100,14 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         // 初始化同步管理器
         syncManager = new SimpleSyncManager(requireContext());
 
-        defaultTabSpinner = root.findViewById(R.id.default_tab_spinner);
-
-        // 设置 Spinner 的选项
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(getContext(),
-                R.array.default_tabs_array, android.R.layout.simple_spinner_item);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        defaultTabSpinner.setAdapter(adapter);
+        // 默认 Tab 下拉（2.3.19.8：与「阅读数据来源」同一套 Material exposed dropdown）
+        final String[] tabLabels = getResources().getStringArray(R.array.default_tabs_array);
+        final List<String> tabOptions = new ArrayList<>(Arrays.asList(tabLabels));
 
         // 加载保存的默认 Tab
         SharedPreferences prefs = requireActivity().getPreferences(Context.MODE_PRIVATE);
         int defaultTab = prefs.getInt("default_tab", 0);
-        
+
         // 处理已废弃的标签页选项（原索引1）的迁移
         // 原索引：0=首页, 1=标签(已废弃), 2=主题, 3=RSS, 4=随机
         // 新索引：0=首页, 1=主题, 2=RSS, 3=随机
@@ -138,63 +132,53 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         }
 
         // 兜底：避免越界导致崩溃
-        if (adjustedTab < 0 || adjustedTab >= adapter.getCount()) {
+        if (adjustedTab < 0 || adjustedTab >= tabOptions.size()) {
             adjustedTab = 0;
         }
-        
-        defaultTabSpinner.setSelection(adjustedTab);
+
+        ViewGroup defaultTabHost = root.findViewById(R.id.default_tab_dropdown_host);
+        defaultTabDropdown = SettingDropdown.attach(requireContext(), defaultTabHost)
+                .setHint(R.string.setting_default_tab_hint);
+        defaultTabDropdown.setOptions(tabOptions, adjustedTab);
 
         // 保存用户选择
-        defaultTabSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                SharedPreferences.Editor editor = prefs.edit();
-                // 将新索引映射回原索引格式（用于MainActivity的兼容性）
-                // 新索引：0=首页, 1=主题, 2=RSS, 3=随机
-                // 原索引：0=首页, 2=主题, 3=RSS（跳过已废弃的1=标签）, 4=随机
-                int savedTab;
-                if (position == 0) {
-                    savedTab = 0; // 主题
-                } else if (position == 1) {
-                    savedTab = 2; // 链接
-                } else if (position == 2) {
-                    savedTab = 3; // RSS
-                } else if (position == 3) {
-                    savedTab = 4; // 随机
-                } else {
-                    savedTab = 5; // 阅读(2.3.19)
-                }
-                editor.putInt("default_tab", savedTab);
-                editor.apply();
+        defaultTabDropdown.setOnSelected(position -> {
+            SharedPreferences.Editor editor = prefs.edit();
+            // 将新索引映射回原索引格式（用于MainActivity的兼容性）
+            // 新索引：0=首页, 1=主题, 2=RSS, 3=随机
+            // 原索引：0=首页, 2=主题, 3=RSS（跳过已废弃的1=标签）, 4=随机
+            int savedTab;
+            if (position == 0) {
+                savedTab = 0; // 首页
+            } else if (position == 1) {
+                savedTab = 2; // 链接
+            } else if (position == 2) {
+                savedTab = 3; // RSS
+            } else if (position == 3) {
+                savedTab = 4; // 随机
+            } else {
+                savedTab = 5; // 阅读(2.3.19)
             }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+            editor.putInt("default_tab", savedTab);
+            editor.apply();
         });
 
-        // 初始化最近标签窗口大小 Spinner
-        recentTagsWindowSpinner = root.findViewById(R.id.recent_tags_window_spinner);
-        ArrayAdapter<CharSequence> windowAdapter = ArrayAdapter.createFromResource(getContext(),
-                R.array.recent_tags_window_array, android.R.layout.simple_spinner_item);
-        windowAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        recentTagsWindowSpinner.setAdapter(windowAdapter);
+        // 最近标签窗口大小下拉（2.3.19.8 同上）
+        final String[] windowLabels = getResources().getStringArray(R.array.recent_tags_window_array);
+        final List<String> windowOptions = new ArrayList<>(Arrays.asList(windowLabels));
 
-        // 加载保存的窗口大小
+        // 加载保存的窗口大小，保存值-3 = 索引
         int savedWindow = RecentTagsManager.getRecentTagsWindow(requireContext());
-        // 将保存的值转换为 Spinner 索引 (保存值-3 = 索引)
-        int windowIndex = Math.max(0, Math.min(7, savedWindow - 3));
-        recentTagsWindowSpinner.setSelection(windowIndex);
+        int windowIndex = Math.max(0, Math.min(windowOptions.size() - 1, savedWindow - 3));
 
-        // 保存用户选择
-        recentTagsWindowSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                int window = position + 3;  // 索引+3 = 实际窗口值
-                RecentTagsManager.setRecentTagsWindow(requireContext(), window);
-            }
+        ViewGroup windowHost = root.findViewById(R.id.recent_tags_window_dropdown_host);
+        recentTagsWindowDropdown = SettingDropdown.attach(requireContext(), windowHost)
+                .setHint(R.string.setting_recent_tags_window_hint);
+        recentTagsWindowDropdown.setOptions(windowOptions, windowIndex);
 
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+        recentTagsWindowDropdown.setOnSelected(position -> {
+            int window = position + 3;  // 索引+3 = 实际窗口值
+            RecentTagsManager.setRecentTagsWindow(requireContext(), window);
         });
 
         // 初始化服务器URL输入框

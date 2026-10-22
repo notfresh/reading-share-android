@@ -1,3 +1,20 @@
+# 2.3.19.8
+设置页下拉风格统一：默认Tab / 最近标签窗口 从裸 Spinner 换成 Material exposed dropdown。
+
+## 改动
+- `fragment_slideshow.xml`：两个 `<Spinner>` 换成空宿主 `LinearLayout`
+  (`default_tab_dropdown_host` / `recent_tags_window_dropdown_host`)
+- `SettingFragment`：改用 `SettingDropdown`(与「阅读页数据来源」同一实例类型),
+  选项走 `R.array.default_tabs_array` / `recent_tags_window_array`
+- 新增 hint:`setting_default_tab_hint`(启动页 / Start page)、
+  `setting_recent_tags_window_hint`(窗口大小 / Window size),中英同步
+- `default_tab` 的索引迁移逻辑(旧 1=标签废弃 → 迁移、新索引↔旧索引映射)原样保留,行为不变
+- 删掉 `SettingFragment` 里不再使用的 `Spinner`/`ArrayAdapter`/`AdapterView` import
+
+## 注意
+`SettingDropdown` 只在用户真的点选时回调(程序化 setOptions 不触发),
+首次进入设置页不会因为"恢复显示"而意外改写 `default_tab` / 窗口大小。
+
 # 2.3.19.7
 修复:设置页数据来源下拉"选了没反应"(表现为选「某个标签」后没有任何标签可选)。
 
