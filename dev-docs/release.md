@@ -1,3 +1,47 @@
+# 2.3.21.6
+
+重构：「给链接打标签」弹窗收敛成全 app 唯一实现；同时修掉 WebView 页重定向后「当前标签」不显示。
+
+## 1. 三份重复 UI 收敛成一份
+
+这个弹窗历史上被复制了三份，**同 layout、同联想 helper、同 recent 逻辑、同「当前标签点击删除」**，
+只差两件事：「已有标签从哪来」和「保存走谁」：
+
+| 位置 | 已有标签来源 | 保存路径 |
+|---|---|---|
+| WebViewActivity 内联版（已删，2.3.21.1） | `getAllLinks()` 线性扫 3000 条 | DAO |
+| ReaderMenuActions 版（已删，2.3.21.3） | DAO | DAO |
+| LinksAdapter 内联版（本次删） | 内存 `item.getTags()` | `addTagsToLink` |
+
+现在统一到 `ui/webview/AddTagDialog`，两个入口：
+
+- `show(ctx, target)` —— WebView 两页，已有标签与保存都走 DAO
+- `show(ctx, target, existingTags, onSaved)` —— 列表页，已有标签由 caller 给
+  （本来就在内存 LinkItem 上，不必回查），保存走 caller 回调（它还要 notify + 事件日志）
+
+`LinksAdapter.showAddTagDialog` 86 行 → 29 行（−57 行）。
+
+## 2. 修 WebView 页重定向后「当前标签」不显示
+
+`AddTagDialog` 解析 linkId 时只查 `target.url()`（= `webView.getUrl()`，302 之后的真页），
+短链场景库里存的是短链、精确匹配 `WHERE url = ?` 查不到 → linkId 为 null → 已有标签为空
+→「当前标签」区块整块不显示。
+
+新增 `resolveLinkId()`：当前 URL 查不到就退回 `target.originalUrl()`（重定向前原 URL）再查，
+与 `EditTitleDialog` 同一条规则。加载路径和保存路径都走它。
+
+## 教训
+
+- **抄字段没用全**：`PageTarget.originalUrl()` 早就有、`EditTitleDialog` 也用了，
+  `AddTagDialog` 却漏了。和 2.3.21.4 的 `isAdded()` 同类：字段/契约在，某个 caller 没用。
+- **`BUILD SUCCESSFUL` 只覆盖主源码树**：`assembleDebugUnitTest` 单独跑才看得见测试源码。
+
+## 验证
+
+- `./gradlew clean assembleDebug assembleDebugUnitTest` → 36 actionable tasks: 36 executed，BUILD SUCCESSFUL
+- `./gradlew testDebugUnitTest` → 86 tests completed, 2 failed（与 2.3.21.4 确认过的
+  两个历史遗留失败完全一致，本刀未引入新失败）
+
 # 2.3.21.5
 
 改动：阅读页「修改标题 / 添加标签 / 切换拦截模式」三项常驻 toolbar，不再折叠进 ⋮ 溢出菜单。

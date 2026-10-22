@@ -43,6 +43,8 @@ import java.util.stream.Collectors;
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
+import person.notfresh.readingshare.ui.webview.AddTagDialog;
+import person.notfresh.readingshare.ui.webview.PageTarget;
 import person.notfresh.readingshare.model.LinkJson;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.flexbox.FlexboxLayout;
@@ -50,7 +52,6 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import person.notfresh.readingshare.util.SearchQueryParser;
-import person.notfresh.readingshare.util.TagSuggestionHelper;
 import java.io.IOException;
 import person.notfresh.readingshare.util.AppUtils;
 import person.notfresh.readingshare.WebViewActivity;
@@ -1409,91 +1410,47 @@ public class LinksAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             tagContainer.addView(tagView);
         }
 
+        /**
+         * 给链接打标签 —— 走全 app 唯一的共享弹窗 {@link AddTagDialog}。
+         *
+         * <p>这里只负责两件本类独有的事：已有标签本来就在内存的 {@link LinkItem} 上（不必回查
+         * DAO），保存后还要 notifyDataSetChanged + 记事件日志。弹窗 UI（当前标签 / 最近标签 /
+         * 输入联想）全在 AddTagDialog 里，不再各写一份。</p>
+         */
         private void showAddTagDialog(Context context, LinkItem item) {
-            // 创建一个自定义布局,包含输入框 + 最近标签 + 当前标签 + 联想(打字时才出现)
-            View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_tag, null);
-            EditText input = dialogView.findViewById(R.id.edit_tag_input);
-            FlexboxLayout recentTagsContainer = dialogView.findViewById(R.id.recent_tags_container);
-            FlexboxLayout currentTagsContainer = dialogView.findViewById(R.id.current_tags_container);
-            TextView currentTagsLabel = dialogView.findViewById(R.id.text_current_tags_label);
-
-            // 当前标签(该链接已打的 tag):展示在 currentTagsContainer,点击可删。
-            // 同时维护 excluded 集合(联想过滤时排除这些 tag)。
-            List<String> existingTags = item.getTags() == null ? new ArrayList<>() : new ArrayList<>(item.getTags());
-            Set<String> suggestionExcluded = new HashSet<>(existingTags);
-            if (!existingTags.isEmpty()) {
-                currentTagsLabel.setVisibility(View.VISIBLE);
-                for (String tag : existingTags) {
-                    TextView tagView = (TextView) LayoutInflater.from(context)
-                            .inflate(R.layout.item_tag, currentTagsContainer, false);
-                    tagView.setText(tag);
-                    tagView.setOnClickListener(v -> {
-                        currentTagsContainer.removeView(tagView);
-                        existingTags.remove(tag);
-                        suggestionExcluded.remove(tag);
-                    });
-                    currentTagsContainer.addView(tagView);
+            List<String> existing = item.getTags() == null
+                    ? new ArrayList<>() : new ArrayList<>(item.getTags());
+            AddTagDialog.show(context, new PageTarget() {
+                @Override
+                public Long linkId() {
+                    return item.getId();
                 }
-            }
 
-            // 联想:suggestion_recycler(xml 默认 gone),attach 内自动按引用读 excluded
-            RecyclerView suggestionRecycler = dialogView.findViewById(R.id.suggestion_recycler);
-            TextView suggestionTitle = dialogView.findViewById(R.id.text_suggestion_label);
-            TagSuggestionHelper.attach(input, suggestionRecycler, suggestionTitle, context, suggestionExcluded);
-
-            // 获取并显示最近标签
-            List<String> recentTags = RecentTagsManager.getRecentTags(context);
-            if (!recentTags.isEmpty()) {
-                TextView recentTagsLabel = dialogView.findViewById(R.id.text_recent_tags_label);
-                recentTagsLabel.setVisibility(View.VISIBLE);
-                
-                for (String tag : recentTags) {
-                    TextView tagView = (TextView) LayoutInflater.from(context)
-                            .inflate(R.layout.item_recent_tag, recentTagsContainer, false);
-                    tagView.setText(tag);
-                    tagView.setOnClickListener(v -> {
-                        String currentText = input.getText().toString().trim();
-                        // 如果输入框不为空且不以逗号结尾，添加逗号分隔符
-                        if (!currentText.isEmpty() && !currentText.endsWith(",") && !currentText.endsWith("，")) {
-                            input.setText(currentText + "，" + tag);
-                        } else {
-                            // 如果为空或以逗号结尾，直接添加标签
-                            input.setText(currentText + tag);
-                        }
-                        // 将光标移到末尾
-                        input.setSelection(input.getText().length());
-                    });
-                    recentTagsContainer.addView(tagView);
+                @Override
+                public String url() {
+                    return item.getUrl();
                 }
-            }
 
-            AlertDialog dialog = new AlertDialog.Builder(context)
-                    .setTitle(R.string.link_dialog_title_add_tag)
-                    .setView(dialogView)
-                    .setPositiveButton(R.string.link_dialog_ok, (dialogInterface, which) -> {
-                        String tagName = input.getText().toString().trim();
-                        String[] tags = tagName.split("[,，]");
-                        List<String> tagList = new ArrayList<>();
-                        for (String tag : tags) {
-                            String trimmedTag = tag.trim();
-                            if (!trimmedTag.isEmpty()) {
-                                tagList.add(trimmedTag);
-                            }
-                        }
-                        
-                        // 记录最近使用的标签
-                        if (!tagList.isEmpty()) {
-                            RecentTagsManager.addRecentTags(context, tagList);
-                        }
-                        
-                        adapter.addTagsToLink(item, tagList); //@mark.1
-                        // adapter.listener.addTagToLink(item, ); //@mark.3
+                @Override
+                public String originalUrl() {
+                    return null;
+                }
 
-                    })
-                    .setNegativeButton(R.string.cancel, null)
-                    .create();
-            
-            dialog.show();
+                @Override
+                public String title() {
+                    return item.getTitle();
+                }
+            }, existing, allTags -> {
+                // 复用既有落库路径：notify + updateLinkTags + 事件日志 + 写最近标签
+                List<String> added = new ArrayList<>(allTags);
+                added.removeAll(existing);
+                for (String tag : added) {
+                    item.addTag(tag);
+                }
+                adapter.updateLinkTags(item);
+                RecentTagsManager.addRecentTags(context, added);
+                adapter.notifyItemChanged(getAdapterPosition());
+            });
         }
 
         private void showTagOptionsDialog(Context context, String tag, LinkItem item) {
