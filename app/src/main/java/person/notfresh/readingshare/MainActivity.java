@@ -96,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        reportLastCrashIfAny();
 
         try {
             binding = ActivityMainBinding.inflate(getLayoutInflater());
@@ -235,6 +236,22 @@ public class MainActivity extends AppCompatActivity {
             Log.e("MainActivity", "onCreate failed", e);
             Toast.makeText(this, "应用启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
             finish();
+        }
+    }
+
+    /** 上次进程崩溃过 → 把栈复制到剪贴板并提示，方便用户回传(2.3.19.5)。 */
+    private void reportLastCrashIfAny() {
+        try {
+            String crash = person.notfresh.readingshare.util.CrashRecorder.consume(this);
+            if (crash == null) return;
+            android.content.ClipboardManager clipboard =
+                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("crash", crash));
+            }
+            Toast.makeText(this, "上次崩溃日志已复制到剪贴板，可粘贴回传", Toast.LENGTH_LONG).show();
+        } catch (Exception ignored) {
+            // 排障辅助,失败不影响启动
         }
     }
 
