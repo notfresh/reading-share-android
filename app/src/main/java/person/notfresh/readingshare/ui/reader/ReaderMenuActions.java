@@ -36,6 +36,9 @@ import java.util.Set;
 
 import person.notfresh.readingshare.LinksHistoryActivity;
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.ui.webview.AddTagDialog;
+import person.notfresh.readingshare.ui.webview.EditTitleDialog;
+import person.notfresh.readingshare.ui.webview.PageTarget;
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.dialog.AddOverrideRuleDialog;
@@ -234,204 +237,41 @@ public final class ReaderMenuActions {
         host.requireActivity().invalidateOptionsMenu();
     }
 
-    /**
-     * 加标签弹窗：与 Activity / Home 的 dialog_add_tag 体验一致 ——
-     * 输入框 + 联想 + 「当前标签」(可点删) + 「最近标签」(点击填入)。
-     */
+    /** 加标签：走共享实现（目标2），链接身份由 page.linkId() 提供，不随重定向变化。 */
     private void showAddTagDialog() {
-        final Long linkId = page.linkId();
-        if (linkId == null) {
-            toast(R.string.reader_action_not_in_queue);
-            return;
-        }
-        final Context app = requireContext().getApplicationContext();
-        new Thread(() -> {
-            List<String> existing = new ArrayList<>();
-            try {
-                existing.addAll(new LinkDao(DbConnection.get(app).writable()).getLinkTags(linkId));
-            } catch (Exception e) {
-                Log.e(TAG, "loadTags failed linkId=" + linkId, e);
-            }
-            final List<String> loaded = existing;
-            mainHandler.post(() -> {
-                if (host.isAdded()) buildTagDialog(linkId, loaded);
-            });
-        }, "reader-load-tags").start();
+        AddTagDialog.show(requireContext(), target());
     }
 
-    private void buildTagDialog(final long linkId, List<String> existingTags) {
-        final Context ctx = requireContext();
-        View dialogView = LayoutInflater.from(ctx).inflate(R.layout.dialog_add_tag, null);
-        final EditText input = dialogView.findViewById(R.id.edit_tag_input);
-        RecyclerView suggestionRecycler = dialogView.findViewById(R.id.suggestion_recycler);
-        TextView suggestionLabel = dialogView.findViewById(R.id.text_suggestion_label);
-        final FlexboxLayout currentContainer = dialogView.findViewById(R.id.current_tags_container);
-        TextView currentLabel = dialogView.findViewById(R.id.text_current_tags_label);
-        FlexboxLayout recentContainer = dialogView.findViewById(R.id.recent_tags_container);
-        TextView recentLabel = dialogView.findViewById(R.id.text_recent_tags_label);
-
-        final List<String> current = new ArrayList<>(existingTags);
-        final Set<String> excluded = new HashSet<>(existingTags);
-
-        // 当前标签：点一下从列表移除（保存时按剩余集合整体替换）
-        if (!current.isEmpty()) {
-            currentLabel.setVisibility(View.VISIBLE);
-            for (String tag : new ArrayList<>(current)) {
-                addChip(ctx, currentContainer, tag, v -> {
-                    currentContainer.removeView((View) v.getParent());
-                    current.remove(tag);
-                    excluded.remove(tag);
-                });
+    /** 当前页面 → 共享弹窗需要的目标描述。 */
+    private PageTarget target() {
+        return new PageTarget() {
+            @Override
+            public Long linkId() {
+                return page.linkId();
             }
-        }
 
-        // 最近标签：点击填进输入框（不给空输入直接落库，保持与 Home 一致的手感）
-        List<String> recent = new ArrayList<>();
-        for (String tag : RecentTagsManager.getRecentTags(ctx)) {
-            if (!excluded.contains(tag)) recent.add(tag);
-        }
-        if (!recent.isEmpty()) {
-            recentLabel.setVisibility(View.VISIBLE);
-            for (String tag : recent) {
-                addChip(ctx, recentContainer, tag, v -> {
-                    String text = input.getText().toString().trim();
-                    if (text.isEmpty()) {
-                        input.setText(tag);
-                    } else if (!text.endsWith(",") && !text.endsWith("，")) {
-                        input.setText(text + ", " + tag);
-                    } else {
-                        input.setText(text + " " + tag);
-                    }
-                    input.setSelection(input.getText().length());
-                });
+            @Override
+            public String url() {
+                return page.url();
             }
-        }
 
-        final TagSuggestionHelper.Binder binder = TagSuggestionHelper.attach(
-                input, suggestionRecycler, suggestionLabel, ctx, excluded);
+            @Override
+            public String originalUrl() {
+                return null;
+            }
 
-        new AlertDialog.Builder(ctx)
-                .setTitle(R.string.link_dialog_title_add_tag)
-                .setView(dialogView)
-                .setPositiveButton(R.string.link_dialog_ok, (dialog, which) -> {
-                    binder.detach();
-                    List<String> tags = new ArrayList<>(current);
-                    for (String tag : splitTags(input.getText().toString())) {
-                        if (!tags.contains(tag)) tags.add(tag);
-                    }
-                    if (tags.isEmpty()) return;
-                    saveTags(linkId, tags, new ArrayList<>(current));
-                })
-                .setNegativeButton(R.string.cancel, (dialog, which) -> binder.detach())
-                .show();
+            @Override
+            public String title() {
+                return page.title();
+            }
+        };
     }
 
-    private void addChip(Context ctx, FlexboxLayout container, String text, View.OnClickListener onClick) {
-        if (container == null) return;
-        TextView chip = (TextView) LayoutInflater.from(ctx)
-                .inflate(R.layout.item_tag, container, false);
-        chip.setText(text);
-        chip.setOnClickListener(onClick);
-        container.addView(chip);
-    }
-
-    /** 整体替换该链接的标签集合（与 LinkDao.updateLinkTags 的"删除后重插"语义一致）。 */
-    private void saveTags(final long linkId, final List<String> tags, final List<String> previousTags) {
-        final Context app = requireContext().getApplicationContext();
-        new Thread(() -> {
-            String message = null;
-            try {
-                LinkDao dao = new LinkDao(DbConnection.get(app).writable());
-                LinkItem item = dao.getLinkById(linkId);
-                if (item != null) {
-                    item.setTags(new ArrayList<>(tags));
-                    dao.updateLinkTags(item);
-                    List<String> added = new ArrayList<>(tags);
-                    added.removeAll(previousTags);
-                    if (!added.isEmpty()) {
-                        RecentTagsManager.addRecentTags(app, added);
-                    }
-                    message = app.getString(R.string.reader_action_tag_saved, String.join(", ", tags));
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "saveTags failed linkId=" + linkId, e);
-            }
-            final String result = message;
-            mainHandler.post(() -> {
-                if (!host.isAdded()) return;
-                if (result == null) {
-                    toast(R.string.reader_action_tag_failed);
-                } else {
-                    Toast.makeText(requireContext(), result, Toast.LENGTH_SHORT).show();
-                }
-            });
-        }, "reader-save-tags").start();
-    }
-
+    /** 改标题：走共享实现（目标2），按 linkId 改，重定向也不影响。 */
     private void showEditTitleDialog() {
-        final Long linkId = page.linkId();
-        final String url = page.url();
-        if (linkId == null && (url == null || url.isEmpty())) {
-            toast(R.string.reader_action_no_url);
-            return;
-        }
-        final Context ctx = requireContext();
-        final EditText input = new EditText(ctx);
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        input.setText(page.title() == null ? "" : page.title());
-        input.setSelectAllOnFocus(true);
-
-        new AlertDialog.Builder(ctx)
-                .setTitle(R.string.edit_title)
-                .setView(input)
-                .setPositiveButton(R.string.link_dialog_ok, (dialog, which) -> {
-                    String newTitle = input.getText().toString().trim();
-                    if (newTitle.isEmpty()) {
-                        toast(R.string.reader_action_title_empty);
-                        return;
-                    }
-                    updateTitle(linkId, url, newTitle);
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        EditTitleDialog.show(requireContext(), target(), null);
     }
 
-    /**
-     * 改标题：有 linkId 就按 id 更新（重定向后 URL 已经不是库里那条的地址），
-     * 没有 linkId 才退回按 URL 更新。
-     */
-    private void updateTitle(final Long linkId, final String url, final String newTitle) {
-        final Context app = requireContext().getApplicationContext();
-        new Thread(() -> {
-            int updated = 0;
-            try {
-                LinkDao dao = new LinkDao(DbConnection.get(app).writable());
-                if (linkId != null) {
-                    updated = dao.updateLinkTitleById(linkId, newTitle);
-                } else {
-                    updated = dao.updateLinkTitle(url, newTitle);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "updateTitle failed linkId=" + linkId + " url=" + url, e);
-            }
-            final int rows = updated;
-            mainHandler.post(() -> {
-                if (!host.isAdded()) return;
-                toast(rows > 0 ? R.string.reader_action_title_updated : R.string.reader_action_title_not_saved);
-            });
-        }, "reader-update-title").start();
-    }
-
-    /** 逗号（中英文）分隔；去空白、去空项。 */
-    private List<String> splitTags(String raw) {
-        List<String> tags = new ArrayList<>();
-        if (raw == null) return tags;
-        for (String part : raw.split("[,，]")) {
-            String tag = part.trim();
-            if (!tag.isEmpty() && !tags.contains(tag)) tags.add(tag);
-        }
-        return tags;
-    }
 
     private int tintForMode(int mode) {
         if (mode == ExternalLinkOpener.MODE_OPEN) {

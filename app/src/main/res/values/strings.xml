@@ -313,4 +313,6 @@
     <string name="language_option_english">English</string>
     <string name="webview_bg_service_title">后台播放</string>
     <string name="webview_bg_service_text">点击返回应用</string>
+    <string name="reader_action_untitled">未命名</string>
+    <string name="reader_action_page_not_loaded">页面未加载</string>
 </resources>

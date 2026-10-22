@@ -312,4 +312,6 @@
     <string name="language_option_english">English</string>
     <string name="webview_bg_service_title">Playing in background</string>
     <string name="webview_bg_service_text">Tap to return to the app</string>
+    <string name="reader_action_untitled">Untitled</string>
+    <string name="reader_action_page_not_loaded">Page not loaded</string>
 </resources>

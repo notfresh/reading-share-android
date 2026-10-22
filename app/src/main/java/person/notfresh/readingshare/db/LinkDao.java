@@ -206,6 +206,31 @@ public class LinkDao {
         return success;
     }
 
+    /**
+     * 按 URL 查链接 id（目标2）：加标签时若没有 linkId，用它解析。
+     * 走 url 索引单行查，绝不 getAllLinks()（§6：3000+ 链接禁止全量）。
+     *
+     * @return 命中返回 id；未命中返回 null
+     */
+    public Long getLinkIdByUrl(String url) {
+        if (url == null || url.isEmpty()) return null;
+        Cursor cursor = null;
+        try {
+            cursor = database.query(LinkDbHelper.TABLE_LINKS,
+                    new String[]{LinkDbHelper.COLUMN_ID},
+                    LinkDbHelper.COLUMN_URL + " = ?",
+                    new String[]{url}, null, null, null, "1");
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getLong(0);
+            }
+        } catch (Exception e) {
+            Log.e("LinkDao", "getLinkIdByUrl failed url=" + url, e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return null;
+    }
+
     /** 按主键更新标题（2.3.20.3）：页面重定向后 URL 已变，只能认 link id。 */
     public int updateLinkTitleById(long linkId, String newTitle) {
         ContentValues values = new ContentValues();
