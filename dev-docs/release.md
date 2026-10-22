@@ -1,3 +1,36 @@
+# 2.3.21.8
+
+修复：WebViewActivity 的「添加标签」弹窗不显示该链接已有的标签（整块「当前标签」缺失）。
+
+## 根因
+
+`WebViewActivity.linkId()` 在 2.3.21.3 收敛菜单时被写死成 `return null`，
+理由是「Activity 没有队列链接概念」。**这个前提是错的。**
+
+Activity 启动时 Intent 里就带了 `context_ids` / `context_index`（`SubjectDetailActivity`
+用它们做上下页导航），这正是「当前读的是队列里第几条链接」—— 唯一可靠的身份来源。
+写死 null 之后，`AddTagDialog.resolveLinkId()` 只能拿 `webView.getUrl()`（302 之后的真页）
+去精确匹配 `WHERE url = ?`，短链/重定向场景查不到 → 已有标签为空 → 整块不显示。
+
+## 改动
+
+`WebViewActivity.linkId()` 改为返回 `contextIds[currentIndex]`（`> 0` 才返回）。
+翻页时 `loadByContextIndex` 已维护 `currentIndex = index`，所以翻页后自动跟着变。
+无上下文（外部打开 / 单条链接）时仍返回 null，退回按 URL 解析（弹窗内部还会试 originalUrl）。
+
+## 教训
+
+- **收敛共享类时，"某个 caller 没有 X" 要先查清它真的没有，还是我没查。**
+  我看到 `linkId()` 恒 null 就当成「Activity 没这个概念」写进注释，
+  实际是 Activity 手上有 `contextIds` 只是没接。错误的注释比没有注释更糟 ——
+  后人（或我自己）会拿它当依据。
+- 判别：某个字段/能力在某 caller 里"没有"，先 `rg` 全工程该 caller 有没有相关数据源，
+  再决定是「真没有」还是「没接线」。
+
+## 验证
+
+`./gradlew clean assembleDebug assembleDebugUnitTest` → 36 actionable tasks: 36 executed，BUILD SUCCESSFUL
+
 # 2.3.21.7
 
 修复：阅读页 toolbar 的「加标签 / 改标题 / 切换拦截模式」明明配了 `showAsAction="always"`

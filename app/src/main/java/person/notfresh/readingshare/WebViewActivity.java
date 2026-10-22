@@ -331,9 +331,22 @@ public class WebViewActivity extends AppCompatActivity
         return webView;
     }
 
-    /** Activity 侧没有"队列链接"概念,恒为 null = 按 URL 解析(AddTagDialog 会查 url 索引)。 */
+    /**
+     * 当前页面对应的链接 id。
+     *
+     * <p>2.3.21.8 起不再恒为 null：Activity 启动时带的 context_ids/current_index 就是
+     * 「我正在读队列里第几条链接」，这是唯一可靠的身份来源。返回它之后，
+     * 「加标签 / 改标题」都按主键定位，页面 302 跳到哪儿都不影响。</p>
+     *
+     * <p>没有上下文（外部打开 / 单条链接）时仍为 null，弹窗退回按 URL 解析
+     * （{@code AddTagDialog} 内部会再试一次 originalUrl）。</p>
+     */
     @Override
     public Long linkId() {
+        if (contextIds != null && currentIndex >= 0 && currentIndex < contextIds.length) {
+            long id = contextIds[currentIndex];
+            return id > 0 ? id : null;
+        }
         return null;
     }
 
