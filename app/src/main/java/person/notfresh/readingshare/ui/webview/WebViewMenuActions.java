@@ -47,6 +47,15 @@ public final class WebViewMenuActions {
     public interface Host {
         Context context();
 
+        /**
+         * 宿主视图是否还活着(Fragment 未 detach / Activity 未 destroy)。
+         *
+         * <p>异步回调(提取正文的后台线程 post 回主线程)必须先判这个:
+         * {@link Fragment#requireContext()} 在 detach 后<b>抛</b> IllegalStateException,
+         * 不是返回 null —— 判 {@code context() != null} 拦不住。</p>
+         */
+        boolean isAlive();
+
         /** 弹「配置跳转规则」对话框;contextUrl 已算好(重定向前原 URL 优先)。 */
         void showOverrideRuleDialog(String contextUrl);
 
@@ -202,6 +211,9 @@ public final class WebViewMenuActions {
             }
             final String extracted = content;
             mainHandler.post(() -> {
+                // 爬网页可能耗时几秒,期间用户可能已离开本宿主(阅读页 detach)——
+                // 此时 toast() 里的 requireContext() 会抛异常,直接吞掉这次结果。
+                if (!host.isAlive()) return;
                 if (extracted == null || extracted.trim().isEmpty()) {
                     toast(R.string.reader_action_extract_failed);
                     return;
@@ -308,9 +320,8 @@ public final class WebViewMenuActions {
     }
 
     private void toast(int resId) {
-        Context ctx = host.context();
-        if (ctx != null) {
-            Toast.makeText(ctx, resId, Toast.LENGTH_SHORT).show();
-        }
+        // 判 isAlive 而不是 context() != null:Fragment detach 后 requireContext() 是抛异常
+        if (!host.isAlive()) return;
+        Toast.makeText(host.context(), resId, Toast.LENGTH_SHORT).show();
     }
 }

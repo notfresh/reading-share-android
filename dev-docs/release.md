@@ -1,3 +1,38 @@
+# 2.3.21.4
+
+修复：删除「折叠 mini 播放器」时漏删测试导致单测源码树编译失败；补回异步回调的宿主存活守卫。
+
+## 1. 单测源码树从 2.3.21 起就是坏的
+
+2.3.21(`c1a45b6`)删了 `CollapsedPlaybackSession`，但没删它的测试
+`CollapsedPlaybackSessionTest.java`，导致 `./gradlew compileDebugUnitTestJavaWithJavac`
+报 7 处 `package CollapsedPlaybackSession does not exist`。
+`assembleDebug` 不编译测试，所以一直没暴露。测试 3 个用例全是 activate/clear
+该已删除类的行为，无可移植逻辑，随类一并删除。
+
+## 2. 补回 `isAdded()` 守卫（2.3.21.3 引入的崩溃洞）
+
+合并菜单动作时，`extractContent()` 的异步 post 回调漏抄了旧版
+`ReaderMenuActions` 的 `if (!host.isAdded()) return`（旧 `HEAD~1:182`）。
+场景：点「提取正文」→ 立刻离开阅读页 → 后台线程爬完 → post 回来 →
+`host.context()` 调 `requireContext()` → Fragment detach 后**抛**
+IllegalStateException → 崩溃。
+
+- `WebViewMenuActions.Host` 新增 `isAlive()`
+- `toast()` 判 `isAlive()` 而不是 `context() != null`（requireContext 是抛异常不是返回 null）
+- `extractContent()` 的 post 回调首行加 `if (!host.isAlive()) return`
+- `WebViewActivity.isAlive()` = `!isFinishing() && !isDestroyed()`；
+  `ReaderFragment.isAlive()` = `isAdded()`
+
+## 验证
+
+- `./gradlew clean assembleDebug assembleDebugUnitTest` → 36 actionable tasks: 36 executed，BUILD SUCCESSFUL
+- `./gradlew testDebugUnitTest` → 86 tests completed, 2 failed
+  - 失败项 `EventLogClientTest.paging_walks_full_stream_in_order` 与
+    `SyncApiClientTest.shouldEncryptRemoteAndMalformedAddresses`
+  - **已用 `git checkout 9a43cbd`(本次全部改动之前)跑基线确认:同样这 2 个失败**
+    → 本次改动未引入新失败，属历史遗留
+
 # 2.3.21 ~ 2.3.21.3
 
 重构：WebView 页（`WebViewActivity`）与阅读页（`ReaderFragment`）三处重复实现收敛，

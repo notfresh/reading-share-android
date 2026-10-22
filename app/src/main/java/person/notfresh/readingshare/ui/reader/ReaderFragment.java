@@ -212,6 +212,12 @@ public class ReaderFragment extends Fragment implements WebViewMenuActions.Page,
         return requireContext();
     }
 
+    /** detach 后 requireContext() 会抛,异步回调必须先问这个。 */
+    @Override
+    public boolean isAlive() {
+        return isAdded();
+    }
+
     @Override
     public void showOverrideRuleDialog(String contextUrl) {
         AddOverrideRuleDialog.showDialog(getParentFragmentManager(), contextUrl);

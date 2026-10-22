@@ -308,6 +308,12 @@ public class WebViewActivity extends AppCompatActivity
         return this;
     }
 
+    /** Activity 不存在 detach,只要没被 finish 就算活着。 */
+    @Override
+    public boolean isAlive() {
+        return !isFinishing() && !isDestroyed();
+    }
+
     @Override
     public void showOverrideRuleDialog(String contextUrl) {
         AddOverrideRuleDialog.showDialog(getSupportFragmentManager(), contextUrl);
