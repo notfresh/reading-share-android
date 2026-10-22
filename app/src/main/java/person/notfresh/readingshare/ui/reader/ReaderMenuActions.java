@@ -369,8 +369,9 @@ public final class ReaderMenuActions {
     }
 
     private void showEditTitleDialog() {
+        final Long linkId = page.linkId();
         final String url = page.url();
-        if (url == null || url.isEmpty()) {
+        if (linkId == null && (url == null || url.isEmpty())) {
             toast(R.string.reader_action_no_url);
             return;
         }
@@ -389,21 +390,29 @@ public final class ReaderMenuActions {
                         toast(R.string.reader_action_title_empty);
                         return;
                     }
-                    updateTitle(url, newTitle);
+                    updateTitle(linkId, url, newTitle);
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
-    private void updateTitle(final String url, final String newTitle) {
+    /**
+     * 改标题：有 linkId 就按 id 更新（重定向后 URL 已经不是库里那条的地址），
+     * 没有 linkId 才退回按 URL 更新。
+     */
+    private void updateTitle(final Long linkId, final String url, final String newTitle) {
         final Context app = requireContext().getApplicationContext();
         new Thread(() -> {
             int updated = 0;
             try {
                 LinkDao dao = new LinkDao(DbConnection.get(app).writable());
-                updated = dao.updateLinkTitle(url, newTitle);
+                if (linkId != null) {
+                    updated = dao.updateLinkTitleById(linkId, newTitle);
+                } else {
+                    updated = dao.updateLinkTitle(url, newTitle);
+                }
             } catch (Exception e) {
-                Log.e(TAG, "updateTitle failed for " + url, e);
+                Log.e(TAG, "updateTitle failed linkId=" + linkId + " url=" + url, e);
             }
             final int rows = updated;
             mainHandler.post(() -> {

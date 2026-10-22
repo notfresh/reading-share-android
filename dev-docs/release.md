@@ -1,3 +1,27 @@
+# 2.3.20.3
+修复：阅读页翻页后页面自动重定向，导致「加标签 / 改标题」失效（提示 This page is not a link from the reader queue）。
+
+## 根因
+`ReaderFragment.route()` 在 `shouldOverrideUrlLoading` 里，只要目标是 http(s) 就把
+`currentLinkId` 清成 null（原意是防止"页内跳到别的文章后误打标签"）。
+但页面**自动重定向**（`m.weixin`→`mp.weixin`、JS `location.href`、`<meta refresh>`）同样走
+`shouldOverrideUrlLoading` —— 于是点「下一页」之后，文章自己跳了一下，链接身份就丢了。
+
+判定错在概念上：**链接是数据库里的一个对象（有 id），页面 URL 只是它此刻落到的地址**。
+重定向不改变"我正在读的是哪条链接"，不该影响标签/标题的归属。
+
+## 改动
+- `ReaderFragment.route()`：不再清 `currentLinkId`，只更新 `currentLinkUrl`（注释写明原因）
+- `LinkDao` 新增 `updateLinkTitleById(long, String)`：按主键改标题，不依赖 URL
+- `ReaderMenuActions.showEditTitleDialog/updateTitle`：有 linkId 时按 id 更新，没有才退回按 URL
+- 「加标签」逻辑不变（linkId 不再被清空，自然恢复可用）
+
+## 影响面
+- 现在"加标签 / 改标题"永远作用于**队列里那条链接**，即使页面已经跳到别处
+- 若用户从队列链接点进站内另一篇文章并想给它打标签，仍会打到原链接上 —— 这是刻意的取舍：
+  阅读页是"读队列里的文章"，不是自由浏览器
+- `WebViewActivity` 不受影响（它本来就按 URL 走）
+
 # 2.3.20.2
 回退 2.3.20.1 的弹窗改动：样式保持原样（三个按钮），只缩短英文文案。
 

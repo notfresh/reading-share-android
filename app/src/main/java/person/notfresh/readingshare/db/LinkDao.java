@@ -206,6 +206,18 @@ public class LinkDao {
         return success;
     }
 
+    /** 按主键更新标题（2.3.20.3）：页面重定向后 URL 已变，只能认 link id。 */
+    public int updateLinkTitleById(long linkId, String newTitle) {
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_TITLE, newTitle);
+        return database.update(
+                LinkDbHelper.TABLE_LINKS,
+                values,
+                LinkDbHelper.COLUMN_ID + " = ?",
+                new String[]{String.valueOf(linkId)}
+        );
+    }
+
     public int updateLinkTitle(String url, String newTitle) {
         ContentValues values = new ContentValues();
         values.put(LinkDbHelper.COLUMN_TITLE, newTitle);

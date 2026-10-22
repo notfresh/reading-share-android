@@ -366,8 +366,10 @@ public class ReaderFragment extends Fragment implements ReaderMenuActions.Page {
         private boolean route(WebView view, String url) {
             if (url == null || url.isEmpty()) return false;
             if (UrlRoute.isHttp(url)) {
-                // 页内跳转：当前页面已不是队列里那条链接，清掉 linkId 防止误打标签
-                currentLinkId = null;
+                // 2.3.20.3:重定向/站内跳转**不改变**"正在读的那条链接"的身份。
+                // 之前这里把 currentLinkId 清成 null,导致页面自动重定向后
+                // "加标签/改标题"直接失效(提示 This page is not a link from the reader queue)。
+                // 链接是数据库里的一个对象,页面 URL 只是它当前落的地址,不该影响归属。
                 currentLinkUrl = url;
                 return false;
             }
