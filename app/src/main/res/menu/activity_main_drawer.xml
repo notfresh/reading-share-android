@@ -30,6 +30,11 @@
             android:title="@string/menu_documents"
             android:textAppearance="@style/NavigationDrawerText"/>
         <item
+            android:id="@+id/nav_reader"
+            android:icon="@drawable/ic_switch_page"
+            android:title="@string/menu_reader"
+            android:textAppearance="@style/NavigationDrawerText"/>
+        <item
             android:id="@+id/nav_slideshow"
             android:icon="@drawable/ic_settings"
             android:title="@string/menu_settings"

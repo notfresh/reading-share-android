@@ -14,6 +14,7 @@
     <string name="menu_archive">Archive</string>
     <string name="menu_documents">Documents</string>
     <string name="menu_subject">Subjects</string>
+    <string name="menu_reader">Reader</string>
 
         <string name="menu_settings">Settings</string>
 
@@ -22,7 +23,29 @@
         <item>Home</item>
         <item>RSS</item>
         <item>Random</item>
+        <item>Reader</item>
     </string-array>
+
+    <!-- Reader tab (2.3.19): embedded WebView + previous/next/random; configurable source -->
+    <string name="reader_nav_prev">Previous</string>
+    <string name="reader_nav_random">Random</string>
+    <string name="reader_nav_next">Next</string>
+    <string name="reader_empty">No links in this source</string>
+    <string name="reader_link_unavailable">Link is no longer available</string>
+    <string name="reader_external_confirm_title">Open external app</string>
+    <string name="reader_external_confirm_message">This page wants to open an external app. Continue?\n\n%1$s</string>
+    <string name="reader_external_confirm_stay">Stay on page</string>
+    <string name="reader_external_confirm_forbid">Deny and stop asking</string>
+    <string name="reader_external_confirm_open">Open</string>
+    <string name="reader_external_open_failed">Cannot open this link: %1$s</string>
+    <string name="reader_source_section_title">Reader data source</string>
+    <string name="reader_source_type_all">All links</string>
+    <string name="reader_source_type_pinned">Pinned links</string>
+    <string name="reader_source_type_tag">A tag</string>
+    <string name="reader_source_type_subject">A subject</string>
+    <string name="reader_source_param_none">(not required)</string>
+    <string name="reader_source_empty_tags">No tags yet</string>
+    <string name="reader_source_empty_subjects">No subjects yet</string>
 
     <string-array name="recent_tags_window_array">
         <item>3</item>

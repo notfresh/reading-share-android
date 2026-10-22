@@ -118,7 +118,8 @@ public class MainActivity extends AppCompatActivity {
             // 然后设置 AppBarConfiguration
             // 注意：nav_tags已废弃，功能已合并到nav_home
             mAppBarConfiguration = new AppBarConfiguration.Builder(
-                    R.id.nav_home, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive, R.id.nav_documents, R.id.nav_subject)
+                    R.id.nav_home, R.id.nav_slideshow, R.id.nav_rss, R.id.nav_archive, R.id.nav_documents,
+                    R.id.nav_subject, R.id.nav_reader)
                     .setOpenableLayout(drawer)
                     .build();
 
@@ -410,6 +411,9 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case 3: // RSS
                     destinationId = R.id.nav_rss;
+                    break;
+                case 5: // 阅读
+                    destinationId = R.id.nav_reader;
                     break;
                 case 4: { // 随机：主题/链接/RSS
                     int r = (int) (Math.random() * 3);

@@ -46,6 +46,11 @@ import person.notfresh.readingshare.EventLogActivity;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.db.SubjectDao;
+import person.notfresh.readingshare.db.DbConnection;
+import person.notfresh.readingshare.core.model.Subject;
+import person.notfresh.readingshare.model.ReaderSourceSpec;
+import person.notfresh.readingshare.util.ReaderSourceStore;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.db.SearchHistoryManager;
 import android.text.SpannableString;
@@ -127,6 +132,9 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         } else if (defaultTab == 4) {
             // 随机
             adjustedTab = 3;
+        } else if (defaultTab == 5) {
+            // 阅读(2.3.19 新增,原索引方案里没有这一项)
+            adjustedTab = 4;
         }
 
         // 兜底：避免越界导致崩溃
@@ -146,13 +154,15 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
                 // 原索引：0=首页, 2=主题, 3=RSS（跳过已废弃的1=标签）, 4=随机
                 int savedTab;
                 if (position == 0) {
-                    savedTab = 0;
+                    savedTab = 0; // 主题
                 } else if (position == 1) {
-                    savedTab = 2;
+                    savedTab = 2; // 链接
                 } else if (position == 2) {
-                    savedTab = 3;
-                } else {
+                    savedTab = 3; // RSS
+                } else if (position == 3) {
                     savedTab = 4; // 随机
+                } else {
+                    savedTab = 5; // 阅读(2.3.19)
                 }
                 editor.putInt("default_tab", savedTab);
                 editor.apply();
@@ -392,6 +402,9 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
 
         // 语言切换区块 (2.3.18 新增)：见 bindLanguageSection 方法。
         bindLanguageSection(root);
+
+        // 阅读页数据来源区块 (2.3.19 新增)：UI 拆到 ReaderSourceSectionBinder，避免本类继续膨胀。
+        ReaderSourceSectionBinder.bind(this, root);
 
         return root;
     }

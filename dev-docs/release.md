@@ -1,3 +1,23 @@
+# 2.3.19
+特性:新增「阅读」Tab —— 内嵌 WebView 的阅读页,按可配置数据来源成队列,支持上一条 / 下一条 / 随机。
+
+## 数据来源(单选项,设置页「阅读页数据来源」)
+- 全部链接(`getLinksPage` 分页,不碰全表)
+- 置顶链接(`getPinnedLinks`)
+- 某个标签(`getLinksByTag`)
+- 某个主题(`subject_items` 里 linkId 非空、未删、未归档)
+
+## 行为
+- 进页加载队列第一条;上一条 / 下一条环形走已加载窗口;随机不复当前项
+- 页面内 http(s) 由 WebView 加载;app scheme 走既有白名单规则(`WebViewOverrideRules`)+ 全局 external_link_mode 三档
+- 返回键:能回退先回退网页,否则交还 Navigation
+
+## 架构(为下一刀铺路)
+- `core/reader/ReaderSource` + `ReaderQueue` + `UrlRoute` 纯内核,无 Android 依赖,带单测
+- `reader/ReaderSources` 注册表:新增来源 = 一个实现类 + 一行注册
+- `util/WebViewDefaults` / `util/ExternalLinkOpener` 共享单元
+- **本次不改 `WebViewActivity`**;下一刀把它也收到这些单元上(预计净减约 200 行)
+
 ## B
 
 # 2.3.18.2

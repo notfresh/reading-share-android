@@ -14,6 +14,7 @@
     <string name="menu_archive">归档</string>
     <string name="menu_documents">文档</string>
     <string name="menu_subject">主题</string>
+    <string name="menu_reader">阅读</string>
 
         <string name="menu_settings">设置</string>
 
@@ -22,7 +23,29 @@
         <item>链接</item>
         <item>RSS</item>
         <item>随机</item>
+        <item>阅读</item>
     </string-array>
+
+    <!-- 阅读页(2.3.19)：内嵌 WebView + 上一条/下一条/随机；数据来源可配置 -->
+    <string name="reader_nav_prev">上一条</string>
+    <string name="reader_nav_random">随机</string>
+    <string name="reader_nav_next">下一条</string>
+    <string name="reader_empty">该来源暂无链接</string>
+    <string name="reader_link_unavailable">链接已不可用</string>
+    <string name="reader_external_confirm_title">打开外部应用</string>
+    <string name="reader_external_confirm_message">网页正在尝试打开外部应用，是否继续？\n\n%1$s</string>
+    <string name="reader_external_confirm_stay">留在网页</string>
+    <string name="reader_external_confirm_forbid">拒绝并禁止弹窗</string>
+    <string name="reader_external_confirm_open">继续打开</string>
+    <string name="reader_external_open_failed">无法打开此链接: %1$s</string>
+    <string name="reader_source_section_title">阅读页数据来源</string>
+    <string name="reader_source_type_all">全部链接</string>
+    <string name="reader_source_type_pinned">置顶链接</string>
+    <string name="reader_source_type_tag">某个标签</string>
+    <string name="reader_source_type_subject">某个主题</string>
+    <string name="reader_source_param_none">（无需选择）</string>
+    <string name="reader_source_empty_tags">暂无标签</string>
+    <string name="reader_source_empty_subjects">暂无主题</string>
 
     <string-array name="recent_tags_window_array">
         <item>3</item>
