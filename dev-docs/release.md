@@ -1,3 +1,26 @@
+# 2.3.19.6
+修复:进阅读页必崩(表现为"打开秒退",当默认Tab=阅读时就是冷启动崩溃)。
+
+## 根因
+2.3.19.2 把底部三按钮换成 WebViewActivity 那套"底部 2 个 Button + 右侧 3 个 ImageButton"时,
+`ReaderFragment.randomButton` 字段类型仍是 `Button`,而 `reader_floating_random` 实际是 `ImageButton`
+→ `findViewById` 泛型推断到 `Button`,运行时 `ClassCastException`,且发生在 `onViewCreated`,必崩。
+
+## 改动
+- `ReaderFragment.randomButton` 类型改 `ImageButton`(本机修复,commit 2ca1e76)
+- `DbConnection.checkpoint()`:补 `moveToFirst()` 读游标 —— `PRAGMA wal_checkpoint` 不读游标不执行,
+  之前 WAL 从未真正刷回主库(本机修复,commit fef2663)
+- `App.java` 生命周期日志加 `BuildConfig.DEBUG` 门;`build.gradle` 打开 `buildConfig true`,
+  release 构建不再输出 `AppLifecycle` 日志
+- 移除 2.3.19.5 临时加的 `util/CrashRecorder.java` 与其两处调用(根因已定位,排障脚手架撤掉)
+- 新增 `util/CrashClipboard.java`:未捕获异常**当场**把错误栈写进剪贴板(不是等下次启动)——
+  崩溃时界面打不开,用户没有第二次机会看到提示,重开聊天窗口直接粘贴即可;不联网、不上报、不加权限
+
+## 教训
+布局里换控件类型(Button → ImageButton)时,`findViewById` 的泛型形参跟着字段走,
+字段类型不改 = 运行时 ClassCastException,而编译器完全不会报。改这类"同 id 换实现类"的布局,
+必须同时扫一遍所有 `findViewById(R.id.<该 id>)` 的接收字段类型。
+
 # 2.3.19.4
 优化:阅读页数据来源的两个下拉换成 Material exposed dropdown(原 Spinner 是 Holo 观感,丑)。
 

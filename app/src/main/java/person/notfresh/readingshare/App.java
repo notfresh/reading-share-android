@@ -38,6 +38,9 @@ import person.notfresh.readingshare.model.LinkJson;
  */
 public class App extends Application {
 
+    /** 生命周期排障日志开关:release 构建自动关闭(2.3.19.6)。 */
+    private static final boolean DEBUG_LIFECYCLE = BuildConfig.DEBUG;
+
     private static App instance;
 
     private ExecutorService syncExecutor;
@@ -46,8 +49,8 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         instance = this;
-        // 崩溃日志落盘(排障用):下次启动复制到剪贴板,便于用户回传
-        person.notfresh.readingshare.util.CrashRecorder.install(this);
+        // 崩溃即把栈复制到剪贴板(界面打不开时用户唯一能拿到的排障信息)
+        person.notfresh.readingshare.util.CrashClipboard.install(this);
         // 预热数据库连接(进程级单例)
         DbConnection dbConnection = DbConnection.get(this);
         SQLiteDatabase db = dbConnection.writable();
@@ -84,39 +87,39 @@ public class App extends Application {
 
         // 进入后台时落盘:在最后一个 Activity onStop 后,把 WAL 页面 checkpoint 回主 db。
         // 注意:这个回调对"多任务面板一键全部关闭"(SIGKILL)无法保护,但对其它退出路径足够。
-        android.util.Log.d("AppLifecycle", "registering ActivityLifecycleCallbacks");
+        if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "registering ActivityLifecycleCallbacks");
         registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             private int visibleCount = 0;
 
             @Override public void onActivityCreated(Activity a, Bundle s) {
-                android.util.Log.d("AppLifecycle", "onActivityCreated: " + a.getClass().getSimpleName() + " visibleCount=" + visibleCount);
+                if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "onActivityCreated: " + a.getClass().getSimpleName() + " visibleCount=" + visibleCount);
             }
             @Override public void onActivityStarted(Activity a) {
                 visibleCount++;
-                android.util.Log.d("AppLifecycle", "onActivityStarted: " + a.getClass().getSimpleName() + " visibleCount=" + visibleCount);
+                if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "onActivityStarted: " + a.getClass().getSimpleName() + " visibleCount=" + visibleCount);
             }
             @Override public void onActivityResumed(Activity a) {
-                android.util.Log.d("AppLifecycle", "onActivityResumed: " + a.getClass().getSimpleName());
+                if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "onActivityResumed: " + a.getClass().getSimpleName());
             }
             @Override public void onActivityPaused(Activity a) {
-                android.util.Log.d("AppLifecycle", "onActivityPaused: " + a.getClass().getSimpleName());
+                if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "onActivityPaused: " + a.getClass().getSimpleName());
             }
             @Override public void onActivityStopped(Activity a) {
                 visibleCount--;
-                android.util.Log.d("AppLifecycle", "onActivityStopped: " + a.getClass().getSimpleName() + " visibleCount=" + visibleCount);
+                if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "onActivityStopped: " + a.getClass().getSimpleName() + " visibleCount=" + visibleCount);
                 if (visibleCount <= 0) {
                     // app 进入后台,落盘
-                    android.util.Log.d("AppLifecycle", "calling checkpoint()");
+                    if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "calling checkpoint()");
                     dbConnection.checkpoint();
-                    android.util.Log.d("AppLifecycle", "checkpoint() returned");
+                    if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "checkpoint() returned");
                 }
             }
             @Override public void onActivitySaveInstanceState(Activity a, Bundle s) {}
             @Override public void onActivityDestroyed(Activity a) {
-                android.util.Log.d("AppLifecycle", "onActivityDestroyed: " + a.getClass().getSimpleName());
+                if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "onActivityDestroyed: " + a.getClass().getSimpleName());
             }
         });
-        android.util.Log.d("AppLifecycle", "ActivityLifecycleCallbacks registered");
+        if (DEBUG_LIFECYCLE) android.util.Log.d("AppLifecycle", "ActivityLifecycleCallbacks registered");
     }
 
     /**

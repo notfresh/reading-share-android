@@ -9,8 +9,8 @@ android {
         applicationId "person.notfresh.readingshare"
         minSdk 26
         targetSdk 34
-versionCode 49
-        versionName "2.3.19.5"
+versionCode 50
+        versionName "2.3.19.6"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -28,6 +28,8 @@ versionCode 49
     }
     buildFeatures {
         viewBinding true
+        // 2.3.19.6: 生命周期调试日志用 BuildConfig.DEBUG 包一层,release 不输出
+        buildConfig true
     }
 }
 
