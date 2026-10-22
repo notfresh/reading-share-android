@@ -1,3 +1,20 @@
+# 2.3.19.3
+修复:阅读页选「某个主题」来源时显示「该来源暂无链接」,即使该主题里确有链接。
+
+## 根因
+`reader/SubjectSource.java` 用了 `new SubjectDao(Context)` —— 这是 @Deprecated 构造,
+`database` 字段要等 `open()` 之后才有值。ReaderSource 的 `loadPage` 在后台线程直接
+`database.query(...)` → NPE,被 SubjectSource 自己的 catch 吞掉 → 快照为空 → 阅读页判定无内容。
+其他三个来源(全部/置顶/标签)都走 `DbConnection.get(ctx).writable()`,所以只有"主题"坏。
+
+## 修法
+- 改成 `new SubjectDao(DbConnection.get(ctx).writable())`,与其他来源一致
+- 快照成功时补一条 `Log.d("SubjectSource", "subject snapshot subjectId=X links=N")`,
+  下次出问题能一眼分清"主题项为空"还是"被过滤掉"
+
+## 教训
+`@Deprecated` 的 `XxxDao(Context)` 构造不会给 `database` 赋值 —— 把它当"兼容旧代码"用是陷阱:
+没有 `open()` 就查询 = NPE,而 NPE 在 catch 里静默降级成"空数据",UI 只表现为"没内容"。
 # 2.3.19.2
 特性:阅读页体验对齐 WebViewActivity(第二轮反馈:页面布局 / 导航条 / 弹窗按钮要一致)。
 

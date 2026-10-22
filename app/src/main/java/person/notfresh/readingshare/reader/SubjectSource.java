@@ -8,6 +8,7 @@ import java.util.List;
 
 import person.notfresh.readingshare.core.model.SubjectItem;
 import person.notfresh.readingshare.core.reader.ReaderSource;
+import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.model.ReaderSourceSpec;
 
@@ -26,7 +27,9 @@ final class SubjectSource implements ReaderSource {
     private List<Long> snapshot;
 
     SubjectSource(Context ctx, long subjectId) {
-        this.subjectDao = new SubjectDao(ctx);
+        // 必须走 DbConnection 注入共享连接：SubjectDao(Context) 是 @Deprecated 构造，
+        // database 字段要等 open() 才有值，漏 open 会 NPE 被吃掉 → 表现为"来源里没有链接"。
+        this.subjectDao = new SubjectDao(DbConnection.get(ctx).writable());
         this.subjectId = subjectId;
     }
 
@@ -53,6 +56,7 @@ final class SubjectSource implements ReaderSource {
                         snapshot.add(linkId);
                     }
                 }
+                Log.d(TAG, "subject snapshot subjectId=" + subjectId + " links=" + snapshot.size());
             } catch (Exception e) {
                 Log.e(TAG, "subject snapshot failed subjectId=" + subjectId, e);
             }
