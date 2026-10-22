@@ -34,7 +34,7 @@
                 android:id="@+id/click_count_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="阅读 0 次"
+                android:text="@string/link_click_count_zero"
                 android:textSize="12sp"
                 android:textColor="@android:color/darker_gray"
                 android:background="@drawable/click_count_background"
@@ -77,7 +77,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:visibility="gone"
-                android:text="显示更多" />
+                android:text="@string/link_show_more" />
         </RelativeLayout>
 
         <com.google.android.flexbox.FlexboxLayout
@@ -94,7 +94,7 @@
                 android:id="@+id/btn_add_tag"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="添加标签"
+                android:text="@string/link_button_add_tag"
                 android:textSize="12sp"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="2dp"
@@ -111,7 +111,7 @@
                 android:id="@+id/btn_add_remark"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="备注"
+                android:text="@string/link_button_add_remark"
                 android:textSize="12sp"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="2dp"
@@ -150,7 +150,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:visibility="gone"
-                android:text="查看完整备注" />
+                android:text="@string/link_view_full_remark" />
         </RelativeLayout>
 
     </LinearLayout>

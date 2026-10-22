@@ -10,7 +10,7 @@
         android:id="@+id/edit_tag_input"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="输入标签名称,可以使用逗号隔开"
+        android:hint="@string/home_dialog_add_tag_hint"
         android:inputType="text"
         android:maxLines="1" />
 
@@ -19,7 +19,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:text="已有标签(输入即联想):"
+        android:text="@string/home_dialog_add_tag_suggestion_label"
         android:textStyle="bold"
         android:visibility="gone" />
 
@@ -36,7 +36,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="当前标签（点击可删除）:"
+        android:text="@string/home_dialog_add_tag_current_label"
         android:textStyle="bold"
         android:visibility="gone" />
 
@@ -54,7 +54,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="最近使用的标签:"
+        android:text="@string/home_dialog_add_tag_recent_label"
         android:textStyle="bold"
         android:visibility="gone" />
 
@@ -67,4 +67,4 @@
         app:alignItems="flex_start"
         app:flexDirection="row" />
 
-</LinearLayout> 
+</LinearLayout>

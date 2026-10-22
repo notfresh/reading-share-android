@@ -1,4 +1,205 @@
+# 2.3.19.4
+优化:阅读页数据来源的两个下拉换成 Material exposed dropdown(原 Spinner 是 Holo 观感,丑)。
+
+## 改动
+- 新增 `ui/settings/SettingDropdown.java`:Material 填充框 + 展开菜单,封装成"挂上去就能用"的小件;
+  只在用户选中时回调,程序化 setText 不触发(内部 suppress),避免联动死循环
+- 新增 `res/layout/view_setting_dropdown.xml`(FilledBox.ExposedDropdownMenu) +
+  `res/layout/item_dropdown_option.xml`(统一 16dp 内边距、16sp)
+- 阅读页数据来源区块:类型 / 参数两个下拉都用它,hint 分别为「来源类型」「具体项」
+- 参数下拉在「全部链接 / 置顶链接」时整块隐藏,不再摆「（无需选择）」这种占位项
+- 与项目既有 TextInputLayout 输入框同一套视觉(填充框),不引入新风格
+
+# 2.3.19.3
+修复:阅读页选「某个主题」来源时显示「该来源暂无链接」,即使该主题里确有链接。
+
+## 根因
+`reader/SubjectSource.java` 用了 `new SubjectDao(Context)` —— 这是 @Deprecated 构造,
+`database` 字段要等 `open()` 之后才有值。ReaderSource 的 `loadPage` 在后台线程直接
+`database.query(...)` → NPE,被 SubjectSource 自己的 catch 吞掉 → 快照为空 → 阅读页判定无内容。
+其他三个来源(全部/置顶/标签)都走 `DbConnection.get(ctx).writable()`,所以只有"主题"坏。
+
+## 修法
+- 改成 `new SubjectDao(DbConnection.get(ctx).writable())`,与其他来源一致
+- 快照成功时补一条 `Log.d("SubjectSource", "subject snapshot subjectId=X links=N")`,
+  下次出问题能一眼分清"主题项为空"还是"被过滤掉"
+
+## 教训
+`@Deprecated` 的 `XxxDao(Context)` 构造不会给 `database` 赋值 —— 把它当"兼容旧代码"用是陷阱:
+没有 `open()` 就查询 = NPE,而 NPE 在 catch 里静默降级成"空数据",UI 只表现为"没内容"。
+# 2.3.19.2
+特性:阅读页体验对齐 WebViewActivity(第二轮反馈:页面布局 / 导航条 / 弹窗按钮要一致)。
+
+## 导航控件(先复制同款,第二刀与 Activity 合并成同一份 include)
+- 底部条:半透明黑底 `#66000000` + padding 12dp + 「上一篇 / 下一篇」,按钮 `backgroundTint=darker_gray`
+- 悬浮层:右侧竖排 3 个 48dp 图标按钮(`floating_arrow_bg` + ic_expand_less/more/random)
+- 显隐策略逐条对齐:`reading_mode=normal` 不显示;`smooth` 按 `nav_button_style`(bottom/floating/both) 显示;
+  显示后 3 秒自动隐藏;触摸网页临时唤起;手动隐藏持久化到 `settings/nav_controls_hidden`
+- 菜单项「显示/隐藏导航控件」仅丝滑模式可见(同 Activity)
+- 新增 `ui/reader/ReaderControlsController.java`,注释标明"Activity 的复制版,第二刀合并"
+
+## 弹窗与文案对齐
+- 加标签:补「当前标签」(点删) + 「最近标签」(点击填入),保存时整体替换,并把新增标签写入最近标签
+- 改标题:弹窗标题改回「修改标题」(`edit_title`),与 Activity 一致
+- 提取正文 toast 改为 Activity 原文「提取Web内容完成，已经写入剪切板」
+- 导航按钮文案改「上一篇 / 下一篇 / 随机跳转」
+
+## toolbar
+- 页面标题跟随时更新(与 WebViewActivity 一致);离开阅读页由 NavigationUI 恢复各页 label
+
+# 2.3.19.1
+特性:阅读页补上顶部菜单(对齐 WebViewActivity 的 webview_menu,刻意去掉 Activity 专属项)。
+
+## 菜单项(9 个)
+- 刷新 / 浏览器打开 / 分享 / 提取正文到剪贴板 / 配置跳转规则 / 链接历史
+- 加标签(复用 dialog_add_tag + TagSuggestionHelper 联想)
+- 改标题(按当前 URL 更新 links 表)
+- 拦截模式切换(0 弹窗 → 2 拦截 → 1 跳转,循环;图标红/白/灰染色与 Activity 一致)
+
+## 刻意不做
+- 强制返回 / 存档返回(Activity finish 语义,Fragment 无对应)
+- 折叠 mini player、丝滑模式的导航控件开关(阅读页已有固定底部控件)
+
+## 实现
+- `ui/reader/ReaderMenuActions.java`:9 个动作各自命名方法;ReaderFragment 只实现 `Page`
+  接口(webView/linkId/url/title)并委托,不再往 Fragment 里堆 if-else
+- `res/menu/reader_menu.xml`:独立菜单,不动 `webview_menu.xml`
+- 加标签/改标题只对"队列链接"生效:用户点进页内别的链接后 `linkId` 置空,
+  避免把标签打到错误的链接上(Activity 那版是 URL 全表线性查找,这里按 id 直取)
+- 新增 14 条中英文案
+
+# 2.3.19
+特性:新增「阅读」Tab —— 内嵌 WebView 的阅读页,按可配置数据来源成队列,支持上一条 / 下一条 / 随机。
+
+## 数据来源(单选项,设置页「阅读页数据来源」)
+- 全部链接(`getLinksPage` 分页,不碰全表)
+- 置顶链接(`getPinnedLinks`)
+- 某个标签(`getLinksByTag`)
+- 某个主题(`subject_items` 里 linkId 非空、未删、未归档)
+
+## 行为
+- 进页加载队列第一条;上一条 / 下一条环形走已加载窗口;随机不复当前项
+- 页面内 http(s) 由 WebView 加载;app scheme 走既有白名单规则(`WebViewOverrideRules`)+ 全局 external_link_mode 三档
+- 返回键:能回退先回退网页,否则交还 Navigation
+
+## 架构(为下一刀铺路)
+- `core/reader/ReaderSource` + `ReaderQueue` + `UrlRoute` 纯内核,无 Android 依赖,带单测
+- `reader/ReaderSources` 注册表:新增来源 = 一个实现类 + 一行注册
+- `util/WebViewDefaults` / `util/ExternalLinkOpener` 共享单元
+- **本次不改 `WebViewActivity`**;下一刀把它也收到这些单元上(预计净减约 200 行)
+
 ## B
+
+# 2.3.18.2
+特性:全局关掉 Material Button 默认 ALL CAPS(2.3.18.1 patch 反馈:英文版按钮显示成 "BROWSE HISTORY" / "EXPORT ALL LINKS" / "+ ADD RULE" / "ABOUT" 等全大写,不符合 sentence case 美学)。
+
+## 改动
+- `values/themes.xml` + `values-night/themes.xml` Theme.MyApplication 加 `<item name="textAllCaps">false</item>`
+- 影响范围:整个 app 所有 MaterialButton(普通 Button / OutlinedButton / TextButton / icon button 等)
+- 不影响 RadioButton/Switch(各自有样式)
+- 中文 button 文字不变(中文无大小写概念,纯是渲染行为变化)
+
+## 设计原因
+- Android Material Components 默认 button textAllCaps=true → 英文按钮强制大写
+- Material Design 当前推荐 sentence case(只句首大写),与代码现状(string 已全部是 sentence case)对齐
+- 集中改 theme 不动 layout:避免给每个 Button 加 `android:textAllCaps="false"` 这种重复 boilerplate
+
+# 2.3.18.1
+特性:补完 Home 弹窗 / 设置页 中英双语(2.3.18 后续 patch,用户反馈添加弹窗内控件仍有中文)。
+
+## 范围
+- `dialog_add_tag.xml` 4 处 hint/label 外提(`home_dialog_add_tag_*`)
+- `dialog_add_remark.xml` 1 处 hint 外提(`home_dialog_add_remark_hint`)
+- `item_link.xml` 5 处:阅读 0 次默认 / 显示更多 / 添加标签按钮 / 备注按钮 / 查看完整备注
+  - "添加标签" → `link_button_add_tag`("Add tag")
+  - "备注" → `link_button_add_remark`("Note")
+  - "阅读 0 次" → `link_click_count_zero`("0 reads")
+  - "显示更多" / "查看完整备注" 复用 2.3.18 已有的 `link_show_more` / `link_view_full_remark`
+- `fragment_slideshow.xml`(设置页)32 处全部外提,新增 `setting_*` 30+ 个 string
+- `SettingFragment.java` 运行时 dialog/toast 全部外提:
+  - Snackbar "已保存：保留 N 条历史"
+  - 同步状态文本:正在同步 / 同步成功 / 同步失败
+  - 文件选择器 / 导入对话框 / 导出对话框的 title + 确定/取消 + 去重 checkbox + 导入结果摘要
+
+## 命名约定补充
+- `home_dialog_add_tag_*` — 添加标签 dialog 内部
+- `home_dialog_add_remark_hint` — 添加备注 dialog 内部
+- `link_button_*` — 列表项内按钮文字(独立于 `link_menu_*` / `link_dialog_*`)
+- `link_click_count_zero` — 布局默认 "0 reads"(运行时真实值走 `link_click_count` + `%1$d`)
+- `setting_*` — 设置页区块
+- `setting_import_summary` 占位:`%1$s`=格式(CSV/JSON)、`%2$d`=导入成功、`%3$d`=跳过重复、`%4$d`=失败
+
+# 2.3.18
+特性:HomeFragment 中英双语 + 设置页语言切换(跟随系统 / 中文 / English)。
+
+## 范围
+- HomeFragment.java(57 处硬编码中文外提为 string resource)
+- LinksAdapter.java(80 处硬编码中文外提 — 只服务于 HomeFragment 列表)
+- fragment_home.xml + home_menu.xml(layout/menu 硬编码 → @string/)
+- values/strings.xml + values-en/strings.xml(新增 110+ 条双语条目)
+- SettingFragment.java — 新增语言切换区块(动态 inflate,不动 layout)
+
+## 切换机制
+- 用 androidx AppCompatDelegate.setApplicationLocales() —— 无自建 LocaleManager、无 attachBaseContext 改造
+- API 33+ 写系统设置;老版本由 androidx 1.6.1 自己持久化
+- 用户在设置页点选后,系统自动 recreate Activity
+
+## 字符串命名约定
+- `home_*` — HomeFragment 动态文案(toast/title/snackbar/dialog)
+- `home_action_*` — home_menu.xml 菜单项 title
+- `link_*` — LinksAdapter 显示相关(列表行 / dialog / popup)
+- `tag_op_*` — HomeFragment 标签操作 dialog 选项
+- `language_*` — 设置页语言区块
+
+# 2.3.17.5
+特性:WebView 跳转白名单模式 —— 针对个别网址配置单独的跳转策略。
+
+## 数据模型
+- 新增 `model/WebViewOverrideRule.java`(不可变 record-like,JSON 序列化适配老数据)
+- 新增 `model/OverrideAction.java` 枚举 ASK / OPEN / BLOCK(与既有 externalLinkMode 三档一一对应)
+- 新增 `util/WebViewOverrideRules.java` 数据层(`loadAll` / `firstMatch` / `add` / `update` / `remove` / `recordRedirectedUrl`)
+  - 单一真相源:SharedPreferences("settings") / `override_rules_json`
+  - 复合字段(2.3.17.5 后):`contextUrl`(用户手填的原始 URL) + `redirectedUrl`(系统自动记录的重定向后 URL) + `action`
+- 兼容:老 2.3.17 之前的 pattern 字段在 `fromJson` 自动映射到新 contextUrl
+
+## 匹配语义(2.3.17.5 最终版,合并初版与 5 刀修复)
+- 候选 URL:`webView.getUrl()`(重定向后当前页) + `webView.getOriginalUrl()`(302 前的原始链)
+- 命中条件:任一 candidate 被规则的 `contextUrl` 或 `redirectedUrl` 子串包含(忽略大小写)即胜出
+- 首次命中且 `redirectedUrl` 为空 + 已发生重定向(候选 URL ≠ contextUrl) → 系统自动写 `redirectedUrl` 到 SP
+- 这样无论用户配的是原始短链(`xhslink.cn`)还是重定向后的真页(`xiaohongshu.com`),规则都能正确命中
+
+## UI 配置入口(两处共用一个 DialogFragment)
+1. **设置抽屉**(fragment_slideshow.xml)「拦截名单」区块:RecyclerView + 每行(`pattern + 3 选 1 + 删除`) + 底部「+」按钮 + 空态提示
+2. **WebView toolbar**:菜单项「配置本页跳转」(`action_configure_override_rule`);弹 dialog 时 `pattern` 预填 `webView.getOriginalUrl()`(若空回退 `getUrl()`,再回退 `currentUrl`)
+3. row 点击 TextView 区域 → 弹只读详情 dialog 显示完整 contextUrl + redirectedUrl + action
+4. item layout 重新设计(垂直 LinearLayout 包两层:主行 + 副 redirectedUrl 行);副行存在时显示,空时整行隐藏
+
+## WebView 拦截接入
+- `WebViewActivity.handleUrlOverride` 入口先 white-list 命中检查,命中走 `applyRuleAction(url, action)`,未命中走既有全局 mode 0/1/2 逻辑
+- 命中后**永远 return true** —— 避免 chrome 内核对 `xhsdiscover://` 等 scheme 触发 ERR_UNKNOWN_URL_SCHEME 渲染错误页
+- 三个 action 复用既有方法:
+  - ASK → `showExternalOpenConfirmDialog`
+  - OPEN → `openExternalUri`
+  - BLOCK → return true(静默不处理)
+
+## 踩坑记录(关键)
+1. **白名单匹配语义走错关键两步**(2.3.17.2/.3 反复纠偏):
+   - 初版用「跳出来的 url」子串匹配 → xhsdiscover:// 不含 xiaohongshu.com,误判
+   - 改用「webview 当前页 url」匹配 → 但 dialog 预填 currentUrl 变量是短链,与重定向后 webview 不符
+   - 最终用「webview 原 URL」+「webview 当前 URL」两条候选,匹配时一并查
+2. **shouldOverrideUrlLoading 应永远 return true**(2.3.17.4)
+   - 之前 return `action == ASK` 仅在 ASK 时返 true,OPEN/BLOCK 命中时 webview 仍尝试加载 scheme,ERR 错误页出现
+3. **row 点击区不传透 RadioGroup / 删除按钮**(2.3.17.5)
+   - 把 contextUrl 与 redirectedUrl 包成单独的 LinearLayout 给 click listener,RadioGroup / 删除按钮的 click 不触发
+
+## 数据与回滚
+- 老 2.3.17 之前 SP 里的 `pattern` 字段,反序列化时自动映射到 `contextUrl`(读优先读新字段,缺时回退老字段)
+- 回滚成本:单 commit revert,不改 schema 表结构,不引入新依赖
+- versionCode 36 → 40,versionName 2.3.17 → 2.3.17.5
+
+# 2.3.17
+特性:WebView 跳转白名单模式 —— 初版,简化版。详见后续修复 commit。
+- 初版字段命名 `pattern`(子串匹配,命中 web 跳出来的 url),后续发现「网页 JS 触发 scheme 跳转不命中问题」,后续 commit 改字段为 contextUrl + 加 redirectedUrl。
 
 # 2.3.16
 修复:数据库在「多任务一键全部关闭」(SIGKILL) 后出现"主库空 + journal 残留"的丢数据现象。

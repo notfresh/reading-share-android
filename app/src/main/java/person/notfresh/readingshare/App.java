@@ -46,6 +46,8 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        // 崩溃日志落盘(排障用):下次启动复制到剪贴板,便于用户回传
+        person.notfresh.readingshare.util.CrashRecorder.install(this);
         // 预热数据库连接(进程级单例)
         DbConnection dbConnection = DbConnection.get(this);
         SQLiteDatabase db = dbConnection.writable();

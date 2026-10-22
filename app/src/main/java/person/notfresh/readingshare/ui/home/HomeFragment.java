@@ -818,7 +818,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         
         if (arrowIndicator != null) {
             arrowIndicator.setImageResource(R.drawable.ic_expand_less);
-            arrowIndicator.setContentDescription("收起标签");
+            arrowIndicator.setContentDescription(getString(R.string.home_collapsing_tags));
         }
         
             // 加载高亮标签设置
@@ -971,7 +971,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         
         // 更新标题
         if (isSelectionMode) {
-            requireActivity().setTitle("选择要分享的链接");
+            requireActivity().setTitle(R.string.home_title_select_to_share);
         } else {
             // 根据是否有标签筛选来更新标题
             if (selectedTagNames.isEmpty()) {
@@ -1078,8 +1078,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         
         // 更新标题
         if (isSortMode) {
-            requireActivity().setTitle("拖拽排序标签");
-            Toast.makeText(requireContext(), "长按标签可拖拽排序", Toast.LENGTH_SHORT).show();
+            requireActivity().setTitle(R.string.home_title_sort_tags);
+            Toast.makeText(requireContext(), R.string.home_toast_long_press_to_drag, Toast.LENGTH_SHORT).show();
         } else {
             // 根据是否有标签筛选来更新标题
             if (selectedTagNames.isEmpty()) {
@@ -1096,7 +1096,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * 执行基于相似度的自动排序
      */
     private void performAutoSort() {
-        Toast.makeText(requireContext(), "正在计算标签相似度...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), R.string.home_toast_computing_similarity, Toast.LENGTH_SHORT).show();
 
         // 懒加载：首次使用时才创建 TagEmbeddingManager
         if (tagEmbeddingManager == null) {
@@ -1133,14 +1133,14 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     } else {
                         Log.w("HomeFragment", "sortedItems is empty, sortedTagIds size=" + sortedTagIds.size() + ", currentTags size=" + currentTags.size());
                     }
-                    Toast.makeText(requireContext(), "相似度排序完成，可拖拽微调", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), R.string.home_toast_similarity_done, Toast.LENGTH_SHORT).show();
                 });
             }
 
             @Override
             public void onError(String message) {
                 requireActivity().runOnUiThread(() ->
-                    Toast.makeText(requireContext(), "排序失败: " + message, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.home_toast_sort_failed, message), Toast.LENGTH_SHORT).show()
                 );
             }
         });
@@ -1177,8 +1177,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
         // 更新标题
         if (isShuffleMode) {
-            requireActivity().setTitle("随机推荐");
-            Toast.makeText(requireContext(), "洗牌后随机排序", Toast.LENGTH_SHORT).show();
+            requireActivity().setTitle(R.string.home_title_random);
+            Toast.makeText(requireContext(), R.string.home_toast_shuffled, Toast.LENGTH_SHORT).show();
         } else {
             requireActivity().setTitle(R.string.app_name);
         }
@@ -1200,7 +1200,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         // 重新加载数据（触发洗牌）
         refreshLinksList();
 
-        Toast.makeText(requireContext(), "重新洗牌", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), R.string.home_toast_reshuffled, Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -1244,7 +1244,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         ShareUtil.shareLinksAsFileWithDialog(requireContext(), items, isJson, deleteAfterShare -> {
             if (deleteAfterShare) {
                 deleteSelectedLinks(items);
-                Toast.makeText(requireContext(), "已删除已分享的链接", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), R.string.home_toast_deleted_shared_links, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -1282,18 +1282,18 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void confirmAndDeleteSelected() {
         Set<LinkItem> selectedItems = adapter.getSelectedItems();
         if (selectedItems.isEmpty()) {
-            Toast.makeText(requireContext(), "请先选择要删除的链接", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), R.string.home_toast_select_first_to_delete, Toast.LENGTH_SHORT).show();
             return;
         }
         int count = selectedItems.size();
         new AlertDialog.Builder(requireContext())
-                .setTitle("批量删除")
-                .setMessage("确认删除选中的 " + count + " 条链接?此操作不可撤销。")
-                .setPositiveButton("删除", (dialog, which) -> {
+                .setTitle(R.string.home_dialog_title_batch_delete)
+                .setMessage(getString(R.string.home_dialog_msg_batch_delete, count))
+                .setPositiveButton(R.string.delete, (dialog, which) -> {
                     deleteSelectedLinks(new ArrayList<>(selectedItems));
-                    Toast.makeText(requireContext(), "已删除 " + count + " 条链接", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), getString(R.string.home_toast_deleted_count, count), Toast.LENGTH_SHORT).show();
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1304,7 +1304,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void addToSubject() {
         Set<LinkItem> selectedItems = adapter.getSelectedItems();
         if (selectedItems.isEmpty()) {
-            Toast.makeText(requireContext(), "请先选择要添加的链接", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), R.string.home_toast_select_first_to_add, Toast.LENGTH_SHORT).show();
             return;
         }
         // 复用辅助方法
@@ -1358,7 +1358,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      */
     private void addLinksToSubject(List<LinkItem> items) {
         if (items == null || items.isEmpty()) {
-            Toast.makeText(requireContext(), "请先选择要添加的链接", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), R.string.home_toast_select_first_to_add, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -1377,7 +1377,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             try {
                 // 获取现有主题项，用于计算 orderIndex
                 List<SubjectItem> existingItems = subjectDao.getSubjectItemsBySubjectId(subjectId);
-                
+
                 // 为每个链接创建 SubjectItem
                 List<SubjectItem> newItems = new ArrayList<>();
                 for (Long linkId : selectedLinkIds) {
@@ -1389,10 +1389,10 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     existingItems.add(item); // 添加到列表，用于下一个项的计算
                     newItems.add(item);
                 }
-                
+
                 // 批量插入
                 subjectDao.batchInsertSubjectItems(newItems);
-                Toast.makeText(requireContext(), "已添加 " + newItems.size() + " 个链接到主题", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), getString(R.string.home_toast_added_count_to_subject, newItems.size()), Toast.LENGTH_SHORT).show();
             } finally {
                 subjectDao.close();
             }
@@ -1675,12 +1675,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         
                         Log.d("HomeFragment", "Shortcut created successfully (using custom icon)");
                     } else {
-                        Toast.makeText(requireContext(), "无法读取图片", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), R.string.home_toast_cannot_read_image, Toast.LENGTH_SHORT).show();
                         Log.e("HomeFragment", "Failed to read image from URI");
                     }
                 } catch (Exception e) {
                     Log.e("HomeFragment", "Error processing image: " + e.getMessage(), e);
-                    Toast.makeText(requireContext(), "处理图片时出错: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), getString(R.string.home_toast_image_error, e.getMessage()), Toast.LENGTH_SHORT).show();
                 } finally {
                     // 清理临时数据
                     pendingIconItem = null;
@@ -1728,7 +1728,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             }
             if (selectedTagNames.isEmpty()) {
                 // 如果没有选中任何标签，显示所有链接（HomeFragment原有行为）
-                requireActivity().setTitle("全部内容");
+                requireActivity().setTitle(getString(R.string.home_title_all_content));
                 refreshLinksList();  // 使用统一方法刷新
                 clearSavedSelections();
             } else {
@@ -1756,11 +1756,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     } else {
                         // 标签不存在（tagID为-1），不能添加
                         Log.w(TAG, "updateTagSelectionByName: tag not found (tagID=-1), tagName=" + tagName);
-                        Toast.makeText(requireContext(), "标签不存在: " + tagName, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), getString(R.string.home_toast_tag_not_exist, tagName), Toast.LENGTH_SHORT).show();
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "updateTagSelectionByName: failed to get tagID for tag: " + tagName, e);
-                    Toast.makeText(requireContext(), "验证标签失败: " + tagName, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), getString(R.string.home_toast_verify_tag_failed, tagName), Toast.LENGTH_SHORT).show();
                 }
             }
         }
@@ -2108,7 +2108,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 adapter.setGroupedLinks(groupedLinks);
                 adapter.notifyDataSetChanged();
                 try {
-                    requireActivity().setTitle("全部内容");
+                    requireActivity().setTitle(getString(R.string.home_title_all_content));
                 } catch (Exception e) {
                     Log.e(TAG, "updateContentBySelectedTags: failed to set title", e);
                 }
@@ -2190,16 +2190,16 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         try {
             StringBuilder title = new StringBuilder();
             if (tags.isEmpty() && !includeNoTag) {
-                title.append("全部内容");
+                title.append(getString(R.string.home_title_all_content));
             } else {
                 if (includeNoTag) {
-                    title.append("无标签");
+                    title.append(getString(R.string.home_title_no_tag));
                     if (!tags.isEmpty()) {
-                        title.append(" + ");
+                        title.append(getString(R.string.home_title_separator_plus));
                     }
                 }
                 if (!tags.isEmpty()) {
-                    title.append(String.join(" + ", tags));
+                    title.append(String.join(getString(R.string.home_title_separator_plus).trim(), tags));
                 }
             }
             requireActivity().setTitle(title.toString());
@@ -2357,13 +2357,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void updateExpandMoreButtonState() {
         if (textExpandMore != null && iconExpandMore != null) {
             if (isMoreTagsExpanded) {
-                textExpandMore.setText("收起标签");
+                textExpandMore.setText(R.string.home_collapsing_tags);
                 iconExpandMore.setImageResource(R.drawable.ic_expand_less);
-                iconExpandMore.setContentDescription("收起");
+                iconExpandMore.setContentDescription(getString(R.string.home_cd_collapse));
             } else {
-                textExpandMore.setText("展开更多标签");
+                textExpandMore.setText(R.string.home_expand_more);
                 iconExpandMore.setImageResource(R.drawable.ic_expand_more);
-                iconExpandMore.setContentDescription("展开");
+                iconExpandMore.setContentDescription(getString(R.string.home_cd_expand));
             }
         }
     }
@@ -2454,13 +2454,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
             // 展开状态 - 设置为自适应高度
             params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
             arrowIndicator.setImageResource(R.drawable.ic_expand_less);
-            arrowIndicator.setContentDescription("收起标签");
+            arrowIndicator.setContentDescription(getString(R.string.home_collapsing_tags));
         } else {
             // 折叠状态 - 使用固定高度
             float density = getResources().getDisplayMetrics().density;
             params.height = (int) (COLLAPSED_HEIGHT_DP * density);
             arrowIndicator.setImageResource(R.drawable.ic_expand_more);
-            arrowIndicator.setContentDescription("展开标签");
+            arrowIndicator.setContentDescription(getString(R.string.home_expand_more));
         }
         
         tagsScrollView.setLayoutParams(params);
@@ -2535,7 +2535,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         }
         
         // 显示提示
-        String message = highlightedTags.contains(tagName) ? "已高亮标签：" + tagName : "已取消高亮：" + tagName;
+        String message = highlightedTags.contains(tagName)
+                ? getString(R.string.home_snackbar_tag_highlighted, tagName)
+                : getString(R.string.home_snackbar_tag_unhighlighted, tagName);
         Snackbar.make(requireView(), message, Snackbar.LENGTH_SHORT).show();
     }
     
@@ -2568,10 +2570,15 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
      * 显示标签选项对话框
      */
     private void showTagOptionsDialog(String tag) {
-        String[] options = {"删除标签", "删除标签及所有关联链接", "发布到网站", "切换高亮"};
-        
+        String[] options = new String[]{
+                getString(R.string.tag_op_delete_tag),
+                getString(R.string.tag_op_delete_tag_and_links),
+                getString(R.string.tag_op_publish_to_website),
+                getString(R.string.tag_op_toggle_highlight)
+        };
+
         new AlertDialog.Builder(requireContext())
-            .setTitle("标签操作")
+            .setTitle(R.string.tag_op_dialog_title)
             .setItems(options, (dialog, which) -> {
                 switch (which) {
                     case 0: // 删除标签
@@ -2597,9 +2604,9 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void confirmDeleteTag(String tag, boolean isCascading) {
         try {
             new AlertDialog.Builder(requireContext())
-                .setTitle("确认删除")
-                .setMessage("确定要删除标签 \"" + tag + "\" 吗？")
-                .setPositiveButton("删除", (dialog, which) -> {
+                .setTitle(R.string.tag_op_confirm_delete_title)
+                .setMessage(getString(R.string.tag_op_confirm_delete_msg, tag))
+                .setPositiveButton(R.string.delete, (dialog, which) -> {
                     try {
                         Log.d("HomeFragment", "Start deleting tag: " + tag);
                         
@@ -2627,23 +2634,23 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         }
                         
                         // 显示成功提示
-                        Toast.makeText(requireContext(), 
-                            "标签已删除", 
+                        Toast.makeText(requireContext(),
+                            R.string.tag_op_toast_tag_deleted,
                             Toast.LENGTH_SHORT).show();
                         
                     } catch (Exception e) {
                         Log.e("HomeFragment", "Error deleting tag", e);
-                        Toast.makeText(requireContext(), 
-                            "删除标签失败: " + e.getMessage(), 
+                        Toast.makeText(requireContext(),
+                            getString(R.string.tag_op_toast_tag_delete_failed, e.getMessage()),
                             Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.cancel, null)
                 .show();
         } catch (Exception e) {
             Log.e("HomeFragment", "Error showing confirmation dialog", e);
-            Toast.makeText(requireContext(), 
-                "操作失败: " + e.getMessage(), 
+            Toast.makeText(requireContext(),
+                getString(R.string.tag_op_toast_action_failed, e.getMessage()),
                 Toast.LENGTH_SHORT).show();
         }
         
@@ -2660,7 +2667,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void publishTagToWebsite(String tag) {
         Log.d("HomeFragment", "Start publishing tag to website: " + tag);
         // TODO: 此功能将在后续阶段迁移到Sync模块
-        Snackbar.make(requireView(), "发布功能待迁移到Sync模块", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(requireView(), R.string.tag_op_snackbar_publish_pending, Snackbar.LENGTH_SHORT).show();
     }
     
     /**
@@ -2671,16 +2678,16 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         EditText tagInput = dialogView.findViewById(R.id.edit_tag_input);
 
         new AlertDialog.Builder(requireContext())
-                .setTitle("添加新标签")
+                .setTitle(R.string.tag_op_dialog_title_add_new)
                 .setView(dialogView)
-                .setPositiveButton("添加", (dialog, which) -> {
+                .setPositiveButton(R.string.tag_op_button_add, (dialog, which) -> {
                     String tagName = tagInput.getText().toString().trim();
                     if (!TextUtils.isEmpty(tagName)) {
                         // 检查标签是否已存在
                         List<String> existingTags = linkDao.getAllTags();
                         if (existingTags.contains(tagName)) {
                             // 如果标签已存在，显示提示
-                            Snackbar.make(requireView(), "标签已存在", Snackbar.LENGTH_SHORT).show();
+                            Snackbar.make(requireView(), R.string.tag_op_snackbar_tag_exists, Snackbar.LENGTH_SHORT).show();
                             return;
                         }
                         
@@ -2690,11 +2697,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                             // 重新加载标签列表
                             loadTags();
                             // 显示提示
-                            Snackbar.make(requireView(), "已添加标签：" + tagName, Snackbar.LENGTH_SHORT).show();
+                            Snackbar.make(requireView(), getString(R.string.tag_op_snackbar_tag_added, tagName), Snackbar.LENGTH_SHORT).show();
                         }
                     }
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 

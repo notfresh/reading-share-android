@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <WebView
+            android:id="@+id/reader_webview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <ProgressBar
+            android:id="@+id/reader_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/reader_empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/reader_empty"
+            android:visibility="gone" />
+
+        <!-- 底部条 + 悬浮翻页层：与 activity_webview.xml:27-107 同款(2.3.19.2 先复制对齐,
+             第二刀与 Activity 合并成同一份 include)。 -->
+        <FrameLayout
+            android:id="@+id/reader_navigation_controls"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:padding="12dp"
+                android:background="#66000000">
+
+                <Button
+                    android:id="@+id/reader_button_previous"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="@string/reader_nav_prev"
+                    android:backgroundTint="@android:color/darker_gray" />
+
+                <Button
+                    android:id="@+id/reader_button_next"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/reader_nav_next"
+                    android:backgroundTint="@android:color/darker_gray" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/reader_floating_nav_controls"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right|center_vertical"
+                android:orientation="vertical"
+                android:layout_marginEnd="12dp"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/reader_floating_previous"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/floating_arrow_bg"
+                    android:src="@drawable/ic_expand_less"
+                    android:contentDescription="@string/reader_nav_prev"
+                    android:scaleType="centerInside" />
+
+                <ImageButton
+                    android:id="@+id/reader_floating_next"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginBottom="100dp"
+                    android:background="@drawable/floating_arrow_bg"
+                    android:src="@drawable/ic_expand_more"
+                    android:contentDescription="@string/reader_nav_next"
+                    android:scaleType="centerInside" />
+
+                <ImageButton
+                    android:id="@+id/reader_floating_random"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/floating_arrow_bg"
+                    android:src="@drawable/ic_random"
+                    android:contentDescription="@string/reader_nav_random"
+                    android:scaleType="centerInside" />
+            </LinearLayout>
+        </FrameLayout>
+    </FrameLayout>
+</LinearLayout>

@@ -48,6 +48,12 @@
         android:label="@string/menu_subject"
         tools:layout="@layout/fragment_subject" />
 
+    <fragment
+        android:id="@+id/nav_reader"
+        android:name="person.notfresh.readingshare.ui.reader.ReaderFragment"
+        android:label="@string/menu_reader"
+        tools:layout="@layout/fragment_reader" />
+
     <action
         android:id="@+id/action_nav_home_to_nav_statistics"
         app:destination="@id/nav_statistics" />

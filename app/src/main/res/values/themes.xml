@@ -16,6 +16,8 @@
         <item name="android:popupMenuStyle">@style/PopupMenu.Custom</item>
         <item name="textAppearancePopupMenuHeader">@style/PopupMenuTextAppearance</item>
         <item name="android:itemTextAppearance">@style/PopupMenuTextAppearance</item>
+        <!-- 关闭 Material Button 默认 ALL CAPS,英文按钮显示更自然的 sentence case (2.3.18.1 patch) -->
+        <item name="textAllCaps">false</item>
     </style>
 
     <style name="Theme.MyApplication.NoActionBar">

@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Reading Share</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
@@ -9,4 +10,302 @@
 
     <string name="menu_home">Home</string>
     <string name="menu_gallery">Tags</string>
+    <string name="menu_rss">RSS</string>
+    <string name="menu_archive">Archive</string>
+    <string name="menu_documents">Documents</string>
+    <string name="menu_subject">Subjects</string>
+    <string name="menu_reader">Reader</string>
+
+        <string name="menu_settings">Settings</string>
+
+    <string-array name="default_tabs_array">
+        <item>Subjects</item>
+        <item>Home</item>
+        <item>RSS</item>
+        <item>Random</item>
+        <item>Reader</item>
+    </string-array>
+
+    <!-- Reader tab (2.3.19): embedded WebView + previous/next/random; configurable source -->
+    <string name="reader_nav_prev">Previous</string>
+    <string name="reader_nav_random">Random</string>
+    <string name="reader_nav_next">Next</string>
+    <string name="reader_empty">No links in this source</string>
+    <string name="reader_link_unavailable">Link is no longer available</string>
+    <string name="reader_external_confirm_title">Open external app</string>
+    <string name="reader_external_confirm_message">This page wants to open an external app. Continue?\n\n%1$s</string>
+    <string name="reader_external_confirm_stay">Stay on page</string>
+    <string name="reader_external_confirm_forbid">Deny and stop asking</string>
+    <string name="reader_external_confirm_open">Open</string>
+    <string name="reader_external_open_failed">Cannot open this link: %1$s</string>
+    <string name="reader_source_section_title">Reader data source</string>
+    <string name="reader_source_hint_type">Source type</string>
+    <string name="reader_source_hint_param">Specific item</string>
+    <string name="reader_source_type_all">All links</string>
+    <string name="reader_source_type_pinned">Pinned links</string>
+    <string name="reader_source_type_tag">A tag</string>
+    <string name="reader_source_type_subject">A subject</string>
+    <string name="reader_source_param_none">(not required)</string>
+    <string name="reader_source_empty_tags">No tags yet</string>
+    <string name="reader_source_empty_subjects">No subjects yet</string>
+    <string name="reader_action_page_loading">Page not loaded</string>
+    <string name="reader_action_no_url">Cannot get page URL</string>
+    <string name="reader_action_open_browser_failed">Cannot open browser</string>
+    <string name="reader_action_extract_ok">Content extracted to clipboard</string>
+    <string name="reader_action_extract_failed">Extraction failed</string>
+    <string name="reader_action_not_in_queue">This page is not a link from the reader queue</string>
+    <string name="reader_action_tag_saved">Tags saved: %1$s</string>
+    <string name="reader_action_tag_failed">Failed to save tags</string>
+    <string name="reader_action_title_empty">Title cannot be empty</string>
+    <string name="reader_action_title_updated">Title updated</string>
+    <string name="reader_action_title_not_saved">This page is not saved as a link</string>
+    <string name="reader_action_mode_block">Switched to: block all external links</string>
+    <string name="reader_action_mode_open">Switched to: open directly</string>
+    <string name="reader_action_mode_ask">Switched to: ask before opening</string>
+
+    <string-array name="recent_tags_window_array">
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+    </string-array>
+
+    <string name="fragment_tags">Tags</string>
+
+    <string name="delete_tag">Delete tag</string>
+    <string name="publish_tag">Publish to website</string>
+    <string name="confirm_delete_tag">Confirm deleting this tag?</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="publishing">Publishing...</string>
+    <string name="publish_success">Published successfully</string>
+    <string name="publish_failed">Publish failed</string>
+
+    <string name="open_in_browser">Open in system browser</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="add_statistics">Add statistics</string>
+    <string name="read_statistics">Read statistics</string>
+
+    <string name="read_monthly_statistics">Monthly statistics</string>
+    <string name="read_weekly_statistics">Weekly statistics</string>
+    <string name="read_total_clicks">Total clicks</string>
+
+    <string name="statistics_title">Link click statistics</string>
+
+    <string name="no_data_available">No data available</string>
+
+    <string name="force_back">Force back</string>
+    <string name="archive_back">Archive and back</string>
+    <string name="webview_switch_out">Switch out temporarily</string>
+    <string name="webview_share">Share</string>
+    <string name="extract_web_content">Extract web content</string>
+    <string name="toggle_navigation">Show/hide navigation controls</string>
+    <string name="toggle_external_block">Toggle external link block mode</string>
+    <string name="add_tag">Add tag</string>
+    <string name="edit_title">Edit title</string>
+    <string name="link_history">Browse history</string>
+    <string name="configure_override_rule">Configure this page redirect</string>
+
+    <!-- Search history dropdown -->
+    <string name="search_history_empty">No search history</string>
+    <string name="search_history_pin">Pin</string>
+    <string name="search_history_unpin">Unpin</string>
+    <string name="search_history_delete">Delete</string>
+    <string name="search_history_max_count_label">Search history retention (non-pinned)</string>
+    <string name="search_history_max_count_hint">Default 10</string>
+    <string name="search_clear">Clear search</string>
+
+    <!-- ============================================================ -->
+    <!-- New HomeFragment bilingual additions (2.3.18, 2026-10-13) -->
+    <!-- ============================================================ -->
+
+    <!-- fragment_home.xml -->
+    <string name="home_search_hint">Search title or tag</string>
+    <string name="home_expand_more">Show more tags</string>
+    <string name="home_cd_expand">Expand</string>
+    <string name="home_cd_collapse">Collapse</string>
+    <string name="home_cd_expand_collapse_tags">Expand/collapse tags</string>
+    <string name="home_collapsing_tags">Collapse tags</string>
+
+    <!-- home_menu.xml -->
+    <string name="home_action_add_tag">Add tag</string>
+    <string name="home_action_pinned_tags">Pinned tags</string>
+    <string name="home_action_sort_tags">Sort</string>
+    <string name="home_action_exit_sort">Finish sort</string>
+    <string name="home_action_auto_sort">Auto sort</string>
+    <string name="home_action_similarity_config">Similarity config</string>
+    <string name="home_action_shuffle">Shuffle</string>
+    <string name="home_action_exit_shuffle">Exit shuffle</string>
+    <string name="home_action_close_selection">Exit selection</string>
+    <string name="home_action_select_all">Select all</string>
+    <string name="home_action_delete_selected">Batch delete</string>
+    <string name="home_action_share">Share</string>
+    <string name="home_action_share_text">Share as text</string>
+    <string name="home_action_share_json">Share as JSON</string>
+    <string name="home_action_share_csv">Share as CSV</string>
+    <string name="home_action_add_to_subject">Add to subject</string>
+    <string name="home_action_enter_selection">Multi-select</string>
+    <string name="home_action_subject">Subjects</string>
+
+    <!-- HomeFragment dynamic strings -->
+    <string name="home_title_select_to_share">Select links to share</string>
+    <string name="home_title_sort_tags">Drag to reorder tags</string>
+    <string name="home_toast_long_press_to_drag">Long-press a tag to drag</string>
+    <string name="home_toast_computing_similarity">Computing tag similarity…</string>
+    <string name="home_toast_similarity_done">Similarity sort done, fine-tune by drag</string>
+    <string name="home_toast_sort_failed">Sort failed: %1$s</string>
+    <string name="home_title_random">Picks for you</string>
+    <string name="home_toast_shuffled">Randomly shuffled</string>
+    <string name="home_toast_reshuffled">Shuffled again</string>
+    <string name="home_toast_deleted_shared_links">Shared links deleted</string>
+    <string name="home_toast_select_first_to_delete">Please select links to delete first</string>
+    <string name="home_dialog_title_batch_delete">Batch delete</string>
+    <string name="home_dialog_msg_batch_delete">Delete the %1$d selected links? This cannot be undone.</string>
+    <string name="home_toast_deleted_count">%1$d links deleted</string>
+    <string name="home_toast_select_first_to_add">Please select links to add first</string>
+    <string name="home_toast_added_count_to_subject">%1$d links added to subject</string>
+    <string name="home_toast_cannot_read_image">Cannot read the image</string>
+    <string name="home_toast_image_error">Error processing image: %1$s</string>
+    <string name="home_title_all_content">All content</string>
+    <string name="home_toast_tag_not_exist">Tag does not exist: %1$s</string>
+    <string name="home_toast_verify_tag_failed">Failed to verify tag: %1$s</string>
+    <string name="home_title_no_tag">No tag</string>
+    <string name="home_title_separator_plus"> + </string>
+    <string name="home_snackbar_tag_highlighted">Tag highlighted: %1$s</string>
+    <string name="home_snackbar_tag_unhighlighted">Highlight removed: %1$s</string>
+
+    <!-- PopupMenu items from home menu (LinksAdapter) -->
+    <string name="link_menu_edit_title">Edit title</string>
+    <string name="link_menu_delete">Delete</string>
+    <string name="link_menu_share_one">Share this link</string>
+    <string name="link_menu_toggle_pin">Toggle pin</string>
+    <string name="link_menu_enter_multi_select">Multi-select</string>
+    <string name="link_menu_get_summary">Fetch summary</string>
+    <string name="link_menu_add_to_desktop">Add to desktop</string>
+    <string name="link_menu_add_to_subject">Add to subject</string>
+
+    <!-- LinksAdapter summary/shortcut/remark/tag -->
+    <string name="link_progress_getting_summary">Fetching summary…</string>
+    <string name="link_toast_summary_success">Summary fetched</string>
+    <string name="link_toast_summary_failed_unparseable">Fetch failed: page content cannot be parsed</string>
+    <string name="link_toast_summary_failed_with_msg">Fetch failed: %1$s</string>
+    <string name="link_toast_login_or_unreachable">This link may require login or is not directly reachable</string>
+
+    <string name="link_icon_picker_use_website">Use website icon</string>
+    <string name="link_icon_picker_from_gallery">Pick from gallery</string>
+    <string name="link_icon_picker_use_default">Use default icon</string>
+    <string name="link_dialog_title_pick_icon">Choose shortcut icon</string>
+    <string name="link_toast_cannot_open_gallery">Cannot open gallery</string>
+    <string name="link_progress_getting_favicon">Fetching website icon…</string>
+    <string name="link_toast_shortcut_added">Shortcut added</string>
+    <string name="link_toast_shortcut_failed">Failed to create shortcut</string>
+    <string name="link_toast_shortcut_failed_with_msg">Failed to create shortcut: %1$s</string>
+
+    <string name="link_default_title">New link</string>
+
+    <string name="link_dialog_title_delete_confirm">Delete confirmation</string>
+    <string name="link_dialog_msg_delete_confirm">Are you sure you want to delete this link?</string>
+    <string name="link_dialog_ok">OK</string>
+
+    <string name="link_toast_cannot_open_link">Cannot open link: %1$s</string>
+    <string name="link_snackbar_cannot_open_link">Cannot open this link: %1$s</string>
+    <string name="link_click_count">%1$d reads</string>
+
+    <string name="link_show_more">Show more</string>
+    <string name="link_show_less">Show less</string>
+
+    <string name="link_remark_prefix">Note: %1$s</string>
+    <string name="link_view_full_remark">View full note</string>
+    <string name="link_dialog_title_full_remark">Full note</string>
+    <string name="link_dialog_title_edit_title">Edit title</string>
+    <string name="link_dialog_close">Close</string>
+
+    <string name="link_dialog_title_add_tag">Add tag</string>
+
+    <string name="link_dialog_title_add_remark">Add note</string>
+
+    <string name="pinned_header">Pinned</string>
+
+    <!-- HomeFragment showTagOptionsDialog items -->
+    <string name="tag_op_delete_tag">Delete tag</string>
+    <string name="tag_op_delete_tag_and_links">Delete tag and all related links</string>
+    <string name="tag_op_publish_to_website">Publish to website</string>
+    <string name="tag_op_toggle_highlight">Toggle highlight</string>
+    <string name="tag_op_dialog_title">Tag operations</string>
+    <string name="tag_op_confirm_delete_title">Confirm delete</string>
+    <string name="tag_op_confirm_delete_msg">Delete tag \"%1$s\"?</string>
+    <string name="tag_op_toast_tag_deleted">Tag deleted</string>
+    <string name="tag_op_toast_tag_delete_failed">Failed to delete tag: %1$s</string>
+    <string name="tag_op_toast_action_failed">Action failed: %1$s</string>
+    <string name="tag_op_snackbar_publish_pending">Publish feature pending migration to Sync module</string>
+    <string name="tag_op_dialog_title_add_new">Add new tag</string>
+    <string name="tag_op_button_add">Add</string>
+    <string name="tag_op_snackbar_tag_exists">Tag already exists</string>
+    <string name="tag_op_snackbar_tag_added">Tag added: %1$s</string>
+
+    <!-- Setting page (fragment_slideshow.xml) -->
+    <string name="setting_default_launcher_title">Default starting tab</string>
+    <string name="setting_show_mail_entry">Show mail entry</string>
+    <string name="setting_show_random_entry">Show random entry</string>
+    <string name="setting_fab_position_title">FAB area position</string>
+    <string name="setting_fab_position_right">Right-handed (default, bottom-right)</string>
+    <string name="setting_fab_position_left">Left-handed (bottom-left)</string>
+    <string name="setting_browse_history_button">Browse history</string>
+    <string name="setting_export_button">Export all links</string>
+    <string name="setting_csv_format_hint">CSV format must match the export format</string>
+    <string name="setting_import_button">Import share links from CSV</string>
+    <string name="setting_event_log_button">Event log</string>
+    <string name="setting_server_config_title">Backend server settings</string>
+    <string name="setting_server_config_subtitle">Used for syncing link data</string>
+    <string name="setting_server_address_hint">Server address</string>
+    <string name="setting_sync_settings_title">Sync settings</string>
+    <string name="setting_sync_secret_hint">Sync secret</string>
+    <string name="setting_reading_mode_title">Reading mode</string>
+    <string name="setting_reading_mode_normal">Normal (control bar hidden)</string>
+    <string name="setting_reading_mode_smooth">Smooth (auto-hide control bar)</string>
+    <string name="setting_page_button_title">Page-turn button layout</string>
+    <string name="setting_page_button_bottom">Bottom row (prev/next only)</string>
+    <string name="setting_page_button_floating">Floating on the right (up/down arrows only)</string>
+    <string name="setting_page_button_both">Show both (default)</string>
+    <string name="setting_external_link_mode_title">External link open mode</string>
+    <string name="setting_external_link_ask">Confirm in dialog (default)</string>
+    <string name="setting_external_link_open">Open directly (auto-launch external app)</string>
+    <string name="setting_external_link_block">Block all (no external app opens)</string>
+    <string name="setting_override_rules_title">Override rules (per-URL open behavior)</string>
+    <string name="setting_override_rules_empty">No rules yet — all URLs fall back to the global mode</string>
+    <string name="setting_override_rules_add">+ Add rule</string>
+    <string name="setting_recent_tags_title">Recent tags window size</string>
+    <string name="setting_about_button">About</string>
+
+    <!-- Setting page runtime strings (SettingFragment.java) -->
+    <string name="setting_snackbar_saved_history">Saved: keep the most recent %1$d entries</string>
+    <string name="setting_sync_status_syncing">Syncing…</string>
+    <string name="setting_sync_status_ok">Synced: uploaded %1$d, downloaded %2$d</string>
+    <string name="setting_sync_status_failed">Sync failed: %1$s</string>
+    <string name="setting_chooser_csv_or_json">Choose a CSV or JSON file</string>
+    <string name="setting_import_dedup_checkbox">Skip duplicates (existing links are kept)</string>
+    <string name="setting_import_dialog_title">Import options</string>
+    <string name="setting_import_no_links">No links to import</string>
+    <string name="setting_import_summary">%1$s import done: %2$d added, %3$d duplicates skipped, %4$d failed</string>
+    <string name="setting_export_chooser_title">Choose export option</string>
+
+    <!-- Home dialog internals (dialog_add_tag.xml / dialog_add_remark.xml / item_link.xml) -->
+    <string name="home_dialog_add_tag_hint">Enter tag names, separate with commas</string>
+    <string name="home_dialog_add_tag_suggestion_label">Existing tags (auto-suggest as you type):</string>
+    <string name="home_dialog_add_tag_current_label">Current tags (tap to remove):</string>
+    <string name="home_dialog_add_tag_recent_label">Recently used tags:</string>
+    <string name="home_dialog_add_remark_hint">Add note content</string>
+    <string name="link_button_add_tag">Add tag</string>
+    <string name="link_button_add_remark">Note</string>
+    <string name="link_click_count_zero">0 reads</string>
+
+    <!-- Language settings (SettingFragment new section, 2.3.18) -->
+    <string name="language_section_title">Language</string>
+    <string name="language_option_system">Follow system</string>
+    <string name="language_option_chinese">中文</string>
+    <string name="language_option_english">English</string>
 </resources>

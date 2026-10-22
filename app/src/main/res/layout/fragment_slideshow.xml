@@ -13,7 +13,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="选择默认启动页"
+            android:text="@string/setting_default_launcher_title"
             android:textSize="18sp"
             android:layout_marginBottom="8dp"/>
 
@@ -28,7 +28,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="显示邮件入口" />
+            android:text="@string/setting_show_mail_entry" />
 
         <CheckBox
             android:id="@+id/show_random_entry_checkbox"
@@ -36,12 +36,12 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:checked="true"
-            android:text="显示随机入口" />
+            android:text="@string/setting_show_random_entry" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="FAB 区域位置"
+            android:text="@string/setting_fab_position_title"
             android:textSize="18sp"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"/>
@@ -58,13 +58,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                android:text="右手模式(默认,右下角)" />
+                android:text="@string/setting_fab_position_right" />
 
             <RadioButton
                 android:id="@+id/fab_side_left"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="左手模式(左下角)" />
+                android:text="@string/setting_fab_position_left" />
 
         </RadioGroup>
 
@@ -73,19 +73,19 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="浏览历史" />
+            android:text="@string/setting_browse_history_button" />
 
         <Button
             android:id="@+id/button_export"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="导出所有链接"
+            android:text="@string/setting_export_button"
             android:layout_marginTop="16dp"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="CSV的格式需要与导出格式匹配"
+            android:text="@string/setting_csv_format_hint"
             android:textColor="#808080"
             android:layout_marginTop="16dp"/>
 
@@ -93,7 +93,7 @@
             android:id="@+id/button_import_csv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="从CSV导入分享链接"
+            android:text="@string/setting_import_button"
             android:layout_marginTop="8dp"/>
 
         <Button
@@ -101,12 +101,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="事件日志" />
+            android:text="@string/setting_event_log_button" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="后台服务器设置"
+            android:text="@string/setting_server_config_title"
             android:textSize="18sp"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"/>
@@ -114,7 +114,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="用于同步链接数据"
+            android:text="@string/setting_server_config_subtitle"
             android:textColor="#808080"
             android:layout_marginBottom="8dp"/>
 
@@ -122,7 +122,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="服务器地址">
+            android:hint="@string/setting_server_address_hint">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/server_url_input"
@@ -137,7 +137,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="同步设置"
+            android:text="@string/setting_sync_settings_title"
             android:textSize="18sp"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"/>
@@ -146,7 +146,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="同步密钥"
+            android:hint="@string/setting_sync_secret_hint"
             app:endIconMode="password_toggle">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -170,7 +170,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="阅读模式"
+            android:text="@string/setting_reading_mode_title"
             android:textSize="18sp"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"/>
@@ -186,20 +186,20 @@
                 android:id="@+id/reading_mode_normal"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="常规（不显示控制层）" />
+                android:text="@string/setting_reading_mode_normal" />
 
             <RadioButton
                 android:id="@+id/reading_mode_smooth"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="平滑（自动隐藏控制层）" />
+                android:text="@string/setting_reading_mode_smooth" />
 
         </RadioGroup>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="翻页按钮显示方式"
+            android:text="@string/setting_page_button_title"
             android:textSize="18sp"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp" />
@@ -215,26 +215,26 @@
                 android:id="@+id/nav_button_style_bottom"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="底部横排（仅上一篇/下一篇）" />
+                android:text="@string/setting_page_button_bottom" />
 
             <RadioButton
                 android:id="@+id/nav_button_style_floating"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="右侧悬浮（仅上下箭头）" />
+                android:text="@string/setting_page_button_floating" />
 
             <RadioButton
                 android:id="@+id/nav_button_style_both"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="都显示（默认）" />
+                android:text="@string/setting_page_button_both" />
 
         </RadioGroup>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="外部链接打开模式"
+            android:text="@string/setting_external_link_mode_title"
             android:textSize="18sp"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"/>
@@ -250,26 +250,57 @@
                 android:id="@+id/external_link_mode_confirm"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="弹窗确认（默认）" />
+                android:text="@string/setting_external_link_ask" />
 
             <RadioButton
                 android:id="@+id/external_link_mode_direct"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="直接跳转（自动打开外部应用）" />
+                android:text="@string/setting_external_link_open" />
 
             <RadioButton
                 android:id="@+id/external_link_mode_block"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="全部拦截（禁止打开外部应用）" />
+                android:text="@string/setting_external_link_block" />
 
         </RadioGroup>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="最近使用的标签窗口大小"
+            android:text="@string/setting_override_rules_title"
+            android:textSize="18sp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/override_rule_empty_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/setting_override_rules_empty"
+            android:textColor="@android:color/darker_gray"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/override_rule_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:nestedScrollingEnabled="true" />
+
+        <Button
+            android:id="@+id/override_rule_add_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/setting_override_rules_add"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/setting_recent_tags_title"
             android:textSize="18sp"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"/>
@@ -308,7 +339,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="关于" />
+            android:text="@string/setting_about_button" />
 
     </LinearLayout>
 </ScrollView>

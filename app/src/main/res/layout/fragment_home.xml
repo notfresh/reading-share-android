@@ -20,7 +20,7 @@
             android:paddingEnd="36dp"
             android:paddingBottom="8dp"
             android:background="@drawable/search_background"
-            android:hint="搜索标题或标签"
+            android:hint="@string/home_search_hint"
             android:maxLines="1"
             android:singleLine="true"
             android:imeOptions="actionSearch"
@@ -91,7 +91,7 @@
                         android:id="@+id/text_expand_more"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="展开更多标签"
+                        android:text="@string/home_expand_more"
                         android:textColor="#666666"
                         android:textSize="14sp"
                         android:maxLines="1"
@@ -103,7 +103,7 @@
                         android:layout_height="20dp"
                         android:layout_marginStart="6dp"
                         android:src="@drawable/ic_expand_more"
-                        android:contentDescription="展开"
+                        android:contentDescription="@string/home_cd_expand"
                         android:scaleType="fitCenter" />
                 </LinearLayout>
 
@@ -141,7 +141,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_expand_more"
-                android:contentDescription="展开收起标签"
+                android:contentDescription="@string/home_cd_expand_collapse_tags"
                 android:background="@drawable/circle_background"
                 android:padding="2dp"/>
         </LinearLayout>

@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -28,6 +29,8 @@ import android.widget.Toast;
 import android.app.AlertDialog;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.os.LocaleListCompat;
 import androidx.fragment.app.Fragment;
 
 import java.io.File;
@@ -43,6 +46,11 @@ import person.notfresh.readingshare.EventLogActivity;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.db.LinkDao;
+import person.notfresh.readingshare.db.SubjectDao;
+import person.notfresh.readingshare.db.DbConnection;
+import person.notfresh.readingshare.core.model.Subject;
+import person.notfresh.readingshare.model.ReaderSourceSpec;
+import person.notfresh.readingshare.util.ReaderSourceStore;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.db.SearchHistoryManager;
 import android.text.SpannableString;
@@ -59,10 +67,17 @@ import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.ShareUtil;
 import person.notfresh.readingshare.util.SubjectUtil;
 import com.google.android.material.textfield.TextInputEditText;
+import person.notfresh.readingshare.adapter.OverrideRuleAdapter;
+import person.notfresh.readingshare.model.OverrideAction;
+import person.notfresh.readingshare.dialog.AddOverrideRuleDialog;
+import person.notfresh.readingshare.model.WebViewOverrideRule;
+import person.notfresh.readingshare.util.WebViewOverrideRules;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import person.notfresh.readingshare.sync.SimpleSyncManager;
 
-public class SettingFragment extends Fragment {
+public class SettingFragment extends Fragment implements AddOverrideRuleDialog.OnRuleSubmitListener {
 
     private static final int REQUEST_CODE_IMPORT_FILE = 1; // 改为通用文件导入
     private static final String DEFAULT_SERVER_URL = "https://duxiang.ai";
@@ -117,6 +132,9 @@ public class SettingFragment extends Fragment {
         } else if (defaultTab == 4) {
             // 随机
             adjustedTab = 3;
+        } else if (defaultTab == 5) {
+            // 阅读(2.3.19 新增,原索引方案里没有这一项)
+            adjustedTab = 4;
         }
 
         // 兜底：避免越界导致崩溃
@@ -136,13 +154,15 @@ public class SettingFragment extends Fragment {
                 // 原索引：0=首页, 2=主题, 3=RSS（跳过已废弃的1=标签）, 4=随机
                 int savedTab;
                 if (position == 0) {
-                    savedTab = 0;
+                    savedTab = 0; // 主题
                 } else if (position == 1) {
-                    savedTab = 2;
+                    savedTab = 2; // 链接
                 } else if (position == 2) {
-                    savedTab = 3;
-                } else {
+                    savedTab = 3; // RSS
+                } else if (position == 3) {
                     savedTab = 4; // 随机
+                } else {
+                    savedTab = 5; // 阅读(2.3.19)
                 }
                 editor.putInt("default_tab", savedTab);
                 editor.apply();
@@ -346,6 +366,9 @@ public class SettingFragment extends Fragment {
             editor.apply();
         });
 
+        // 拦截名单(白名单)区块 —— 每行 = pattern + 3 选 1 + 删除 + 底部 +号新增
+        bindOverrideRulesSection(root);
+
         // 添加导入文件按钮
         root.findViewById(R.id.button_import_csv).setOnClickListener(v -> {
             importFile();  // 支持 CSV 和 JSON
@@ -373,11 +396,93 @@ public class SettingFragment extends Fragment {
                 if (count > 100) count = 100;
                 historyManager.setMaxCount(count);
                 maxCountInput.setText(String.valueOf(count));
-                Snackbar.make(requireView(), "已保存：保留 " + count + " 条历史", Snackbar.LENGTH_SHORT).show();
+                Snackbar.make(requireView(), getString(R.string.setting_snackbar_saved_history, count), Snackbar.LENGTH_SHORT).show();
             }
         });
 
+        // 语言切换区块 (2.3.18 新增)：见 bindLanguageSection 方法。
+        bindLanguageSection(root);
+
+        // 阅读页数据来源区块 (2.3.19 新增)：UI 拆到 ReaderSourceSectionBinder，避免本类继续膨胀。
+        ReaderSourceSectionBinder.bind(this, root);
+
         return root;
+    }
+
+    /**
+     * 语言切换区块：动态添加标题 + 3 选 1 RadioGroup 到设置页底部。
+     * 通过 AppCompatDelegate.setApplicationLocales() 切换；该 API 在 API 33+ 写系统设置，
+     * 老版本由 androidx 自己持久化。系统会自动 recreate 当前 Activity。
+     */
+    private void bindLanguageSection(View root) {
+        android.widget.ScrollView scroll = (root instanceof android.widget.ScrollView)
+                ? (android.widget.ScrollView) root : null;
+        android.view.ViewGroup container = null;
+        if (scroll != null && scroll.getChildCount() > 0) {
+            android.view.View child = scroll.getChildAt(0);
+            if (child instanceof android.view.ViewGroup) container = (android.view.ViewGroup) child;
+        }
+        if (container == null) return;
+
+        android.widget.TextView title = new android.widget.TextView(requireContext());
+        title.setText(R.string.language_section_title);
+        title.setTextSize(18f);
+        android.widget.LinearLayout.LayoutParams titleLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        titleLp.topMargin = (int) (24 * getResources().getDisplayMetrics().density);
+        titleLp.bottomMargin = (int) (8 * getResources().getDisplayMetrics().density);
+        title.setLayoutParams(titleLp);
+        container.addView(title);
+
+        android.widget.RadioGroup group = new android.widget.RadioGroup(requireContext());
+        group.setOrientation(android.widget.RadioGroup.VERTICAL);
+        android.widget.LinearLayout.LayoutParams groupLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        group.setLayoutParams(groupLp);
+
+        String[] labels = new String[]{
+                getString(R.string.language_option_system),
+                getString(R.string.language_option_chinese),
+                getString(R.string.language_option_english)
+        };
+        String[] tags = new String[]{"", "zh", "en"};
+        android.widget.RadioButton[] buttons = new android.widget.RadioButton[labels.length];
+
+        androidx.core.os.LocaleListCompat current = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales();
+        String currentTag = current.toLanguageTags().toLowerCase();
+        int currentIdx = 0;
+        if (currentTag.startsWith("zh")) {
+            currentIdx = 1;
+        } else if (currentTag.startsWith("en")) {
+            currentIdx = 2;
+        }
+
+        for (int i = 0; i < labels.length; i++) {
+            android.widget.RadioButton rb = new android.widget.RadioButton(requireContext());
+            rb.setText(labels[i]);
+            rb.setId(android.view.View.generateViewId());
+            rb.setTag(tags[i]);
+            rb.setChecked(i == currentIdx);
+            group.addView(rb);
+            buttons[i] = rb;
+        }
+
+        group.setOnCheckedChangeListener((g, checkedId) -> {
+            for (int i = 0; i < buttons.length; i++) {
+                if (buttons[i].getId() == checkedId) {
+                    String tag = (String) buttons[i].getTag();
+                    androidx.core.os.LocaleListCompat target = (tag == null || tag.isEmpty())
+                            ? androidx.core.os.LocaleListCompat.getEmptyLocaleList()
+                            : androidx.core.os.LocaleListCompat.forLanguageTags(tag);
+                    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(target);
+                    return;
+                }
+            }
+        });
+
+        container.addView(group);
     }
 
     @Override
@@ -395,18 +500,18 @@ public class SettingFragment extends Fragment {
      * 执行同步操作
      */
     private void performSync() {
-        syncStatusText.setText("正在同步...");
+        syncStatusText.setText(R.string.setting_sync_status_syncing);
 
         new Thread(() -> {
             SimpleSyncManager.SyncResult result = syncManager.sync();
 
             requireActivity().runOnUiThread(() -> {
                 if (result.success) {
-                    String status = String.format("同步成功: 上传 %d 条, 下载 %d 条",
-                        result.uploadedCount, result.downloadedCount);
+                    String status = getString(R.string.setting_sync_status_ok,
+                            result.uploadedCount, result.downloadedCount);
                     syncStatusText.setText(status);
                 } else {
-                    syncStatusText.setText("同步失败: " + result.message);
+                    syncStatusText.setText(getString(R.string.setting_sync_status_failed, result.message));
                 }
             });
         }).start();
@@ -418,7 +523,7 @@ public class SettingFragment extends Fragment {
         // 使用通配符，支持多种文件类型
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(Intent.createChooser(intent, "选择 CSV 或 JSON 文件"), REQUEST_CODE_IMPORT_FILE);
+        startActivityForResult(Intent.createChooser(intent, getString(R.string.setting_chooser_csv_or_json)), REQUEST_CODE_IMPORT_FILE);
     }
 
     private Uri pendingImportUri; // 待导入的文件 URI
@@ -442,23 +547,23 @@ public class SettingFragment extends Fragment {
     private void showImportOptionsDialog() {
         // 创建复选框
         CheckBox checkBox = new CheckBox(requireContext());
-        checkBox.setText("去重（跳过已存在的链接）");
+        checkBox.setText(R.string.setting_import_dedup_checkbox);
         checkBox.setChecked(true); // 默认勾选去重
-        
+
         // 创建布局容器
         LinearLayout layout = new LinearLayout(requireContext());
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(50, 40, 50, 10);
         layout.addView(checkBox);
-        
+
         new AlertDialog.Builder(requireContext())
-            .setTitle("导入选项")
+            .setTitle(R.string.setting_import_dialog_title)
             .setView(layout)
-            .setPositiveButton("确定", (dialog, which) -> {
+            .setPositiveButton(R.string.link_dialog_ok, (dialog, which) -> {
                 boolean removeDuplicates = checkBox.isChecked();
                 performImport(removeDuplicates);
             })
-            .setNegativeButton("取消", null)
+            .setNegativeButton(R.string.cancel, null)
             .show();
     }
 
@@ -475,7 +580,7 @@ public class SettingFragment extends Fragment {
         ImportUtil.ImportResult result = ImportUtil.importFromUri(requireContext(), pendingImportUri);
         
         if (result.items == null || result.items.isEmpty()) {
-            Snackbar.make(requireView(), "没有可导入的链接", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(requireView(), R.string.setting_import_no_links, Snackbar.LENGTH_SHORT).show();
             return;
         }
         
@@ -532,22 +637,13 @@ public class SettingFragment extends Fragment {
         }
         
         // 显示导入结果
-        StringBuilder message = new StringBuilder();
-        message.append(result.format).append(" 导入完成");
-        
-        if (importedCount > 0) {
-            message.append("，成功导入 ").append(importedCount).append(" 条");
-        }
-        
-        if (removeDuplicates && duplicateCount > 0) {
-            message.append("，跳过 ").append(duplicateCount).append(" 条重复链接");
-        }
-        
-        if (result.errorCount > 0) {
-            message.append("，失败 ").append(result.errorCount).append(" 条");
-        }
-        
-        Snackbar.make(requireView(), message.toString(), Snackbar.LENGTH_LONG).show();
+        Snackbar.make(requireView(),
+                getString(R.string.setting_import_summary,
+                        result.format,
+                        importedCount,
+                        removeDuplicates ? duplicateCount : 0,
+                        result.errorCount),
+                Snackbar.LENGTH_LONG).show();
         
         // 清空待导入的 URI
         pendingImportUri = null;
@@ -566,19 +662,19 @@ public class SettingFragment extends Fragment {
         RadioButton saveRadio = dialogView.findViewById(R.id.radio_save);
         
         AlertDialog dialog = new AlertDialog.Builder(requireContext())
-            .setTitle("选择导出方式")
+            .setTitle(R.string.setting_export_chooser_title)
             .setView(dialogView)
-            .setPositiveButton("确定", (d, which) -> {
+            .setPositiveButton(R.string.link_dialog_ok, (d, which) -> {
                 boolean isJson = (formatGroup.getCheckedRadioButtonId() == jsonRadio.getId());
                 boolean isSave = (actionGroup.getCheckedRadioButtonId() == saveRadio.getId());
-                
+
                 if (isSave) {
                     exportAndSave(isJson);
                 } else {
                     exportAndShare(isJson);
                 }
             })
-            .setNegativeButton("取消", null)
+            .setNegativeButton(R.string.cancel, null)
             .create();
         
         dialog.show();
@@ -726,6 +822,110 @@ public class SettingFragment extends Fragment {
             Context.MODE_PRIVATE
         );
         return prefs.getString("server_url", DEFAULT_SERVER_URL);
+    }
+
+    /**
+     * 拦截名单(白名单)section 绑定:RecyclerView 渲染 + 增改删回调 + 复用
+     * {@link AddOverrideRuleDialog} 作为新增入口(SetFragment 是 DialogFragment 的 parent fragment)。
+     */
+    private void bindOverrideRulesSection(View root) {
+        RecyclerView recycler = root.findViewById(R.id.override_rule_recycler);
+        TextView emptyHint = root.findViewById(R.id.override_rule_empty_hint);
+        Button addBtn = root.findViewById(R.id.override_rule_add_btn);
+
+        recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
+        final Context ctx = requireContext();
+        // 主真相源在 adapter.rules(外部传入),但 LOAD 时从 SP 现读
+        // 提前 final 化让 inner anonymous OnRuleChangeListener 可以引用
+        final OverrideRuleAdapter[] adapterRef = new OverrideRuleAdapter[1];
+        adapterRef[0] = new OverrideRuleAdapter(new OverrideRuleAdapter.OnRuleChangeListener() {
+            @Override
+            public void onRuleActionChanged(int position, OverrideAction newAction) {
+                try {
+                    List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(ctx);
+                    if (position < 0 || position >= all.size()) return;
+                    WebViewOverrideRule old = all.get(position);
+                    WebViewOverrideRule updated = new WebViewOverrideRule(old.getContextUrl(), old.getRedirectedUrl(), newAction);
+                    WebViewOverrideRules.update(ctx, position, updated);
+                    Snackbar.make(requireView(), "已更新: " + updated.getContextUrl(), Snackbar.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Snackbar.make(requireView(), "更新失败: " + e.getMessage(), Snackbar.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onRuleDeleteClicked(int position) {
+                try {
+                    List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(ctx);
+                    if (position < 0 || position >= all.size()) return;
+                    String deletedContextUrl = all.get(position).getContextUrl();
+                    WebViewOverrideRules.remove(ctx, position);
+                    refreshOverrideRulesList(adapterRef[0], emptyHint);
+                    Snackbar.make(requireView(), "已删除: " + deletedContextUrl, Snackbar.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Snackbar.make(requireView(), "删除失败: " + e.getMessage(), Snackbar.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onRuleViewDetailClicked(int position) {
+                List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(ctx);
+                if (position < 0 || position >= all.size()) return;
+                showRuleDetailDialog(all.get(position));
+            }
+        });
+        recycler.setAdapter(adapterRef[0]);
+        refreshOverrideRulesList(adapterRef[0], emptyHint);
+
+        addBtn.setOnClickListener(v ->
+                AddOverrideRuleDialog.showDialog(getChildFragmentManager(), null));
+    }
+
+    private void refreshOverrideRulesList(OverrideRuleAdapter adapter, TextView emptyHint) {
+        List<WebViewOverrideRule> all = WebViewOverrideRules.loadAll(requireContext());
+        adapter.setRules(all);
+        emptyHint.setVisibility(all.isEmpty() ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * 拦截规则查看详情弹窗(只读):显示完整 contextUrl + redirectedUrl + action,
+     * 不用 ScrollingTextView 是因为短链太长,选 AlertDialog 自带 TextView + 项目内通用
+     * `AlertDialog.Builder.setMessage(multi-line)` 行为即可。
+     */
+    private void showRuleDetailDialog(WebViewOverrideRule rule) {
+        String ctx = rule.getContextUrl();
+        String redirected = rule.getRedirectedUrl();
+        String action = rule.getAction().name();
+        StringBuilder message = new StringBuilder();
+        message.append("原始 URL:\n").append(ctx).append("\n\n");
+        if (redirected != null && !redirected.isEmpty()) {
+            message.append("重定向后 URL:\n").append(redirected).append("\n\n");
+        }
+        message.append("动作: ").append(action);
+        new AlertDialog.Builder(requireContext())
+                .setTitle("拦截规则详情")
+                .setMessage(message.toString())
+                .setPositiveButton("关闭", null)
+                .show();
+    }
+
+    /**
+     * AddOverrideRuleDialog 父 fragment 回调:抽屉入口(无 prefill URL)。
+     */
+    @Override
+    public void onRuleSubmitted(WebViewOverrideRule rule) {
+        try {
+            WebViewOverrideRules.add(requireContext(), rule);
+            Snackbar.make(requireView(), "已添加: " + rule.getContextUrl(), Snackbar.LENGTH_SHORT).show();
+            // 重新读 + 重绘
+            RecyclerView recycler = requireView().findViewById(R.id.override_rule_recycler);
+            TextView emptyHint = requireView().findViewById(R.id.override_rule_empty_hint);
+            if (recycler.getAdapter() instanceof OverrideRuleAdapter) {
+                refreshOverrideRulesList((OverrideRuleAdapter) recycler.getAdapter(), emptyHint);
+            }
+        } catch (IllegalArgumentException e) {
+            Snackbar.make(requireView(), e.getMessage(), Snackbar.LENGTH_SHORT).show();
+        }
     }
 
     /** 给一组 link 算出 linkId → subject 名字 映射,供 ExportUtil 带上 subject 列 */
