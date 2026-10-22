@@ -35,7 +35,7 @@
     <string name="reader_external_confirm_title">Open external app</string>
     <string name="reader_external_confirm_message">This page wants to open an external app. Continue?\n\n%1$s</string>
     <string name="reader_external_confirm_stay">Stay on page</string>
-    <string name="reader_external_confirm_forbid">Deny and stop asking</string>
+    <string name="reader_external_confirm_forbid">Always stay on page</string>
     <string name="reader_external_confirm_open">Open</string>
     <string name="reader_external_open_failed">Cannot open this link: %1$s</string>
     <string name="reader_source_section_title">Reader data source</string>

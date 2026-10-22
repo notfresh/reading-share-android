@@ -35,7 +35,7 @@
     <string name="reader_external_confirm_title">打开外部应用</string>
     <string name="reader_external_confirm_message">网页正在尝试打开外部应用，是否继续？\n\n%1$s</string>
     <string name="reader_external_confirm_stay">留在网页</string>
-    <string name="reader_external_confirm_forbid">拒绝并禁止弹窗</string>
+    <string name="reader_external_confirm_forbid">以后都留在网页</string>
     <string name="reader_external_confirm_open">继续打开</string>
     <string name="reader_external_open_failed">无法打开此链接: %1$s</string>
     <string name="reader_source_section_title">阅读页数据来源</string>

@@ -63,6 +63,7 @@ import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.dialog.AddOverrideRuleDialog;
 import person.notfresh.readingshare.model.OverrideAction;
 import person.notfresh.readingshare.model.WebViewOverrideRule;
+import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ReadingPositionStore;
 import person.notfresh.readingshare.util.WebViewDefaults;
 import person.notfresh.readingshare.util.WebViewOverrideRules;
@@ -1043,16 +1044,9 @@ public class WebViewActivity extends AppCompatActivity implements AddOverrideRul
     }
 
     private void showExternalOpenConfirmDialog(String url) {
-        runOnUiThread(() -> new AlertDialog.Builder(this)
-                .setTitle("打开外部应用")
-                .setMessage("网页正在尝试打开外部应用，是否继续？\n\n" + url)
-                .setNegativeButton("留在网页", null)
-                .setNeutralButton("拒绝并禁止弹窗", (dialog, which) -> {
-                    // 独立方法:直接 set 到 mode=2(拦截所有),不走循环
-                    setExternalLinkMode(2);
-                })
-                .setPositiveButton("继续打开", (dialog, which) -> openExternalUri(url))
-                .show());
+        // 2.3.20.1:与阅读页共用同一份确认弹窗(支持中英、两按钮+勾选,不会因文案变长挤成竖排)
+        runOnUiThread(() -> ExternalLinkOpener.confirm(this, url,
+                () -> setExternalLinkMode(ExternalLinkOpener.MODE_BLOCK)));
     }
 
     private void openExternalUri(String url) {

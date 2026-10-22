@@ -1,3 +1,26 @@
+# 2.3.20.1
+修复：切英文后「打开外部应用」确认弹窗的三个按钮挤不开，系统把按钮竖排、样式变形。
+
+## 根因
+弹窗用了 `setNegativeButton + setNeutralButton + setPositiveButton` 三个平级按钮。
+中文「留在网页 / 拒绝并禁止弹窗 / 继续打开」勉强一行放得下；
+英文「Stay on page / Deny and stop asking / Open」超宽 → Android 的 button bar 自动改成竖排，
+看起来就是"样式变了"。
+
+## 改动
+- `ExternalLinkOpener.confirm`：三个按钮 → **两个按钮 + 一个勾选框**
+  - 负向「留在网页」、正向「继续打开」
+  - 勾选框「以后都留在网页」（勾了再点留下 = 原来的"拒绝并禁止弹窗"，写死全局静默拦截）
+  - 理由：「以后别再问」本质是对"留在网页"的修饰，不是平级动作，不该占第三个按钮位
+- `WebViewActivity.showExternalOpenConfirmDialog`：删掉自己那份硬编码中文弹窗，改为调
+  `ExternalLinkOpener.confirm(this, url, ...)` —— 与阅读页共用一份，顺带获得英文支持
+  （原来英文界面下这里仍弹中文）
+- 文案：`reader_external_confirm_forbid` 由「拒绝并禁止弹窗 / Deny and stop asking」
+  改为「以后都留在网页 / Always stay on page」
+
+## 验证
+`./gradlew clean assembleDebug` BUILD SUCCESSFUL，36/36 executed。
+
 # 2.3.20
 简化 WebView 缓存：删掉「寄存页面实例」，换成「系统缓存 + 记住读到哪」。
 
