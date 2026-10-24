@@ -61,6 +61,7 @@ import person.notfresh.readingshare.ui.webview.WebViewNavControls;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ReadingPositionStore;
 import person.notfresh.readingshare.util.WebViewDefaults;
+import person.notfresh.readingshare.util.WebViewCachePolicy;
 import person.notfresh.readingshare.util.WebViewOverrideRules;
 import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.TagSuggestionHelper;
@@ -157,10 +158,12 @@ public class WebViewActivity extends AppCompatActivity
         }
 
         // 2.3.20:不再寄存 WebView 实例(见 WebViewManager 删除说明),
-        // 每次打开都是新实例 + 系统缓存策略(WebViewDefaults.LOAD_CACHE_ELSE_NETWORK),
+        // 每次打开都是新实例 + 缓存策略(基线 WebViewDefaults.LOAD_DEFAULT,
+        // "本地缓存最多 1 小时"由 WebViewCachePolicy.prepareLoad 判定),
         // 阅读位置由 ReadingPositionStore 记住并在 onPageFinished 里恢复。
         webView = findViewById(R.id.webview);
         setupWebView();
+        WebViewCachePolicy.prepareLoad(webView, this, currentUrl);
         webView.loadUrl(currentUrl);
 
         initAudio();
@@ -254,6 +257,7 @@ public class WebViewActivity extends AppCompatActivity
         String newUrl = intent.getStringExtra("url");
         if (newUrl != null && !newUrl.equals(currentUrl)) {
             currentUrl = newUrl;
+            WebViewCachePolicy.prepareLoad(webView, this, currentUrl);
             webView.loadUrl(currentUrl);
         } else if (contextIds != null && currentIndex >= 0 && currentIndex < contextIds.length) {
             loadByContextIndex(currentIndex);
@@ -430,6 +434,8 @@ public class WebViewActivity extends AppCompatActivity
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                // 本次「绕过缓存」已生效,还原成基线,避免后续站内跳转继续绕过缓存
+                WebViewCachePolicy.restoreBaseline(view);
                 recordLinkHistory(view, url);
                 restoreReadingPosition(view, url);
                 try {
@@ -619,6 +625,8 @@ public class WebViewActivity extends AppCompatActivity
         // http(s) 链接直接在 WebView 内加载
         if (url.startsWith("http://") || url.startsWith("https://")) {
             Log.d("WVUrlTrace", "handleUrlOverride http(s) → load in WebView: " + url);
+            // 页内跳转由内核直接发起,不经 loadUrl,这里补一次缓存判定(2.3.22)
+            WebViewCachePolicy.prepareLoad(view, WebViewActivity.this, url);
             return false;
         }
 
@@ -1003,6 +1011,7 @@ public class WebViewActivity extends AppCompatActivity
             runOnUiThread(() -> {
                 if (finalUrl != null && webView != null) {
                     if (!finalUrl.equals(currentUrl)) {
+                        WebViewCachePolicy.prepareLoad(webView, this, finalUrl);
                         webView.loadUrl(finalUrl);
                         currentUrl = finalUrl;
                         if (finalTitle != null && toolbar != null) toolbar.setTitle(finalTitle);

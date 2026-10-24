@@ -25,9 +25,10 @@ public final class WebViewDefaults {
         settings.setDomStorageEnabled(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        // 2.3.20:同一个 URL 再打开时优先用本地已缓存的网页资源(图片/JS/CSS),
-        // 无本地缓存才走网络。不做"寄存 WebView 实例"那套(已删),
-        // 想要更快就该让站点给出合理缓存头,而不是在客户端留 Activity。
-        settings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        // 2.3.22:缓存基线改 LOAD_DEFAULT(按服务器缓存头决定,过期会回源),
+        // "本地缓存最多 1 小时"的上限由 WebViewCachePolicy 在每次加载前判定。
+        // 不再是 LOAD_CACHE_ELSE_NETWORK —— Chromium 把它映射成
+        // net::LOAD_SKIP_CACHE_VALIDATION,过期也不校验,页面会永远停在旧版本。
+        WebViewCachePolicy.apply(webView);
     }
 }

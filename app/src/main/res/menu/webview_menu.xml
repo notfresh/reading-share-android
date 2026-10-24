@@ -18,6 +18,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/action_wv_force_refresh"
+        android:title="@string/action_force_refresh"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_wv_open_browser"
         android:title="@string/open_in_browser"
         app:showAsAction="never" />

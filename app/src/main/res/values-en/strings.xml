@@ -314,4 +314,5 @@
     <string name="webview_bg_service_text">Tap to return to the app</string>
     <string name="reader_action_untitled">Untitled</string>
     <string name="reader_action_page_not_loaded">Page not loaded</string>
+    <string name="action_force_refresh">Force refresh (bypass cache)</string>
 </resources>

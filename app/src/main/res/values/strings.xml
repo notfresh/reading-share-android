@@ -315,4 +315,5 @@
     <string name="webview_bg_service_text">点击返回应用</string>
     <string name="reader_action_untitled">未命名</string>
     <string name="reader_action_page_not_loaded">页面未加载</string>
+    <string name="action_force_refresh">强制刷新（绕过缓存）</string>
 </resources>

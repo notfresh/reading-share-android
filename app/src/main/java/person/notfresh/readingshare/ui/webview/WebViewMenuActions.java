@@ -24,6 +24,7 @@ import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ShareUtil;
+import person.notfresh.readingshare.util.WebViewCachePolicy;
 
 /**
  * WebView 页共用菜单的动作实现 —— 目标2 唯一实现。
@@ -133,6 +134,10 @@ public final class WebViewMenuActions {
             refresh();
             return true;
         }
+        if (itemId == R.id.action_wv_force_refresh) {
+            forceRefresh();
+            return true;
+        }
         if (itemId == R.id.action_wv_open_browser) {
             openInBrowser();
             return true;
@@ -179,6 +184,33 @@ public final class WebViewMenuActions {
             return;
         }
         webView.reload();
+    }
+
+    /**
+     * 强制刷新：完全绕过本地缓存重载当前页。
+     *
+     * <p>普通 {@code reload()} 是 normal reload，在 {@code LOAD_CACHE_ELSE_NETWORK}
+     * 下依然不校验缓存（用户反馈"刷新没反应"）；这里显式切到
+     * {@code LOAD_NO_CACHE}（Chromium 映射成 {@code net::LOAD_BYPASS_CACHE}）强制回源。</p>
+     *
+     * <p>URL 优先取 {@link Page#originalUrl()}（重定向前、用户原始意图的地址），
+     * 为空才退回 {@link Page#url()}。</p>
+     */
+    private void forceRefresh() {
+        WebView webView = page.webView();
+        if (webView == null) {
+            toast(R.string.reader_action_page_loading);
+            return;
+        }
+        String url = page.originalUrl();
+        if (url == null || url.isEmpty()) {
+            url = page.url();
+        }
+        if (url == null || url.isEmpty()) {
+            toast(R.string.reader_action_no_url);
+            return;
+        }
+        WebViewCachePolicy.forceReload(webView, host.context(), url);
     }
 
     private void openInBrowser() {

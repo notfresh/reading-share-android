@@ -47,6 +47,7 @@ import person.notfresh.readingshare.util.ReaderSourceStore;
 import person.notfresh.readingshare.ui.webview.WebViewMenuActions;
 import person.notfresh.readingshare.ui.webview.WebViewNavControls;
 import person.notfresh.readingshare.util.WebViewDefaults;
+import person.notfresh.readingshare.util.WebViewCachePolicy;
 import person.notfresh.readingshare.util.WebViewOverrideRules;
 
 /**
@@ -342,6 +343,7 @@ public class ReaderFragment extends Fragment implements WebViewMenuActions.Page,
                 currentLinkId = linkId;
                 currentLinkUrl = targetUrl;
                 pageTitle = "";
+                WebViewCachePolicy.prepareLoad(webView, requireContext(), targetUrl);
                 webView.loadUrl(targetUrl);
                 updateControls();
             });
@@ -392,6 +394,8 @@ public class ReaderFragment extends Fragment implements WebViewMenuActions.Page,
         @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
+            // 本次「绕过缓存」已生效,还原成基线,避免后续站内跳转继续绕过缓存
+            WebViewCachePolicy.restoreBaseline(view);
             showProgress(false);
             if (view.getTitle() != null && !view.getTitle().trim().isEmpty()) {
                 pageTitle = view.getTitle().trim();
@@ -408,6 +412,8 @@ public class ReaderFragment extends Fragment implements WebViewMenuActions.Page,
         private boolean route(WebView view, String url) {
             if (url == null || url.isEmpty()) return false;
             if (UrlRoute.isHttp(url)) {
+                // 页内跳转由内核直接发起,不经 loadUrl,这里补一次缓存判定(2.3.22)
+                WebViewCachePolicy.prepareLoad(view, requireContext(), url);
                 // 2.3.20.3:重定向/站内跳转**不改变**"正在读的那条链接"的身份。
                 // 之前这里把 currentLinkId 清成 null,导致页面自动重定向后
                 // "加标签/改标题"直接失效(提示 This page is not a link from the reader queue)。
