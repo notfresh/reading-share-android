@@ -1,3 +1,63 @@
+# 2.3.22
+
+WebView 缓存治理：本地缓存最多 1 小时 + 新增「强制刷新（绕过缓存）」菜单项。
+
+## 背景：原来的缓存模式让「1 小时上限」无从谈起
+
+2.3.20 起基线是 `WebSettings.LOAD_CACHE_ELSE_NETWORK`。Chromium 把它映射成
+`net::LOAD_SKIP_CACHE_VALIDATION`（见 chromium
+`android_webview/browser/network_service/net_helpers.cc` 的 `GetCacheModeForClient`）：
+
+```
+case LOAD_CACHE_ELSE_NETWORK:
+  // If the resource is in the cache (even if expired), load from cache.
+  return net::LOAD_SKIP_CACHE_VALIDATION;
+```
+
+**过期也不校验，直接吃本地副本。** 同一层里 `UpdateCacheControlFlags` 会先清掉再覆盖
+所有 cache 相关 flag，所以普通 `webView.reload()`（normal reload）在这种模式下
+**依然不校验缓存** —— 这就是「刷新没反应」的根因。
+
+## 改动
+
+- 新增 `util/WebViewCachePolicy.java` —— 缓存策略唯一来源
+  - `apply` / `restoreBaseline`：基线改 `LOAD_DEFAULT`（按服务器缓存头决定，过期会回源）
+  - `prepareLoad`：加载前判断该 URL 本地副本是否超过 `MAX_CACHE_AGE_MS`（1 小时），
+    超了就切 `LOAD_NO_CACHE` 绕过缓存重取；未超期走 `LOAD_DEFAULT`
+  - `forceReload`：强制刷新当前页（`LOAD_NO_CACHE` + reload）
+  - 记账用 `SharedPreferences("webview_cache_policy")` 存 JSON 数组 [url, 时间戳]，最多 200 条 FIFO
+- `util/WebViewDefaults.java`：删掉 `LOAD_CACHE_ELSE_NETWORK`，改调 `WebViewCachePolicy.apply`
+- `WebViewActivity.java` / `ReaderFragment.java`：3 + 1 个 `loadUrl` 站点各接一次
+  `prepareLoad`；两个宿主的 `onPageFinished` 各接一次 `restoreBaseline`
+- 两个宿主的 `shouldOverrideUrlLoading`（页内跳转走内核直接发起，不经 `loadUrl`）
+  各补一次 `prepareLoad`
+- `res/menu/webview_menu.xml`：新增 `action_wv_force_refresh`，紧跟「刷新」之后
+- `ui/webview/WebViewMenuActions.java`：新增 `forceRefresh()` 分支
+- 中英双语文案 `action_force_refresh`
+- 版本 2.3.21.10 → 2.3.22（versionCode 68 → 69）
+
+菜单资源 `webview_menu.xml` 两宿主共用，所以 **WebView 页和阅读页都有「强制刷新」**。
+
+## 三个容易踩的点
+
+1. **缓存模式是 WebView 级持久状态**，不是「这一次请求」的属性 —— 设成
+   `LOAD_NO_CACHE` 后，站内跳转也会继续绕过缓存。所以 `onPageFinished` 里必须
+   `restoreBaseline` 还原，否则「绕过缓存」会泄漏到后续导航。
+2. **缓存命中时不能记账** —— 记账只在「绕过缓存重取」时发生。本地副本没变，
+   账被刷新的话一小时窗口会被滑动，频繁打开的页面永远命中旧副本。
+3. **页内跳转不经 `loadUrl`** —— `shouldOverrideUrlLoading` 返回 false 后由内核直接
+   发起请求，只在 `loadUrl` 处设缓存模式会漏掉这条路。
+
+## 教训
+
+- **「缓存多久」不是客户端能定的**：HTTP 缓存有效期由服务器的 `Cache-Control` 决定
+  （实测掘金/知乎 `no-store`、维基 `max-age=0`、jsdelivr 静态资源 `max-age=31536000`），
+  客户端唯一能做的是**决定要不要信本地副本**。`LOAD_CACHE_ELSE_NETWORK` 是
+  「无条件信」，`LOAD_DEFAULT` 才是「按缓存头 + 自己加上限」。
+- **Chromium 的 cacheMode → LoadFlags 映射在 `net_helpers.cc`**，不在 Android SDK 文档里。
+  SDK 文档只说 `LOAD_CACHE_ELSE_NETWORK` = "Use cached resources when they are available,
+  even if they have expired"，但「expired 也用」是 Chromium 实现细节 —— 查源码才看得见。
+
 # 2.3.21.10
 
 修复：阅读页 toolbar 的三个常驻按钮（加标签 / 改标题 / 切换拦截）仍不显示，只剩 ⋮。
