@@ -9,14 +9,15 @@
         android:id="@+id/text_merge_subtitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="4dp"
         android:text="@string/tag_merge_dialog_subtitle" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/merge_target_recycler"
+    <!-- 目标标签下拉:复用设置页的 SettingDropdown(Material exposed dropdown) -->
+    <LinearLayout
+        android:id="@+id/merge_dropdown_host"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxHeight="320dp" />
+        android:orientation="vertical" />
 
     <TextView
         android:id="@+id/text_merge_empty"

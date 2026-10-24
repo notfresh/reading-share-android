@@ -13,8 +13,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,13 +24,17 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
+import person.notfresh.readingshare.ui.SettingDropdown;
 import person.notfresh.readingshare.util.TagMergeCleanup;
 
 /**
  * 「合并标签」对话框 —— 选一个目标标签,把源标签下的链接全部搬过去,并删掉源标签。
  *
- * <p>流程:长按标签 → 标签操作弹窗 → 「合并到其他标签」→ 本对话框 → 点目标标签
- * → 二次确认(带链接条数)→ 执行合并。</p>
+ * <p>流程:长按标签 → 标签操作弹窗 → 「合并到其他标签」→ 本对话框 → 下拉选目标
+ * 标签 → 点「合并」→ 二次确认(带链接条数)→ 执行合并。</p>
+ *
+ * <p>目标标签下拉复用设置页的 {@link SettingDropdown}(Material exposed dropdown,
+ * 与设置页「阅读页数据来源」同一套视觉),不再自造 RecyclerView 选单。</p>
  *
  * <p>合并成功后给每条受影响的 link 写一条 {@code links} topic 的 update 事件
  * (payload 带合并后的新标签集)—— 这是后续「联机同步」模块的接口,不能省。</p>
@@ -54,7 +56,13 @@ public class MergeTagDialog extends DialogFragment {
     private static final String ARG_SOURCE_TAG = "source_tag";
 
     private LinkDao linkDao;
-    private final List<TagRow> rows = new ArrayList<>();
+
+    /** 候选目标标签名(下拉选项,按项目标签顺序)。 */
+    private final List<String> targetNames = new ArrayList<>();
+    /** 候选目标标签的链接数(与 targetNames 同下标)。 */
+    private final List<Integer> targetCounts = new ArrayList<>();
+    /** 目标标签下拉(复用设置页组件),用于读当前选中项。 */
+    private SettingDropdown dropdown;
 
     /** 静态工厂(名字不能与父类 DialogFragment.show 同名,否则 javac 报 cannot override)。 */
     public static MergeTagDialog newInstance(String sourceTag) {
@@ -91,7 +99,7 @@ public class MergeTagDialog extends DialogFragment {
                 .inflate(R.layout.dialog_merge_tag, null, false);
 
         TextView subtitle = view.findViewById(R.id.text_merge_subtitle);
-        RecyclerView recycler = view.findViewById(R.id.merge_target_recycler);
+        ViewGroup dropdownHost = view.findViewById(R.id.merge_dropdown_host);
         TextView empty = view.findViewById(R.id.text_merge_empty);
 
         if (subtitle != null) {
@@ -100,40 +108,66 @@ public class MergeTagDialog extends DialogFragment {
 
         // 候选目标标签:所有标签去掉 source 自己
         Map<String, Integer> allTags = linkDao.getTagsWithCount();
-        rows.clear();
+        targetNames.clear();
+        targetCounts.clear();
         for (Map.Entry<String, Integer> entry : allTags.entrySet()) {
             if (source != null && source.equals(entry.getKey())) {
                 continue;
             }
-            rows.add(new TagRow(entry.getKey(), entry.getValue()));
+            targetNames.add(entry.getKey());
+            targetCounts.add(entry.getValue());
         }
 
-        if (rows.isEmpty()) {
+        if (targetNames.isEmpty()) {
             if (empty != null) empty.setVisibility(View.VISIBLE);
-            if (recycler != null) recycler.setVisibility(View.GONE);
         } else {
             if (empty != null) empty.setVisibility(View.GONE);
-            recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
-            recycler.setAdapter(new TargetAdapter(rows, target -> confirmMerge(source, target)));
+            // 复用设置页的下拉组件:选项 = 标签名(带链接数)
+            dropdown = SettingDropdown
+                    .attach(requireContext(), dropdownHost)
+                    .setHint(R.string.tag_merge_target_hint);
+            List<String> labels = new ArrayList<>(targetNames.size());
+            for (int i = 0; i < targetNames.size(); i++) {
+                labels.add(targetNames.get(i) + " (" + targetCounts.get(i) + ")");
+            }
+            dropdown.setOptions(labels, 0);
         }
 
         return new AlertDialog.Builder(requireContext())
                 .setTitle(R.string.tag_merge_dialog_title)
                 .setView(view)
+                .setPositiveButton(R.string.tag_merge_confirm_ok,
+                        (d, w) -> onMergeButtonClicked(source))
                 .setNegativeButton(R.string.cancel, null)
                 .create();
     }
 
-    /** 二次确认:显示源标签 / 目标标签 / 链接条数,确认后才真合并。 */
-    private void confirmMerge(String source, TargetRow target) {
-        if (source == null || target == null) {
+    /** 点「合并」:取下拉当前选中的目标标签 → 二次确认。 */
+    private void onMergeButtonClicked(String source) {
+        if (source == null || targetNames.isEmpty()) {
             return;
         }
-        int linkCount = target.count;
+        int index = currentDropdownIndex();
+        if (index < 0 || index >= targetNames.size()) {
+            return;
+        }
+        confirmMerge(source, targetNames.get(index), targetCounts.get(index));
+    }
+
+    /** 下拉当前选中项的下标。 */
+    private int currentDropdownIndex() {
+        if (dropdown == null) {
+            return -1;
+        }
+        return dropdown.selectedIndex();
+    }
+
+    /** 二次确认:显示源标签 / 目标标签 / 链接条数,确认后才真合并。 */
+    private void confirmMerge(String source, String target, int linkCount) {
         new AlertDialog.Builder(requireContext())
                 .setTitle(R.string.tag_merge_confirm_title)
                 .setMessage(getString(R.string.tag_merge_confirm_msg,
-                        source, linkCount, target.name))
+                        source, linkCount, target))
                 .setPositiveButton(R.string.tag_merge_confirm_ok,
                         (d, w) -> doMerge(source, target))
                 .setNegativeButton(R.string.cancel, null)
@@ -141,7 +175,7 @@ public class MergeTagDialog extends DialogFragment {
     }
 
     /** 执行合并:DB 事务 → 本地配置同步 → 写事件日志 → 通知宿主刷新。 */
-    private void doMerge(String source, TargetRow target) {
+    private void doMerge(String source, String target) {
         try {
             // source 的 tag_id 必须在合并「之前」取 —— 合并后它已被删除,查不到了
             long sourceId = linkDao.getTagIdByName(source);
@@ -149,7 +183,7 @@ public class MergeTagDialog extends DialogFragment {
             // 只能按 target 查 —— 那会把 target 原有的链接也捞进来(多写一堆无变化的事件)
             List<Long> affectedIds = linkDao.getLinkIdsByTag(source);
 
-            int moved = linkDao.mergeTag(source, target.name);
+            int moved = linkDao.mergeTag(source, target);
             if (moved <= 0 && linkDao.getTagIdByName(source) != -1L) {
                 Toast.makeText(requireContext(),
                         getString(R.string.tag_merge_toast_failed, "no links moved"),
@@ -158,7 +192,7 @@ public class MergeTagDialog extends DialogFragment {
             }
 
             // 本地配置同步(置顶/高亮/选中/最近/排序)
-            TagMergeCleanup.apply(requireContext(), source, target.name, sourceId);
+            TagMergeCleanup.apply(requireContext(), source, target, sourceId);
 
             // 写事件日志:每条受影响的 link 一条 update,给后续联机模块用
             writeMergeEvents(affectedIds);
@@ -167,7 +201,7 @@ public class MergeTagDialog extends DialogFragment {
 
             Fragment parent = getParentFragment();
             if (parent instanceof OnMergeListener) {
-                ((OnMergeListener) parent).onTagMerged(source, target.name, moved);
+                ((OnMergeListener) parent).onTagMerged(source, target, moved);
             }
             dismiss();
         } catch (Exception e) {
@@ -198,80 +232,6 @@ public class MergeTagDialog extends DialogFragment {
                         LinkJson.toJsonString(item));
             } catch (Exception ignored) {
                 // 事件日志失败不该让合并回滚(DB 已提交)
-            }
-        }
-    }
-
-    // ===================== model + adapter =====================
-
-    private static class TagRow {
-        final String name;
-        final int count;
-        TagRow(String name, int count) {
-            this.name = name;
-            this.count = count;
-        }
-    }
-
-    /** 候选目标标签行(带链接数)。 */
-    private static class TargetRow {
-        final String name;
-        final int count;
-        TargetRow(String name, int count) {
-            this.name = name;
-            this.count = count;
-        }
-    }
-
-    private static class TargetAdapter extends RecyclerView.Adapter<TargetAdapter.VH> {
-
-        interface OnPick {
-            void onPick(TargetRow row);
-        }
-
-        private final List<TagRow> rows;
-        private final OnPick onPick;
-
-        TargetAdapter(List<TagRow> rows, OnPick onPick) {
-            this.rows = rows;
-            this.onPick = onPick;
-            setHasStableIds(true);
-        }
-
-        @Override
-        public long getItemId(int position) {
-            return rows.get(position).name.hashCode();
-        }
-
-        @NonNull
-        @Override
-        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_tag_with_count, parent, false);
-            return new VH(v);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull VH h, int position) {
-            TagRow r = rows.get(position);
-            h.text.setText(r.name);
-            h.count.setText(String.valueOf(r.count));
-            h.itemView.setOnClickListener(v ->
-                    onPick.onPick(new TargetRow(r.name, r.count)));
-        }
-
-        @Override
-        public int getItemCount() {
-            return rows.size();
-        }
-
-        static class VH extends RecyclerView.ViewHolder {
-            final TextView text;
-            final TextView count;
-            VH(View itemView) {
-                super(itemView);
-                text = itemView.findViewById(R.id.text_tag);
-                count = itemView.findViewById(R.id.text_count);
             }
         }
     }

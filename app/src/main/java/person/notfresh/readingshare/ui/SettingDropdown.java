@@ -1,4 +1,4 @@
-package person.notfresh.readingshare.ui.settings;
+package person.notfresh.readingshare.ui;
 
 import android.content.Context;
 import android.view.LayoutInflater;

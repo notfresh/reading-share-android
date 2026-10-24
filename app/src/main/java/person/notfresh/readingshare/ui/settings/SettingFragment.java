@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.ui.SettingDropdown;
 import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.LinksHistoryActivity;
 import person.notfresh.readingshare.EventLogActivity;

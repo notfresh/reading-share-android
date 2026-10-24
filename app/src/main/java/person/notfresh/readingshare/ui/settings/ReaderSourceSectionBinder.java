@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.ui.SettingDropdown;
 import person.notfresh.readingshare.core.model.Subject;
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;

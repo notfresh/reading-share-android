@@ -258,6 +258,7 @@
     <string name="tag_merge_toast_success">标签已合并</string>
     <string name="tag_merge_toast_failed">标签合并失败: %1$s</string>
     <string name="tag_merge_target_empty">没有可合并的其他标签</string>
+    <string name="tag_merge_target_hint">目标标签</string>
 
     <!-- 设置页 (fragment_slideshow.xml) -->
     <string name="setting_default_launcher_title">选择默认启动页</string>
