@@ -855,6 +855,102 @@ public class LinkDao {
     }
 
 
+    /**
+     * 获取某个标签下的所有链接 ID(纯查询,不改 schema)。
+     *
+     * @param tag 标签名
+     * @return 链接 ID 列表;标签不存在时返回空列表
+     */
+    public List<Long> getLinkIdsByTag(String tag) {
+        List<Long> ids = new ArrayList<>();
+        if (tag == null || tag.isEmpty()) {
+            return ids;
+        }
+        Cursor cursor = database.rawQuery(
+            "SELECT " + LinkDbHelper.COLUMN_LINK_ID +
+            " FROM " + LinkDbHelper.TABLE_LINK_TAGS +
+            " WHERE " + LinkDbHelper.COLUMN_TAG_ID_REF +
+            " = (SELECT " + LinkDbHelper.COLUMN_TAG_ID +
+            " FROM " + LinkDbHelper.TABLE_TAGS +
+            " WHERE " + LinkDbHelper.COLUMN_TAG_NAME + " = ?)",
+            new String[]{tag});
+        try {
+            while (cursor.moveToNext()) {
+                ids.add(cursor.getLong(0));
+            }
+        } finally {
+            cursor.close();
+        }
+        return ids;
+    }
+
+    /**
+     * 合并标签:把 source 标签下的所有链接关联搬到 target 标签下,然后删除 source 标签。
+     *
+     * <p>用 {@code INSERT OR IGNORE ... SELECT} 搬关联:{@code link_tags} 的主键是
+     * {@code (link_id, tag_id_ref)},已同时挂着 target 的链接会主键冲突 → IGNORE
+     * 自动跳过,不会产生重复关联。</p>
+     *
+     * <p>整个操作在一个事务里完成:要么全搬完 + 删掉 source,要么全不动。</p>
+     *
+     * @param source 要被合并掉的标签名
+     * @param target 目标标签名(不存在会自动创建)
+     * @return 被搬走的关联条数(= source 原有的关联数);参数非法时返回 0
+     */
+    public int mergeTag(String source, String target) {
+        if (source == null || target == null
+                || source.isEmpty() || target.isEmpty()
+                || source.equals(target)) {
+            return 0;
+        }
+        SQLiteDatabase db = database;
+        db.beginTransaction();
+        try {
+            long sourceId = getTagIdByName(source);
+            if (sourceId == -1L) {
+                Log.w("LinkDao", "合并标签:未找到源标签 " + source);
+                db.setTransactionSuccessful();
+                return 0;
+            }
+            long targetId = getOrCreateTag(target);
+            // 搬移关联:INSERT OR IGNORE ... SELECT(主键冲突自动跳过,不产生重复关联)
+            db.execSQL("INSERT OR IGNORE INTO " + LinkDbHelper.TABLE_LINK_TAGS +
+                    " (" + LinkDbHelper.COLUMN_LINK_ID + ", " + LinkDbHelper.COLUMN_TAG_ID_REF + ")" +
+                    " SELECT " + LinkDbHelper.COLUMN_LINK_ID + ", ?" +
+                    " FROM " + LinkDbHelper.TABLE_LINK_TAGS +
+                    " WHERE " + LinkDbHelper.COLUMN_TAG_ID_REF + " = ?",
+                    new Object[]{targetId, sourceId});
+            int movedCount = countLinksOfTag(sourceId);
+            db.delete(LinkDbHelper.TABLE_LINK_TAGS,
+                    LinkDbHelper.COLUMN_TAG_ID_REF + " = ?",
+                    new String[]{String.valueOf(sourceId)});
+            db.delete(LinkDbHelper.TABLE_TAGS,
+                    LinkDbHelper.COLUMN_TAG_ID + " = ?",
+                    new String[]{String.valueOf(sourceId)});
+            Log.d("LinkDao", "合并标签 " + source + " -> " + target + ",搬走 " + movedCount + " 条");
+            db.setTransactionSuccessful();
+            return movedCount;
+        } catch (Exception e) {
+            Log.e("LinkDao", "合并标签时出错: " + e.getMessage(), e);
+            return 0;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /** 统计某标签下的关联条数。 */
+    private int countLinksOfTag(long tagId) {
+        Cursor cursor = database.rawQuery(
+            "SELECT COUNT(*) FROM " + LinkDbHelper.TABLE_LINK_TAGS +
+            " WHERE " + LinkDbHelper.COLUMN_TAG_ID_REF + " = ?",
+            new String[]{String.valueOf(tagId)});
+        try {
+            return cursor.moveToFirst() ? cursor.getInt(0) : 0;
+        } finally {
+            cursor.close();
+        }
+    }
+
     // 私有方法：使用ID添加标签
     private void addTagToLink(long linkId, long tagId) {
         ContentValues values = new ContentValues();

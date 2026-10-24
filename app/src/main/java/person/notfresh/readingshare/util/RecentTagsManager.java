@@ -78,11 +78,47 @@ public class RecentTagsManager {
     public static List<String> getRecentTags(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         String recentTagsStr = prefs.getString(KEY_RECENT_TAGS, "");
-        
+
         if (recentTagsStr.isEmpty()) {
             return new ArrayList<>();
         }
-        
+
         return Arrays.asList(recentTagsStr.split(TAG_SEPARATOR));
     }
-} 
+
+    /**
+     * 把最近标签列表里的 oldTag 换成 newTag(标签合并后调用)。
+     *
+     * <p>读写入口唯一 —— 不在业务代码里直接操作这个 SP。</p>
+     *
+     * @param context 上下文
+     * @param oldTag  被合并掉的标签名
+     * @param newTag  目标标签名
+     */
+    public static void replaceTag(Context context, String oldTag, String newTag) {
+        if (context == null || oldTag == null || newTag == null
+                || oldTag.isEmpty() || newTag.isEmpty()
+                || oldTag.equals(newTag)) {
+            return;
+        }
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        String recentTagsStr = prefs.getString(KEY_RECENT_TAGS, "");
+        if (recentTagsStr.isEmpty()) {
+            return;
+        }
+        String[] parts = recentTagsStr.split(TAG_SEPARATOR);
+        LinkedHashSet<String> tagsSet = new LinkedHashSet<>();
+        for (String part : parts) {
+            if (part == null || part.trim().isEmpty()) {
+                continue;
+            }
+            tagsSet.add(part.equals(oldTag) ? newTag : part);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < tagsSet.size(); i++) {
+            if (i > 0) sb.append(TAG_SEPARATOR);
+            sb.append(tagsSet.toArray(new String[0])[i]);
+        }
+        prefs.edit().putString(KEY_RECENT_TAGS, sb.toString()).apply();
+    }
+}

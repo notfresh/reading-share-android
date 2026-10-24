@@ -248,6 +248,15 @@
     <string name="tag_op_button_add">Add</string>
     <string name="tag_op_snackbar_tag_exists">Tag already exists</string>
     <string name="tag_op_snackbar_tag_added">Tag added: %1$s</string>
+    <string name="tag_op_merge_to_other_tag">Merge to another tag</string>
+    <string name="tag_merge_dialog_title">Merge tag</string>
+    <string name="tag_merge_dialog_subtitle">Merge \"%1$s\" into:</string>
+    <string name="tag_merge_confirm_title">Confirm merge</string>
+    <string name="tag_merge_confirm_msg">Move %2$d link(s) from \"%1$s\" to \"%3$s\"? Tag \"%1$s\" will be deleted.</string>
+    <string name="tag_merge_confirm_ok">Merge</string>
+    <string name="tag_merge_toast_success">Tags merged</string>
+    <string name="tag_merge_toast_failed">Failed to merge tags: %1$s</string>
+    <string name="tag_merge_target_empty">No other tags to merge into</string>
 
     <!-- Setting page (fragment_slideshow.xml) -->
     <string name="setting_default_launcher_title">Default starting tab</string>
