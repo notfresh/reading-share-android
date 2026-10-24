@@ -24,7 +24,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
-import person.notfresh.readingshare.ui.SettingDropdown;
+import person.notfresh.readingshare.ui.Dropdown;
 import person.notfresh.readingshare.util.TagMergeCleanup;
 
 /**
@@ -33,7 +33,7 @@ import person.notfresh.readingshare.util.TagMergeCleanup;
  * <p>流程:长按标签 → 标签操作弹窗 → 「合并到其他标签」→ 本对话框 → 下拉选目标
  * 标签 → 点「合并」→ 二次确认(带链接条数)→ 执行合并。</p>
  *
- * <p>目标标签下拉复用设置页的 {@link SettingDropdown}(Material exposed dropdown,
+ * <p>目标标签下拉复用设置页的 {@link Dropdown}(Material exposed dropdown,
  * 与设置页「阅读页数据来源」同一套视觉),不再自造 RecyclerView 选单。</p>
  *
  * <p>合并成功后给每条受影响的 link 写一条 {@code links} topic 的 update 事件
@@ -62,7 +62,7 @@ public class MergeTagDialog extends DialogFragment {
     /** 候选目标标签的链接数(与 targetNames 同下标)。 */
     private final List<Integer> targetCounts = new ArrayList<>();
     /** 目标标签下拉(复用设置页组件),用于读当前选中项。 */
-    private SettingDropdown dropdown;
+    private Dropdown dropdown;
 
     /** 静态工厂(名字不能与父类 DialogFragment.show 同名,否则 javac 报 cannot override)。 */
     public static MergeTagDialog newInstance(String sourceTag) {
@@ -123,7 +123,7 @@ public class MergeTagDialog extends DialogFragment {
         } else {
             if (empty != null) empty.setVisibility(View.GONE);
             // 复用设置页的下拉组件:选项 = 标签名(带链接数)
-            dropdown = SettingDropdown
+            dropdown = Dropdown
                     .attach(requireContext(), dropdownHost)
                     .setHint(R.string.tag_merge_target_hint);
             List<String> labels = new ArrayList<>(targetNames.size());

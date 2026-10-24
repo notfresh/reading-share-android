@@ -12,7 +12,7 @@
         android:layout_marginBottom="4dp"
         android:text="@string/tag_merge_dialog_subtitle" />
 
-    <!-- 目标标签下拉:复用设置页的 SettingDropdown(Material exposed dropdown) -->
+    <!-- 目标标签下拉:复用设置页的 Dropdown(Material exposed dropdown) -->
     <LinearLayout
         android:id="@+id/merge_dropdown_host"
         android:layout_width="match_parent"

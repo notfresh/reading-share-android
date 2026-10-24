@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import person.notfresh.readingshare.R;
-import person.notfresh.readingshare.ui.SettingDropdown;
+import person.notfresh.readingshare.ui.Dropdown;
 import person.notfresh.readingshare.core.model.Subject;
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
@@ -30,7 +30,7 @@ import person.notfresh.readingshare.util.ReaderSourceStore;
  * {@link ReaderSourceStore}（单一真相源），自己不碰 SharedPreferences。</p>
  *
  * <p>2.3.19.4：两个下拉从裸 Spinner 换成 Material exposed dropdown
- * （{@link SettingDropdown}），与项目里既有的 TextInputLayout 输入框同一套视觉。</p>
+ * （{@link Dropdown}），与项目里既有的 TextInputLayout 输入框同一套视觉。</p>
  */
 public final class ReaderSourceSectionBinder {
 
@@ -70,9 +70,9 @@ public final class ReaderSourceSectionBinder {
 
         container.addView(sectionTitle(ctx));
 
-        final SettingDropdown typeDropdown = SettingDropdown.attach(ctx, container)
+        final Dropdown typeDropdown = Dropdown.attach(ctx, container)
                 .setHint(R.string.reader_source_hint_type);
-        final SettingDropdown paramDropdown = SettingDropdown.attach(ctx, container)
+        final Dropdown paramDropdown = Dropdown.attach(ctx, container)
                 .setHint(R.string.reader_source_hint_param);
 
         List<String> typeLabels = new ArrayList<>(TYPE_LABELS.length);
@@ -106,7 +106,7 @@ public final class ReaderSourceSectionBinder {
     }
 
     /** 参数下拉随类型切换：标签列表 / 主题列表 / 不适用则整块隐藏（不摆"（无需选择）"占位）。 */
-    private static void applyParamOptions(SettingDropdown paramDropdown, ReaderSourceSpec spec,
+    private static void applyParamOptions(Dropdown paramDropdown, ReaderSourceSpec spec,
                                           List<String> tags, List<String> subjectTitles,
                                           List<Long> subjectIds) {
         String type = spec == null ? ReaderSourceSpec.TYPE_ALL : spec.getType();
