@@ -14,9 +14,7 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.db.DbConnection;
@@ -24,7 +22,6 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
-import person.notfresh.readingshare.ui.Dropdown;
 import person.notfresh.readingshare.util.TagMergeCleanup;
 
 /**
@@ -57,12 +54,8 @@ public class MergeTagDialog extends DialogFragment {
 
     private LinkDao linkDao;
 
-    /** 候选目标标签名(下拉选项,按项目标签顺序)。 */
-    private final List<String> targetNames = new ArrayList<>();
-    /** 候选目标标签的链接数(与 targetNames 同下标)。 */
-    private final List<Integer> targetCounts = new ArrayList<>();
-    /** 目标标签下拉(复用设置页组件),用于读当前选中项。 */
-    private Dropdown dropdown;
+    /** 目标标签下拉(选标签专用组件,内部包通用 Dropdown)。 */
+    private TagSelectDropdown tagDropdown;
 
     /** 静态工厂(名字不能与父类 DialogFragment.show 同名,否则 javac 报 cannot override)。 */
     public static MergeTagDialog newInstance(String sourceTag) {
@@ -106,31 +99,16 @@ public class MergeTagDialog extends DialogFragment {
             subtitle.setText(getString(R.string.tag_merge_dialog_subtitle, source == null ? "" : source));
         }
 
-        // 候选目标标签:所有标签去掉 source 自己
-        Map<String, Integer> allTags = linkDao.getTagsWithCount();
-        targetNames.clear();
-        targetCounts.clear();
-        for (Map.Entry<String, Integer> entry : allTags.entrySet()) {
-            if (source != null && source.equals(entry.getKey())) {
-                continue;
-            }
-            targetNames.add(entry.getKey());
-            targetCounts.add(entry.getValue());
-        }
+        // 选标签下拉:候选 = 所有标签去掉 source 自己
+        tagDropdown = TagSelectDropdown
+                .attach(requireContext(), dropdownHost)
+                .setHint(R.string.tag_merge_target_hint);
+        tagDropdown.loadTags(source);
 
-        if (targetNames.isEmpty()) {
+        if (tagDropdown.isEmpty()) {
             if (empty != null) empty.setVisibility(View.VISIBLE);
         } else {
             if (empty != null) empty.setVisibility(View.GONE);
-            // 复用设置页的下拉组件:选项 = 标签名(带链接数)
-            dropdown = Dropdown
-                    .attach(requireContext(), dropdownHost)
-                    .setHint(R.string.tag_merge_target_hint);
-            List<String> labels = new ArrayList<>(targetNames.size());
-            for (int i = 0; i < targetNames.size(); i++) {
-                labels.add(targetNames.get(i) + " (" + targetCounts.get(i) + ")");
-            }
-            dropdown.setOptions(labels, 0);
         }
 
         return new AlertDialog.Builder(requireContext())
@@ -144,22 +122,14 @@ public class MergeTagDialog extends DialogFragment {
 
     /** 点「合并」:取下拉当前选中的目标标签 → 二次确认。 */
     private void onMergeButtonClicked(String source) {
-        if (source == null || targetNames.isEmpty()) {
+        if (source == null || tagDropdown == null) {
             return;
         }
-        int index = currentDropdownIndex();
-        if (index < 0 || index >= targetNames.size()) {
+        String target = tagDropdown.selectedTag();
+        if (target == null) {
             return;
         }
-        confirmMerge(source, targetNames.get(index), targetCounts.get(index));
-    }
-
-    /** 下拉当前选中项的下标。 */
-    private int currentDropdownIndex() {
-        if (dropdown == null) {
-            return -1;
-        }
-        return dropdown.selectedIndex();
+        confirmMerge(source, target, tagDropdown.selectedCount());
     }
 
     /** 二次确认:显示源标签 / 目标标签 / 链接条数,确认后才真合并。 */
