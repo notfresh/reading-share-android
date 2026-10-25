@@ -9,8 +9,8 @@ android {
         applicationId "person.notfresh.readingshare"
         minSdk 26
         targetSdk 34
-        versionCode 71
-        versionName "2.3.24"
+        versionCode 72
+        versionName "2.3.25"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
