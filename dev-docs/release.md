@@ -1,3 +1,31 @@
+# 2.3.25
+
+修复「标签合并」点击后秒退（2.3.24 实测崩溃）。
+
+## 做了什么
+
+- **异常拦截**：合并流程四段全部兜住，任何一段抛异常都不再让 app 挂掉，
+  并且把栈 + 断点位置复制到剪贴板（用户粘一下就能看出断在哪）：
+  - `mergeTag:onCreateDialog`（弹窗构建）
+  - `mergeTag:onMergeButton`（点「合并」按钮）
+  - `mergeTag:<源>-><目标>`（合并主体）
+  - `mergeTag:eventLog`（事件日志写入）
+- **`CrashClipboard.copyException(ctx, label, throwable)`**（新 API）：业务异常手动
+  复制栈到剪贴板，与「崩溃即复制」的全局 handler 共用同一套写入逻辑。
+
+## 顺手修掉的三个问题
+
+- **FragmentManager 不一致（确定 bug）**：`HomeFragment` show 合并弹窗用
+  `getParentFragmentManager()`，而同文件的 `PinnedTagsPickerDialog` 用
+  `getChildFragmentManager()`。前者会让 `DialogFragment.getParentFragment()`
+  返回 null → `onTagMerged` 回调收不到 → 合并后 UI 不刷新。已统一为
+  `getChildFragmentManager()`。
+- **AlertDialog 实现**：`android.app.AlertDialog` → `androidx.appcompat.app.AlertDialog`。
+  下拉是 `MaterialAutoCompleteTextView`（ExposedDropdownMenu），在非 appcompat 的
+  Dialog 里 theme / 测量容易炸。
+- **事件日志单独兜底**：`EventLogClient.get()` 在未 init 时抛
+  `EventLogException`，不该让合并回滚。
+
 # 2.3.24
 
 新增「标签合并」功能：长按任意标签 → 选「合并到其他标签」→ 选目标标签 →
