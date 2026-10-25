@@ -2596,8 +2596,11 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         toggleTagHighlight(tag);
                         break;
                     case 4: // 合并到其他标签
+                        // 用 getChildFragmentManager() —— 与本文件里 PinnedTagsPickerDialog
+                        // (:272)保持一致。用 getParentFragmentManager() 的话
+                        // DialogFragment.getParentFragment() 返回 null,回调收不到。
                         MergeTagDialog.newInstance(tag)
-                                .show(getParentFragmentManager(), "merge_tag_dialog");
+                                .show(getChildFragmentManager(), "merge_tag_dialog");
                         break;
                 }
             })

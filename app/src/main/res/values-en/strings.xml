@@ -256,6 +256,7 @@
     <string name="tag_merge_confirm_ok">Merge</string>
     <string name="tag_merge_toast_success">Tags merged</string>
     <string name="tag_merge_toast_failed">Failed to merge tags: %1$s</string>
+    <string name="tag_merge_toast_failed_generic">Failed to merge tags. Error details copied to clipboard.</string>
     <string name="tag_merge_target_empty">No other tags to merge into</string>
     <string name="tag_merge_target_hint">Target tag</string>
 

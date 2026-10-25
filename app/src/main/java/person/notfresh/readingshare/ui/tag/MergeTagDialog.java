@@ -1,6 +1,5 @@
 package person.notfresh.readingshare.ui.tag;
 
-import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
@@ -11,6 +10,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 
@@ -22,6 +22,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
+import person.notfresh.readingshare.util.CrashClipboard;
 import person.notfresh.readingshare.util.TagMergeCleanup;
 
 /**
@@ -87,6 +88,25 @@ public class MergeTagDialog extends DialogFragment {
     @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
+        try {
+            return buildDialog(savedInstanceState);
+        } catch (Throwable t) {
+            // 弹窗构建阶段崩(如 Material 下拉在 Dialog 里测量异常)—— 兜住,
+            // 把栈复制到剪切板,不让整个 app 挂掉(2.3.24)
+            CrashClipboard.copyException(requireContext(), "mergeTag:onCreateDialog", t);
+            Toast.makeText(requireContext(),
+                    getString(R.string.tag_merge_toast_failed, String.valueOf(t.getMessage())),
+                    Toast.LENGTH_LONG).show();
+            return new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.tag_merge_dialog_title)
+                    .setMessage(R.string.tag_merge_toast_failed_generic)
+                    .setNegativeButton(R.string.cancel, null)
+                    .create();
+        }
+    }
+
+    /** 构建合并标签弹窗(由 {@link #onCreateDialog} 统一兜底)。 */
+    private Dialog buildDialog(Bundle savedInstanceState) {
         final String source = sourceTag();
         View view = LayoutInflater.from(requireContext())
                 .inflate(R.layout.dialog_merge_tag, null, false);
@@ -115,7 +135,20 @@ public class MergeTagDialog extends DialogFragment {
                 .setTitle(R.string.tag_merge_dialog_title)
                 .setView(view)
                 .setPositiveButton(R.string.tag_merge_confirm_ok,
-                        (d, w) -> onMergeButtonClicked(source))
+                        (d, w) -> {
+                            // 按钮回调在 doMerge 的 try 之外 —— 这里也要兜住,
+                            // 否则下拉读取之类的异常会直接崩掉整个 app(2.3.24)
+                            try {
+                                onMergeButtonClicked(source);
+                            } catch (Throwable t) {
+                                CrashClipboard.copyException(requireContext(),
+                                        "mergeTag:onMergeButton", t);
+                                Toast.makeText(requireContext(),
+                                        getString(R.string.tag_merge_toast_failed,
+                                                String.valueOf(t.getMessage())),
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        })
                 .setNegativeButton(R.string.cancel, null)
                 .create();
     }
@@ -139,13 +172,27 @@ public class MergeTagDialog extends DialogFragment {
                 .setMessage(getString(R.string.tag_merge_confirm_msg,
                         source, linkCount, target))
                 .setPositiveButton(R.string.tag_merge_confirm_ok,
-                        (d, w) -> doMerge(source, target))
+                        (d, w) -> doMerge(source, target))  // doMerge 内部已兜底
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
     /** 执行合并:DB 事务 → 本地配置同步 → 写事件日志 → 通知宿主刷新。 */
     private void doMerge(String source, String target) {
+        // 整个合并流程包一层:任何一段抛异常都不让 app 崩,把栈复制到剪切板,
+        // 用户粘一下就知道断在哪一段(2.3.24)
+        try {
+            doMergeInternal(source, target);
+        } catch (Throwable t) {
+            CrashClipboard.copyException(requireContext(), "mergeTag:" + source + "->" + target, t);
+            Toast.makeText(requireContext(),
+                    getString(R.string.tag_merge_toast_failed, String.valueOf(t.getMessage())),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** 合并的具体步骤(由 {@link #doMerge} 统一兜底)。 */
+    private void doMergeInternal(String source, String target) {
         try {
             // source 的 tag_id 必须在合并「之前」取 —— 合并后它已被删除,查不到了
             long sourceId = linkDao.getTagIdByName(source);
@@ -200,8 +247,11 @@ public class MergeTagDialog extends DialogFragment {
                         String.valueOf(item.getId()),
                         item.getTimestamp(),
                         LinkJson.toJsonString(item));
-            } catch (Exception ignored) {
-                // 事件日志失败不该让合并回滚(DB 已提交)
+            } catch (Throwable t) {
+                // 事件日志失败不该让合并回滚(DB 已提交),但要把栈留下来 ——
+                // EventLogClient.get() 在未 init 时抛 EventLogException,
+                // 这正是"点了 merge 秒退"的候选原因之一(2.3.24)
+                CrashClipboard.copyException(requireContext(), "mergeTag:eventLog", t);
             }
         }
     }
