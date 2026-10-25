@@ -1,3 +1,40 @@
+# 2.3.26
+
+修复「标签合并」二次确认后秒退（2.3.25 崩溃栈定位）。
+
+## 根因：AlertDialog 按钮点击自动 dismiss → DialogFragment 被 detach
+
+`MergeTagDialog` 要弹「二次确认」，而二次确认是独立的 `AlertDialog`。原先确认/
+取消用 `setPositiveButton` / `setNegativeButton` —— **AlertDialog 的按钮一旦点击，
+弹窗立即 dismiss**。dismiss 会让 DialogFragment 被移除、detach：
+
+1. 点第一个弹窗的「合并」→ `AlertDialog` 自动 dismiss
+2. dismiss → `DialogFragment.onDismiss` → Fragment 被移除、detach
+3. 二次确认框（独立 AlertDialog，不受 fragment 生命周期管）还活着
+4. 点确认 → `doMerge` → `linkDao` 已在 `onDetach` 置 null → NPE
+5. 进 catch → catch 里调 `requireContext()` → fragment 已 detach →
+   `IllegalStateException: Fragment ... not attached to a context` → 秒退
+
+栈顶落在 `doMerge` 的 catch 块上（`requireContext()` 自身抛的），把第 4 步的
+原始 NPE 掩盖了 —— 所以第一眼看到的是「not attached」，真正的问题在前面。
+
+## 修法
+
+- **确认/取消按钮挪进布局**（`button_merge_confirm` / `button_merge_cancel`），
+  不用 `AlertDialog` 的 setPositiveButton / setNegativeButton —— 自定义按钮点击
+  不会自动 dismiss，fragment 全程 attached。
+- **回调里一律用缓存 context**（新增 `safeContext()`）：优先 `requireContext()`，
+  拿不到就用 `onAttach` 缓存的 application context。
+- **`onDetach` 不再把 `linkDao` 置 null**：二次确认回调可能发生在 detach 之后。
+- `doMergeInternal` 开头显式检查 `linkDao == null` 并抛带说明的
+  `IllegalStateException`，不再让 NPE 裸奔。
+
+## 通用教训
+
+**DialogFragment 里弹「第二层确认框」时，第一层不能用 AlertDialog 的默认按钮**
+—— 默认按钮点击即 dismiss，fragment 当场 detach，第二层回调回来就炸。
+要么用布局里的自定义按钮，要么让第二层确认做成 fragment 内部的状态切换。
+
 # 2.3.25
 
 修复「标签合并」点击后秒退（2.3.24 实测崩溃）。

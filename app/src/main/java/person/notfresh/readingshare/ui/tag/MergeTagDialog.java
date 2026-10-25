@@ -38,6 +38,16 @@ import person.notfresh.readingshare.util.TagMergeCleanup;
  * (payload 带合并后的新标签集)—— 这是后续「联机同步」模块的接口,不能省。</p>
  *
  * <p>宿主通过 {@link OnMergeListener} 拿到结果并刷新 UI。</p>
+ *
+ * <p><b>生命周期陷阱(2.3.25 实测秒退的根因)</b>:本弹窗要弹「二次确认」,而
+ * {@link AlertDialog} 的 {@code setPositiveButton} 一旦点击就自动 dismiss ——
+ * dismiss 会让 DialogFragment 被移除、detach。此时二次确认框(独立的 AlertDialog,
+ * 不受 fragment 生命周期管)再回调回来,{@code requireContext()} 直接抛
+ * {@code IllegalStateException: Fragment ... not attached to a context}。
+ * 所以:① 确认/取消按钮放在布局里(自定义按钮点击不会自动 dismiss);
+ * ② 回调里一律用缓存的 {@link #appContext},不用 {@code requireContext()};
+ * ③ {@link #linkDao} 在 {@code onDetach} 不置 null —— 二次确认回调可能发生在
+ * detach 之后。</p>
  */
 public class MergeTagDialog extends DialogFragment {
 
@@ -54,6 +64,11 @@ public class MergeTagDialog extends DialogFragment {
     private static final String ARG_SOURCE_TAG = "source_tag";
 
     private LinkDao linkDao;
+    /**
+     * 缓存的 application context —— 回调可能发生在 fragment detach 之后,
+     * 那时 {@code requireContext()} 会抛 IllegalStateException。
+     */
+    private Context appContext;
 
     /** 目标标签下拉(选标签专用组件,内部包通用 Dropdown)。 */
     private TagSelectDropdown tagDropdown;
@@ -75,6 +90,7 @@ public class MergeTagDialog extends DialogFragment {
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
+        appContext = context.getApplicationContext();
         // 新代码一律用 DbConnection 注入连接(不再用 new LinkDao(context) + open())
         linkDao = new LinkDao(DbConnection.get(context).writable());
     }
@@ -82,7 +98,18 @@ public class MergeTagDialog extends DialogFragment {
     @Override
     public void onDetach() {
         super.onDetach();
-        linkDao = null;
+        // 故意不置 null:二次确认框的回调可能发生在 detach 之后
+        // (AlertDialog 的按钮点击会让本 fragment dismiss → detach),
+        // 那时 linkDao 还是 null 的话 doMerge 直接 NPE。
+        appContext = null;
+    }
+
+    /** 拿一个安全的 context:优先 fragment 的,拿不到就用缓存的 application context。 */
+    private Context safeContext() {
+        if (isAdded()) {
+            return requireContext();
+        }
+        return appContext;
     }
 
     @NonNull
@@ -93,10 +120,13 @@ public class MergeTagDialog extends DialogFragment {
         } catch (Throwable t) {
             // 弹窗构建阶段崩(如 Material 下拉在 Dialog 里测量异常)—— 兜住,
             // 把栈复制到剪切板,不让整个 app 挂掉(2.3.24)
-            CrashClipboard.copyException(requireContext(), "mergeTag:onCreateDialog", t);
-            Toast.makeText(requireContext(),
-                    getString(R.string.tag_merge_toast_failed, String.valueOf(t.getMessage())),
-                    Toast.LENGTH_LONG).show();
+            Context ctx = safeContext();
+            CrashClipboard.copyException(ctx, "mergeTag:onCreateDialog", t);
+            if (ctx != null) {
+                Toast.makeText(ctx,
+                        ctx.getString(R.string.tag_merge_toast_failed_generic),
+                        Toast.LENGTH_LONG).show();
+            }
             return new AlertDialog.Builder(requireContext())
                     .setTitle(R.string.tag_merge_dialog_title)
                     .setMessage(R.string.tag_merge_toast_failed_generic)
@@ -108,48 +138,51 @@ public class MergeTagDialog extends DialogFragment {
     /** 构建合并标签弹窗(由 {@link #onCreateDialog} 统一兜底)。 */
     private Dialog buildDialog(Bundle savedInstanceState) {
         final String source = sourceTag();
-        View view = LayoutInflater.from(requireContext())
+        final Context ctx = requireContext();
+        View view = LayoutInflater.from(ctx)
                 .inflate(R.layout.dialog_merge_tag, null, false);
 
         TextView subtitle = view.findViewById(R.id.text_merge_subtitle);
         ViewGroup dropdownHost = view.findViewById(R.id.merge_dropdown_host);
         TextView empty = view.findViewById(R.id.text_merge_empty);
+        View confirmButton = view.findViewById(R.id.button_merge_confirm);
+        View cancelButton = view.findViewById(R.id.button_merge_cancel);
 
         if (subtitle != null) {
-            subtitle.setText(getString(R.string.tag_merge_dialog_subtitle, source == null ? "" : source));
+            subtitle.setText(ctx.getString(R.string.tag_merge_dialog_subtitle,
+                    source == null ? "" : source));
         }
 
         // 选标签下拉:候选 = 所有标签去掉 source 自己
         tagDropdown = TagSelectDropdown
-                .attach(requireContext(), dropdownHost)
+                .attach(ctx, dropdownHost)
                 .setHint(R.string.tag_merge_target_hint);
         tagDropdown.loadTags(source);
 
         if (tagDropdown.isEmpty()) {
             if (empty != null) empty.setVisibility(View.VISIBLE);
+            if (confirmButton != null) confirmButton.setEnabled(false);
         } else {
             if (empty != null) empty.setVisibility(View.GONE);
         }
 
-        return new AlertDialog.Builder(requireContext())
+        // 自定义按钮(不能用 AlertDialog 的 setPositiveButton —— 见类注释的生命周期陷阱)
+        if (confirmButton != null) {
+            confirmButton.setOnClickListener(v -> {
+                try {
+                    onMergeButtonClicked(source);
+                } catch (Throwable t) {
+                    handleError("mergeTag:onMergeButton", t);
+                }
+            });
+        }
+        if (cancelButton != null) {
+            cancelButton.setOnClickListener(v -> dismiss());
+        }
+
+        return new AlertDialog.Builder(ctx)
                 .setTitle(R.string.tag_merge_dialog_title)
                 .setView(view)
-                .setPositiveButton(R.string.tag_merge_confirm_ok,
-                        (d, w) -> {
-                            // 按钮回调在 doMerge 的 try 之外 —— 这里也要兜住,
-                            // 否则下拉读取之类的异常会直接崩掉整个 app(2.3.24)
-                            try {
-                                onMergeButtonClicked(source);
-                            } catch (Throwable t) {
-                                CrashClipboard.copyException(requireContext(),
-                                        "mergeTag:onMergeButton", t);
-                                Toast.makeText(requireContext(),
-                                        getString(R.string.tag_merge_toast_failed,
-                                                String.valueOf(t.getMessage())),
-                                        Toast.LENGTH_LONG).show();
-                            }
-                        })
-                .setNegativeButton(R.string.cancel, null)
                 .create();
     }
 
@@ -167,9 +200,13 @@ public class MergeTagDialog extends DialogFragment {
 
     /** 二次确认:显示源标签 / 目标标签 / 链接条数,确认后才真合并。 */
     private void confirmMerge(String source, String target, int linkCount) {
-        new AlertDialog.Builder(requireContext())
+        Context ctx = safeContext();
+        if (ctx == null) {
+            return;
+        }
+        new AlertDialog.Builder(ctx)
                 .setTitle(R.string.tag_merge_confirm_title)
-                .setMessage(getString(R.string.tag_merge_confirm_msg,
+                .setMessage(ctx.getString(R.string.tag_merge_confirm_msg,
                         source, linkCount, target))
                 .setPositiveButton(R.string.tag_merge_confirm_ok,
                         (d, w) -> doMerge(source, target))  // doMerge 内部已兜底
@@ -184,48 +221,48 @@ public class MergeTagDialog extends DialogFragment {
         try {
             doMergeInternal(source, target);
         } catch (Throwable t) {
-            CrashClipboard.copyException(requireContext(), "mergeTag:" + source + "->" + target, t);
-            Toast.makeText(requireContext(),
-                    getString(R.string.tag_merge_toast_failed, String.valueOf(t.getMessage())),
-                    Toast.LENGTH_LONG).show();
+            handleError("mergeTag:" + source + "->" + target, t);
         }
     }
 
     /** 合并的具体步骤(由 {@link #doMerge} 统一兜底)。 */
     private void doMergeInternal(String source, String target) {
-        try {
-            // source 的 tag_id 必须在合并「之前」取 —— 合并后它已被删除,查不到了
-            long sourceId = linkDao.getTagIdByName(source);
-            // 受影响的 link id 也要在合并前取:合并后 source 已不存在,
-            // 只能按 target 查 —— 那会把 target 原有的链接也捞进来(多写一堆无变化的事件)
-            List<Long> affectedIds = linkDao.getLinkIdsByTag(source);
-
-            int moved = linkDao.mergeTag(source, target);
-            if (moved <= 0 && linkDao.getTagIdByName(source) != -1L) {
-                Toast.makeText(requireContext(),
-                        getString(R.string.tag_merge_toast_failed, "no links moved"),
-                        Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // 本地配置同步(置顶/高亮/选中/最近/排序)
-            TagMergeCleanup.apply(requireContext(), source, target, sourceId);
-
-            // 写事件日志:每条受影响的 link 一条 update,给后续联机模块用
-            writeMergeEvents(affectedIds);
-
-            Toast.makeText(requireContext(), R.string.tag_merge_toast_success, Toast.LENGTH_SHORT).show();
-
-            Fragment parent = getParentFragment();
-            if (parent instanceof OnMergeListener) {
-                ((OnMergeListener) parent).onTagMerged(source, target, moved);
-            }
-            dismiss();
-        } catch (Exception e) {
-            Toast.makeText(requireContext(),
-                    getString(R.string.tag_merge_toast_failed, String.valueOf(e.getMessage())),
-                    Toast.LENGTH_SHORT).show();
+        if (linkDao == null) {
+            throw new IllegalStateException("linkDao is null (fragment detached?)");
         }
+        Context ctx = safeContext();
+
+        // source 的 tag_id 必须在合并「之前」取 —— 合并后它已被删除,查不到了
+        long sourceId = linkDao.getTagIdByName(source);
+        // 受影响的 link id 也要在合并前取:合并后 source 已不存在,
+        // 只能按 target 查 —— 那会把 target 原有的链接也捞进来(多写一堆无变化的事件)
+        List<Long> affectedIds = linkDao.getLinkIdsByTag(source);
+
+        int moved = linkDao.mergeTag(source, target);
+        if (moved <= 0 && linkDao.getTagIdByName(source) != -1L) {
+            if (ctx != null) {
+                Toast.makeText(ctx,
+                        ctx.getString(R.string.tag_merge_toast_failed, "no links moved"),
+                        Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+
+        // 本地配置同步(置顶/高亮/选中/最近/排序)
+        TagMergeCleanup.apply(ctx, source, target, sourceId);
+
+        // 写事件日志:每条受影响的 link 一条 update,给后续联机模块用
+        writeMergeEvents(affectedIds);
+
+        if (ctx != null) {
+            Toast.makeText(ctx, R.string.tag_merge_toast_success, Toast.LENGTH_SHORT).show();
+        }
+
+        Fragment parent = getParentFragment();
+        if (parent instanceof OnMergeListener) {
+            ((OnMergeListener) parent).onTagMerged(source, target, moved);
+        }
+        dismiss();
     }
 
     /**
@@ -249,10 +286,20 @@ public class MergeTagDialog extends DialogFragment {
                         LinkJson.toJsonString(item));
             } catch (Throwable t) {
                 // 事件日志失败不该让合并回滚(DB 已提交),但要把栈留下来 ——
-                // EventLogClient.get() 在未 init 时抛 EventLogException,
-                // 这正是"点了 merge 秒退"的候选原因之一(2.3.24)
-                CrashClipboard.copyException(requireContext(), "mergeTag:eventLog", t);
+                // EventLogClient.get() 在未 init 时抛 EventLogException(2.3.24)
+                CrashClipboard.copyException(safeContext(), "mergeTag:eventLog", t);
             }
+        }
+    }
+
+    /** 统一异常处理:复制栈到剪切板 + toast 提示,不让 app 挂掉。 */
+    private void handleError(String label, Throwable t) {
+        Context ctx = safeContext();
+        CrashClipboard.copyException(ctx, label, t);
+        if (ctx != null) {
+            Toast.makeText(ctx,
+                    ctx.getString(R.string.tag_merge_toast_failed_generic),
+                    Toast.LENGTH_LONG).show();
         }
     }
 }
