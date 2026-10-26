@@ -69,6 +69,7 @@ import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
 import person.notfresh.readingshare.util.StringUtil;
+import person.notfresh.readingshare.util.TitleCleaner;
 
 import java.io.IOException;
 import android.widget.ImageView;
@@ -508,6 +509,17 @@ public class MainActivity extends AppCompatActivity {
                     String initialTitle = (title == null || title.isEmpty())
                             ? StringUtil.extractTitle(sharedText) : title;
 
+                    // 站点特化标题清洗(标题优化规则):抖音等平台的分享文案带一段
+                    // 广告话术前缀，切掉。详见 dev-docs/title-optimization-rules.md
+                    // 注意：只清洗从分享文本里提取的标题 —— EXTRA_SUBJECT 是调用方
+                    // 自己给的主题，不该被改。
+                    if (title == null || title.isEmpty()) {
+                        String cleanedTitle = TitleCleaner.clean(sharedText);
+                        if (cleanedTitle != null) {
+                            initialTitle = cleanedTitle;
+                        }
+                    }
+
                     // 收集目标 Activity 信息，供保存时使用
                     StringBuilder targetActivityInfo = new StringBuilder();
                     for (ResolveInfo info : activities) {
@@ -618,7 +630,14 @@ public class MainActivity extends AppCompatActivity {
             
             // 获取URL之前的内容作为标题
             String title = text.substring(0, urlMatcher.start()).trim();
-            
+
+            // 站点特化标题清洗(标题优化规则):抖音等平台的分享文案带一段
+            // 广告话术前缀，切掉。详见 dev-docs/title-optimization-rules.md
+            String cleanedTitle = TitleCleaner.clean(text);
+            if (cleanedTitle != null) {
+                title = cleanedTitle;
+            }
+
             // 如果标题为空或者太长，进行处理
             if (TextUtils.isEmpty(title)) {
                 title = "新链接";
