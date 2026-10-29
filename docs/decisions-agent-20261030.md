@@ -3,6 +3,42 @@
 > 记「为什么这么定」,不记代码细节。代码细节看 `dev-docs/release.md` 对应版本。
 > 反向查阅用:遇到"能不能改成 X"时,先看这里当时为什么没选 X。
 
+## 零、地基决策(2.4.0)
+
+架构与工具层怎么搭 —— 后面所有 agent 功能都建在这上面。
+
+### A. 架构形态
+
+| 决策 | 选择 | 为什么 | 放弃的方案 |
+|---|---|---|---|
+| 部署形态 | **Python 内核跑在 app 进程内**(Chaquopy) | 用户明确要求"不用 server";省掉服务端改造和多一跳网络 | 独立 server / MCP server |
+| 内核来源 | **minimal-agent-v2 是唯一源头**,app 侧 `app/src/main/python/` 是同步产物 | 双向改动必然漂移;Chaquopy 只认 app 侧目录 | 两边各改各的 |
+| 跨语言引用 | **拆两类**:`AgentBridgeHost`(Python 持有)+ `PythonAgentBridge`(持 PyObject) | Chaquopy 文档警告:两语言互相持有的环**两个 GC 都检测不到** → 内存泄漏 | 一个类兼任两边 |
+
+### B. 工具层
+
+| 决策 | 选择 | 为什么 | 放弃的方案 |
+|---|---|---|---|
+| schema 位置 | **单一来源在 Java**(`AgentToolRegistry`) | 工具直接对应 DAO 能力;同源 = 改 DAO 加字段不会漏改 schema | Python 侧手写 |
+| schema 传递 | **启动时拉取 + `register_external` 注入** | 不手抄第二份;改一处即生效 | 两份手抄 |
+| 写操作落库 | **走同一条路**:同一 DAO + `EventLogClient` + `LinkJson` | 与用户手动操作完全同源 → 跨端同步/审计/回放白送 | agent 另建写入通道 |
+
+### C. 安全边界
+
+| 决策 | 选择 | 为什么 | 放弃的方案 |
+|---|---|---|---|
+| 确认机制 | **复用 V2 已有的 `runner.guard`** | guard 返回字符串 = 拒绝且工具不执行、错误回灌模型;不新造机制 | Python 侧另写拦截 |
+| 兜底 | **三重保险**:无确认门→拒绝;60 秒超时→按拒绝;拒绝原因回灌模型 | 宁可不做,也不替用户决定 | 超时默认放行 |
+
+### D. 依赖与内核修复
+
+| 决策 | 选择 | 为什么 | 放弃的方案 |
+|---|---|---|---|
+| openai SDK | **锁 1.30.0** + pydantic 1.10.13 + httpx 0.27.2 | ≥1.40 硬依赖 `jiter`(Rust),Chaquopy 无 Android wheel → 装不上;httpx 0.28 移除 proxies 会让 openai 1.30 TypeError | 追新版本(装不上) |
+| Python 版本 | **3.11**(V2 原写 ≥3.13,已放宽) | 实测语法兼容;3.12+ 不提供 32 位 ABI | 3.13 |
+| 内核 bug | **修 V2 `_success_result` 缺 `append(assistant)`** | 抓包实测:桌面端多轮上下文也只带用户提问、丢 agent 回答 —— `session_manager.py` 那句「已包含 assistant 回复」不成立。修在 V2 源头,**桌面端一并受益** | 在 Android 侧绕(治标) |
+| 工具注册 | **`register_external` 改幂等**(同名替换而非再 append) | 注册表是模块级全局;不幂等第 3 轮 tools 里有 3 份同名 → openai 报 Duplicate function names | 每次 run 重建注册表 |
+
 ## 一、会话历史(2.4.4)
 
 | 决策 | 选择 | 为什么 | 放弃的方案 |
