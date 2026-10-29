@@ -76,6 +76,8 @@ public final class AgentTools {
                 case "list_pinned_links":   return listPinnedLinks();
                 case "list_subjects":       return listSubjects();
                 case "list_subject_items":  return listSubjectItems(args);
+                case "list_links_by_date":  return listLinksByDate(args);
+                case "open_link":           return openLink(args);
                 case "add_tag_to_link":     return addTagToLink(args);
                 case "remove_tag_from_link":return removeTagFromLink(args);
                 case "set_link_remark":     return setLinkRemark(args);
@@ -135,6 +137,97 @@ public final class AgentTools {
             return error("找不到 id=" + id + " 的链接");
         }
         return linkToJson(item).toString();
+    }
+
+    /**
+     * 按日期查当天创建的链接。
+     *
+     * <p>只读工具(不需要确认)。时间口径 = **设备本地时区的自然日**
+     * [00:00:00.000, 次日 00:00:00.000)。</p>
+     */
+    private String listLinksByDate(JSONObject args) throws JSONException {
+        String dateText = args.optString("date", "").trim();
+        int limit = Math.min(Math.max(args.optInt("limit", SEARCH_LIMIT_DEFAULT), 1), SEARCH_LIMIT_MAX);
+
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        if (!dateText.isEmpty()) {
+            java.text.SimpleDateFormat fmt =
+                    new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+            fmt.setLenient(false);
+            try {
+                java.util.Date parsed = fmt.parse(dateText);
+                if (parsed == null) {
+                    return error("日期格式应为 yyyy-MM-dd");
+                }
+                cal.setTime(parsed);
+            } catch (java.text.ParseException e) {
+                return error("日期格式应为 yyyy-MM-dd,收到: " + dateText);
+            }
+        }
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        long startMs = cal.getTimeInMillis();
+        cal.add(java.util.Calendar.DAY_OF_MONTH, 1);
+        long endMs = cal.getTimeInMillis();
+
+        String dayText = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                .format(new java.util.Date(startMs));
+        List<LinkItem> links = linkDao.getLinksByTimeRange(startMs, endMs, limit);
+
+        JSONArray arr = new JSONArray();
+        for (LinkItem item : links) {
+            JSONObject row = new JSONObject();
+            row.put("id", item.getId());
+            row.put("title", item.getTitle());
+            row.put("url", item.getUrl());
+            row.put("time", new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                    .format(new java.util.Date(item.getTimestamp())));
+            arr.put(row);
+        }
+        JSONObject out = new JSONObject();
+        out.put("ok", true);
+        out.put("date", dayText);
+        out.put("count", links.size());
+        out.put("links", arr);
+        return out.toString();
+    }
+
+    /**
+     * 用 App 内置 WebView 打开链接 —— **直接打开,不需要用户确认**(用户拍板)。
+     *
+     * <p>工具跑在后台线程,所以启动 Activity 必须带 {@code FLAG_ACTIVITY_NEW_TASK}。</p>
+     */
+    private String openLink(JSONObject args) throws JSONException {
+        long linkId = args.optLong("link_id", 0);
+        String url = args.optString("url", "").trim();
+        String title = "";
+
+        if (linkId > 0) {
+            LinkItem item = linkDao.getLinkById(linkId);
+            if (item == null) {
+                return error("找不到 id=" + linkId + " 的链接");
+            }
+            url = item.getUrl();
+            title = item.getTitle();
+        }
+        if (url.isEmpty()) {
+            return error("需要 link_id 或 url 之一");
+        }
+
+        android.content.Intent intent =
+                new android.content.Intent(context, person.notfresh.readingshare.WebViewActivity.class);
+        intent.putExtra("url", url);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
+
+        JSONObject out = new JSONObject();
+        out.put("ok", true);
+        out.put("opened", true);
+        out.put("url", url);
+        out.put("title", title);
+        return out.toString();
     }
 
     private String listTags() throws JSONException {

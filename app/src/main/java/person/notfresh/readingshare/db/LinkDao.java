@@ -425,6 +425,37 @@ public class LinkDao {
     }
 
     /**
+     * 按创建时间范围取链接,半开区间 {@code [startMs, endMs)},按时间倒序。
+     *
+     * <p>走 {@code idx_links_timestamp} 索引。timestamp 列存的是**毫秒**
+     * (见 LinksAdapter.formatDate 直接拿 long 格式化)。</p>
+     */
+    public List<LinkItem> getLinksByTimeRange(long startMs, long endMs, int limit) {
+        List<LinkItem> links = new ArrayList<>();
+        if (limit <= 0 || endMs <= startMs) {
+            return links;
+        }
+        Cursor cursor = database.query(
+                LinkDbHelper.TABLE_LINKS,
+                null,
+                LinkDbHelper.COLUMN_TIMESTAMP + " >= ? AND " + LinkDbHelper.COLUMN_TIMESTAMP + " < ?",
+                new String[]{String.valueOf(startMs), String.valueOf(endMs)},
+                null, null,
+                LinkDbHelper.COLUMN_TIMESTAMP + " DESC",
+                String.valueOf(limit));
+        try {
+            if (cursor.moveToFirst()) {
+                do {
+                    links.add(createLinkItemFromCursor(cursor));
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            cursor.close();
+        }
+        return links;
+    }
+
+    /**
      * 按 spec 搜索链接。所有 SQL 拼装逻辑收敛到 {@link #buildSearchQuery} 一处。
      */
     public List<LinkItem> searchLinks(LinkSearchSpec spec) {

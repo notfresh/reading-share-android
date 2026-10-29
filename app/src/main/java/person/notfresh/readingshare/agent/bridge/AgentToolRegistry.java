@@ -138,6 +138,20 @@ public final class AgentToolRegistry {
                 "列出某个主题下的所有收录链接。",
                 false,
                 req("subject_id", "number", "主题 id"));
+
+        add("list_links_by_date",
+                "按日期查**当天创建**的链接(默认今天)。date 用 yyyy-MM-dd;"
+                        + "返回该自然日 00:00~24:00 创建的链接,按时间倒序。",
+                false,
+                opt("date", "string", "日期 yyyy-MM-dd,不传 = 今天"),
+                opt("limit", "number", "最多返回多少条,默认 20,上限 50"));
+
+        add("open_link",
+                "用 App 内置 WebView 打开一条链接。**直接打开,不需要用户确认。**"
+                        + "链接 id 或 url 传一个即可(优先 link_id)。",
+                false,
+                opt("link_id", "number", "链接 id(优先,和 url 二选一)"),
+                opt("url", "string", "链接地址(没有 id 时用)"));
     }
 
     private void registerWriteTools() {
