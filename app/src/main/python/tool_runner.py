@@ -149,6 +149,12 @@ def register_external(
 
     Returns:
         注册进 _TOOL_SCHEMAS 的 schema dict
+
+    **幂等**:同名工具重复注册会**替换**旧条目,而不是再 append 一份。
+    注册表是模块级全局的 —— 宿主每次启动 agent 内核都会重新注册一遍
+    (Android 侧每次 run() 都重新拉 schema)。不幂等的话,跑第 3 轮时
+    发给 LLM 的 tools 数组里会有 3 份同名工具,openai SDK 会报
+    "Duplicate function names"。
     """
     schema = {
         "type": "function",
@@ -159,7 +165,14 @@ def register_external(
         },
     }
     _TOOL_REGISTRY[name] = {"fn": fn, "schema": schema}
-    _TOOL_SCHEMAS.append(schema)
+    # 幂等：同名工具替换旧 schema，不重复 append
+    # （_TOOL_SCHEMAS 是模块级全局，宿主反复注册会导致 tools 数组出现重名）
+    for i, existing in enumerate(_TOOL_SCHEMAS):
+        if existing.get("function", {}).get("name") == name:
+            _TOOL_SCHEMAS[i] = schema
+            break
+    else:
+        _TOOL_SCHEMAS.append(schema)
     return schema
 
 

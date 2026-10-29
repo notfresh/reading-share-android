@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI 助手页的选项菜单。目前只有「新对话」——
+     清掉会话,agent 不记得之前的对话(会话是内存态,进程活着就在)。 -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_agent_new_chat"
+        android:title="@string/agent_new_chat"
+        app:showAsAction="ifRoom" />
+</menu>

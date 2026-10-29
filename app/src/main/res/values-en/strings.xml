@@ -326,4 +326,27 @@
     <string name="reader_action_untitled">Untitled</string>
     <string name="reader_action_page_not_loaded">Page not loaded</string>
     <string name="action_force_refresh">Force refresh (bypass cache)</string>
+    <!-- Agent chat -->
+    <string name="menu_agent">AI Assistant</string>
+    <string name="agent_input_hint">Ask me to find links, tag them…</string>
+    <string name="agent_send">Send</string>
+    <string name="agent_not_configured">No API key configured yet — set one in Settings to use this</string>
+    <string name="agent_error_generic">Error: %1$s</string>
+    <string name="agent_empty_response">(The agent returned nothing)</string>
+    <string name="agent_new_chat">New chat</string>
+    <string name="agent_empty_state_title">What\'s in your library? Just ask —</string>
+    <string name="agent_empty_state_examples">"Which links do I have tagged 小红书?"\n"Tag them all as 待读"\n"What\'s pinned?"</string>
+    <string name="agent_confirm_title">Confirm this action?</string>
+    <string name="agent_confirm_desc">The agent wants to modify your library. It only runs after you confirm.</string>
+    <string name="agent_confirm_ok">Confirm</string>
+    <string name="agent_confirm_cancel">Cancel</string>
+    <string name="agent_confirm_rejected">The user cancelled this action</string>
+    <string name="agent_tool_running">Calling tool: %1$s</string>
+    <string name="agent_settings_title">AI Assistant settings</string>
+    <string name="agent_settings_desc">The assistant turns your words into operations on your library. The key is stored on this device only.</string>
+    <string name="agent_settings_model">Model</string>
+    <string name="agent_settings_base_url">API base URL</string>
+    <string name="agent_settings_api_key">API key</string>
+    <string name="agent_settings_save">Save</string>
+    <string name="agent_settings_saved">Saved</string>
 </resources>

@@ -54,6 +54,12 @@
         android:label="@string/menu_reader"
         tools:layout="@layout/fragment_reader" />
 
+    <fragment
+        android:id="@+id/nav_agent"
+        android:name="person.notfresh.readingshare.ui.agent.AgentFragment"
+        android:label="@string/menu_agent"
+        tools:layout="@layout/fragment_agent" />
+
     <action
         android:id="@+id/action_nav_home_to_nav_statistics"
         app:destination="@id/nav_statistics" />

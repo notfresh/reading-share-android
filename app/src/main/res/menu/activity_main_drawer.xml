@@ -35,6 +35,11 @@
             android:title="@string/menu_reader"
             android:textAppearance="@style/NavigationDrawerText"/>
         <item
+            android:id="@+id/nav_agent"
+            android:icon="@drawable/ic_agent"
+            android:title="@string/menu_agent"
+            android:textAppearance="@style/NavigationDrawerText"/>
+        <item
             android:id="@+id/nav_slideshow"
             android:icon="@drawable/ic_settings"
             android:title="@string/menu_settings"

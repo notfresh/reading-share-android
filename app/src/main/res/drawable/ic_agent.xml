@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AI 助手图标(2.3.28):对话气泡 + 内部三个点。
+  刻意不跟已有图标撞脸:
+    - ic_reader 是"摊开的书"(左右对称的曲线)
+    - ic_subject 是"标签/文档"
+    - 这里用"一个圆角方气泡 + 气泡尾部",轮廓上是明显的对话框形状。
+  单色描边,由调用方 tint(NavigationView 着色)。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- 气泡主体:圆角矩形,右下角开口(被尾部替代) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M4.5,5.2 L19.5,5.2 C20.3,5.2 20.9,5.8 20.9,6.6 L20.9,15.4 C20.9,16.2 20.3,16.8 19.5,16.8 L10.6,16.8 L5.9,20.6 L6.9,16.8 L4.5,16.8 C3.7,16.8 3.1,16.2 3.1,15.4 L3.1,6.6 C3.1,5.8 3.7,5.2 4.5,5.2 Z"
+        android:strokeColor="#FF000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="1.7" />
+
+    <!-- 三个点:代表"在思考" -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M7.6,11 m-1.05,0 a1.05,1.05 0 1,0 2.1,0 a1.05,1.05 0 1,0 -2.1,0 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M11.9,11 m-1.05,0 a1.05,1.05 0 1,0 2.1,0 a1.05,1.05 0 1,0 -2.1,0 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M16.2,11 m-1.05,0 a1.05,1.05 0 1,0 2.1,0 a1.05,1.05 0 1,0 -2.1,0 Z" />
+</vector>

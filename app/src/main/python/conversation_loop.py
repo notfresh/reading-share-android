@@ -142,6 +142,10 @@ class ConversationLoop:
                 continue
 
             # 4. 没有工具调用 → 最终回答
+            #    先把 assistant 消息存进 messages —— 否则 result["messages"]
+            #    缺最后这条,宿主存回 session 后下一轮就丢了 agent 的回答
+            #    (多轮上下文只剩用户提问,agent 会"忘记"自己说过什么)。
+            messages.append(assistant)
             return self._success_result(messages, assistant)
 
         # 循环退出（预算/上限/中断）

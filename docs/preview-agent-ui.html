@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>reading-share · AI 助手页(布局预览)</title>
+<style>
+  /* ── 复刻 reading-share 的真实主题色 ──────────────────────────────
+     primary #2E51A4(primary_dark #243F83,accent #4267B2)
+     布局按 fragment_agent.xml / item_agent_message.xml 1:1 还原 */
+  :root {
+    --primary: #2E51A4;
+    --primary-dark: #243F83;
+    --accent: #4267B2;
+    --surface: #FFFFFF;
+    --surface-variant: #F0F2F7;
+    --on-surface-variant: #3C4257;
+    --text: #1A1C22;
+    --text-dim: #808080;
+    --error: #C62828;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 24px 16px 40px;
+    background: #EDEFF3;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center; gap: 28px;
+  }
+  .caption { max-width: 400px; font-size: 13px; color: var(--text-dim); line-height: 1.7; }
+  .caption b { color: var(--text); }
+  .caption code { background: #fff; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* ── 手机外框 ────────────────────────────────────────────────── */
+  .phone {
+    width: 380px; height: 760px; background: var(--surface);
+    border-radius: 28px; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(20,30,60,.18);
+    display: flex; flex-direction: column; position: relative;
+  }
+  .statusbar {
+    height: 26px; background: var(--primary-dark);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; font-size: 11px; color: #fff;
+  }
+  .appbar {
+    height: 52px; background: var(--primary);
+    display: flex; align-items: center; padding: 0 12px;
+    color: #fff; font-size: 16px; gap: 10px;
+  }
+  .appbar .hamburger { width: 22px; height: 22px; display: flex; flex-direction: column; justify-content: space-between; }
+  .appbar .hamburger i { display: block; height: 2px; background: #fff; border-radius: 1px; }
+  .appbar .title { flex: 1; font-weight: 500; }
+  .appbar .newchat { font-size: 13px; opacity: .9; padding: 4px 10px; border: 1px solid rgba(255,255,255,.45); border-radius: 14px; }
+
+  /* ── 顶部提示条(agent_not_configured)──────────────────────────── */
+  .banner {
+    background: #DCE4F7; color: #1B3A7A;
+    padding: 10px 14px; font-size: 13px; line-height: 1.5;
+  }
+  .banner.hide { display: none; }
+
+  /* ── 对话列表 ────────────────────────────────────────────────── */
+  .messages {
+    flex: 1; padding: 10px 12px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 4px;
+    background: var(--surface);
+  }
+  .msg { padding: 8px 14px; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .msg.user {
+    align-self: flex-end; max-width: 78%;
+    background: var(--primary); color: #fff;
+    border-radius: 16px 16px 4px 16px;
+  }
+  .msg.agent {
+    align-self: flex-start; max-width: 88%;
+    background: var(--surface-variant); color: var(--on-surface-variant);
+    border-radius: 16px 16px 16px 4px;
+  }
+  .msg.error { align-self: flex-start; max-width: 88%; color: var(--error); padding-left: 4px; }
+  .msg .tool {
+    display: inline-block; font-size: 11.5px; font-family: ui-monospace, Menlo, monospace;
+    background: rgba(46,81,164,.10); color: var(--primary);
+    padding: 2px 7px; border-radius: 6px; margin-bottom: 4px;
+  }
+  .msg .tool.used { background: rgba(46,81,164,.05); color: var(--text-dim); }
+
+  /* ── 思考指示 ────────────────────────────────────────────────── */
+  .progress { display: flex; justify-content: center; padding: 4px 0; }
+  .progress.hide { display: none; }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid #C8CEDD; border-top-color: var(--primary);
+    border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 输入区 ──────────────────────────────────────────────────── */
+  .inputbar {
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 8px 12px 14px; border-top: 1px solid #E3E6EE; background: var(--surface);
+  }
+  .inputbox {
+    flex: 1; min-height: 44px; max-height: 110px;
+    background: var(--surface-variant); border-radius: 22px;
+    padding: 11px 16px; font-size: 14.5px; color: var(--text);
+    display: flex; align-items: center;
+  }
+  .inputbox .ph { color: #9AA1B2; }
+  .send {
+    height: 44px; padding: 0 18px; border-radius: 22px; background: var(--primary);
+    color: #fff; font-size: 14px; display: flex; align-items: center; border: none;
+  }
+  .send.disabled { background: #C3C8D6; }
+
+  /* ── 确认弹窗 ────────────────────────────────────────────────── */
+  .overlay {
+    position: absolute; inset: 0; background: rgba(15,20,35,.45);
+    display: flex; align-items: center; justify-content: center; padding: 22px;
+  }
+  .overlay.hide { display: none; }
+  .dialog {
+    background: #fff; border-radius: 16px; width: 100%; padding: 20px 22px 16px;
+    box-shadow: 0 10px 34px rgba(0,0,0,.3);
+  }
+  .dialog h3 { margin: 0 0 8px; font-size: 17px; }
+  .dialog p { margin: 0 0 12px; font-size: 13.5px; color: #5A6172; line-height: 1.6; }
+  .detail {
+    background: var(--surface-variant); border-radius: 8px; padding: 10px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; line-height: 1.6;
+    color: #2A3145; white-space: pre-wrap; word-break: break-all; margin-bottom: 14px;
+  }
+  .dlgbtns { display: flex; justify-content: flex-end; gap: 8px; }
+  .dlgbtns button { height: 38px; padding: 0 18px; border-radius: 19px; font-size: 14px; border: none; }
+  .cancel { background: transparent; color: var(--primary); }
+  .ok { background: var(--primary); color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <b>reading-share · AI 助手页(布局预览)</b><br>
+  按 <code>fragment_agent.xml</code> / <code>item_agent_message.xml</code> 1:1 还原,<br>
+  颜色取自 <code>colors.xml</code>(primary #2E51A4)。<br>
+  这是 <b>mockup</b>,不是真机截图 —— 本机无 emulator 也无 KVM。
+</div>
+
+<!-- ── 屏 1:正常聊天 ─────────────────────────────────────────── -->
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+  <div class="appbar">
+    <div class="hamburger"><i></i><i></i><i></i></div>
+    <div class="title">AI 助手</div>
+    <div class="newchat">新对话</div>
+  </div>
+
+  <div class="messages">
+    <div class="msg user">我收藏了哪些小红书的链接？</div>
+    <div class="msg agent"><span class="tool">🔧 search_links</span>
+找到 3 条带「小红书」标签的链接:
+
+1. 《小红书穿搭灵感合集》 — 2026-10-20
+2. 《秋日通勤穿搭笔记》 — 2026-10-15
+3. 《小户型收纳好物》 — 2026-09-28</div>
+
+    <div class="msg user">给它们都打个「待读」标签</div>
+    <div class="msg agent"><span class="tool">🔧 add_tag_to_link × 3</span>
+已给 3 条链接添加标签「待读」,并写入事件日志。</div>
+  </div>
+
+  <div class="progress hide"><div class="spinner"></div></div>
+
+  <div class="inputbar">
+    <div class="inputbox"><span class="ph">让我帮你找链接、打标签…</span></div>
+    <button class="send">发送</button>
+  </div>
+</div>
+
+<div class="caption">
+  <b>屏 1 · 正常聊天</b><br>
+  用户靠右(主色底),agent 靠左(浅灰底)。<br>
+  <b>工具调用标签</b>(蓝底小标签)显示 agent 调了哪个工具 ——<br>
+  这是我建议加的第 4 条:让 agent 的动作可见。
+</div>
+
+<!-- ── 屏 2:写操作确认 ───────────────────────────────────────── -->
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+  <div class="appbar">
+    <div class="hamburger"><i></i><i></i><i></i></div>
+    <div class="title">AI 助手</div>
+    <div class="newchat">新对话</div>
+  </div>
+
+  <div class="messages">
+    <div class="msg user">把这些都删了</div>
+    <div class="msg agent">好的,我先确认要操作哪些链接。</div>
+  </div>
+
+  <div class="progress"><div class="spinner"></div></div>
+
+  <div class="inputbar">
+    <div class="inputbox"><span class="ph">让我帮你找链接、打标签…</span></div>
+    <button class="send disabled">发送</button>
+  </div>
+
+  <div class="overlay">
+    <div class="dialog">
+      <h3>确认执行这个操作？</h3>
+      <p>agent 想修改你的阅读库。确认后才会真正执行。</p>
+      <div class="detail">add_tag_to_link
+link_id: 42
+tag: 待读</div>
+      <div class="dlgbtns">
+        <button class="cancel">取消</button>
+        <button class="ok">确认执行</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="caption">
+  <b>屏 2 · 写操作确认(唯一的写入门)</b><br>
+  4 个写工具全部走这一条路:后台线程 → 主线程弹窗 → 阻塞等结果。<br>
+  60 秒不点 = <b>按拒绝处理</b>(宁可不做,也不替你决定)。<br>
+  拒绝原因会回灌给模型,让它换方案而不是卡死。
+</div>
+
+<!-- ── 屏 3:未配置 key ───────────────────────────────────────── -->
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+  <div class="appbar">
+    <div class="hamburger"><i></i><i></i><i></i></div>
+    <div class="title">AI 助手</div>
+    <div class="newchat">新对话</div>
+  </div>
+
+  <div class="banner">还没配置 API key,去设置页填一下才能用</div>
+
+  <div class="messages">
+    <div class="msg agent" style="max-width:100%;background:transparent;color:var(--text-dim);font-size:13px;">
+      你的阅读库里有什么?直接问我 ——<br><br>
+      「我收藏了哪些小红书的链接」<br>
+      「给它们都打个待读标签」<br>
+      「置顶有哪些」
+    </div>
+  </div>
+
+  <div class="progress hide"><div class="spinner"></div></div>
+
+  <div class="inputbar">
+    <div class="inputbox"><span class="ph">让我帮你找链接、打标签…</span></div>
+    <button class="send disabled">发送</button>
+  </div>
+</div>
+
+<div class="caption">
+  <b>屏 3 · 没配 API key</b><br>
+  顶部提示条 + 空态引导。API key 在<b>设置页</b>配置(模型 / API 地址 / Key 三个框)。
+</div>
+
+</body>
+</html>

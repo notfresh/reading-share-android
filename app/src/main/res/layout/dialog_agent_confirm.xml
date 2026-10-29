@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 写操作确认弹窗:展示"agent 想干什么"。
+     注意(§30 教训):确认/取消按钮放在**布局里**,不用 AlertDialog 的
+     setPositiveButton/setNegativeButton —— 默认按钮点击即 dismiss,
+     DialogFragment 会当场 detach,回调回来就炸。
+     这里用的是普通 AlertDialog(不是 DialogFragment),但按钮仍放布局里 ——
+     保持"点击不自动 dismiss"的一致行为,避免以后改成 DialogFragment 时踩坑。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="20dp">
+
+    <TextView
+        android:id="@+id/confirm_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/agent_confirm_title"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/confirm_desc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/agent_confirm_desc"
+        android:textSize="14sp" />
+
+    <!-- 具体参数(工具名 + 参数 JSON) -->
+    <TextView
+        android:id="@+id/confirm_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:fontFamily="monospace"
+        android:padding="10dp"
+        android:textSize="12sp"
+        android:textIsSelectable="true" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/confirm_cancel"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/agent_confirm_cancel" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/confirm_ok"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/agent_confirm_ok" />
+    </LinearLayout>
+</LinearLayout>

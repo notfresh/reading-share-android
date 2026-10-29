@@ -327,4 +327,27 @@
     <string name="reader_action_untitled">未命名</string>
     <string name="reader_action_page_not_loaded">页面未加载</string>
     <string name="action_force_refresh">强制刷新（绕过缓存）</string>
+    <!-- agent 聊天页 -->
+    <string name="menu_agent">AI 助手</string>
+    <string name="agent_input_hint">让我帮你找链接、打标签…</string>
+    <string name="agent_send">发送</string>
+    <string name="agent_not_configured">还没配置 API key，去设置页填一下才能用</string>
+    <string name="agent_error_generic">出错了：%1$s</string>
+    <string name="agent_empty_response">（agent 没有返回内容）</string>
+    <string name="agent_new_chat">新对话</string>
+    <string name="agent_empty_state_title">你的阅读库里有什么？直接问我 ——</string>
+    <string name="agent_empty_state_examples">「我收藏了哪些小红书的链接」\n「给它们都打个待读标签」\n「置顶有哪些」</string>
+    <string name="agent_confirm_title">确认执行这个操作？</string>
+    <string name="agent_confirm_desc">agent 想修改你的阅读库。确认后才会真正执行。</string>
+    <string name="agent_confirm_ok">确认执行</string>
+    <string name="agent_confirm_cancel">取消</string>
+    <string name="agent_confirm_rejected">用户取消了这个操作</string>
+    <string name="agent_tool_running">正在调用工具：%1$s</string>
+    <string name="agent_settings_title">AI 助手设置</string>
+    <string name="agent_settings_desc">AI 助手用大模型把你的话变成对阅读库的操作。Key 只存在本机。</string>
+    <string name="agent_settings_model">模型</string>
+    <string name="agent_settings_base_url">API 地址</string>
+    <string name="agent_settings_api_key">API Key</string>
+    <string name="agent_settings_save">保存</string>
+    <string name="agent_settings_saved">已保存</string>
 </resources>

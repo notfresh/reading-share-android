@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- agent 对话里的一条消息。左右分栏:用户靠右,agent 靠左。
+     role_user / role_agent 两个 View 靠 visibility 切换 —— 一条布局两种角色,
+     不写两套布局(单一来源)。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingVertical="4dp">
+
+    <!-- 用户消息(靠右) -->
+    <TextView
+        android:id="@+id/msg_user"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginStart="48dp"
+        android:background="?attr/colorPrimaryContainer"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp"
+        android:textColor="?attr/colorOnPrimaryContainer"
+        android:textIsSelectable="true" />
+
+    <!-- agent 消息(靠左) -->
+    <TextView
+        android:id="@+id/msg_agent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginEnd="48dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textIsSelectable="true" />
+
+    <!-- 工具调用流水:小标签样式,让 agent 的动作可见 -->
+    <TextView
+        android:id="@+id/msg_tool"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginStart="4dp"
+        android:layout_marginBottom="2dp"
+        android:background="?attr/colorPrimaryContainer"
+        android:fontFamily="monospace"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="3dp"
+        android:textColor="?attr/colorOnPrimaryContainer"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <!-- 错误消息 -->
+    <TextView
+        android:id="@+id/msg_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginEnd="48dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp"
+        android:textColor="?attr/colorError"
+        android:textIsSelectable="true"
+        android:visibility="gone" />
+</LinearLayout>

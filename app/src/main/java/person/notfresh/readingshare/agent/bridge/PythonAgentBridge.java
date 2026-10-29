@@ -87,6 +87,9 @@ public final class PythonAgentBridge {
      *
      * <p>**必须在后台线程调用** —— 里面会发网络请求(等 LLM 响应)。</p>
      *
+     * <p>**多轮上下文**:会话由 Python 侧(agent_bridge 模块级状态)持有,
+     * 本类每次调用都是"同一会话的下一轮"。要开新会话调 {@link #resetSession()}。</p>
+     *
      * @param userText 用户自然语言输入
      * @return 结果 JSON 字符串:
      *         {@code {final_response, messages, api_calls, tool_calls, exit_reason, error, tools}}
@@ -100,6 +103,22 @@ public final class PythonAgentBridge {
         } catch (Exception e) {
             Log.e(TAG, "agent 回合异常", e);
             return errorJson(e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * 清空会话(新对话)。
+     *
+     * <p>会话状态在 Python 侧(进程级)—— 清掉后 agent 不记得之前的对话。</p>
+     */
+    public void resetSession() {
+        if (!isReady()) {
+            return;
+        }
+        try {
+            pyModule.callAttr("reset_session");
+        } catch (Exception e) {
+            Log.e(TAG, "重置会话失败", e);
         }
     }
 

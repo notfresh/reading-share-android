@@ -34,6 +34,32 @@ from typing import Any, Optional
 #   model_name() / base_url() / api_key() -> str  LLM 配置
 _JAVA_BRIDGE: Any = None
 
+# ── 会话状态(多轮上下文)───────────────────────────────────────────────────
+# 照搬 V2 桌面端的接法(session_manager.py:308):
+#     result = loop.run(user_message=..., initial_messages=session.messages)
+#     session.messages = result.get("messages", [])
+#
+# 桌面端由 session_manager 持有 session 对象;Android 侧由本模块持有 ——
+# **为什么放在 Python 侧而不是 Java 侧**:
+#   1. 零编解码 —— 历史消息是 Python 原生的 list[dict],放 Java 要来回转 JSON
+#   2. 进程级 —— Fragment 重建(转屏/导航返回)后会话还在,agent 不会"失忆"
+#   3. Java 侧只管显示 —— 显示列表(用户文本/agent 文本)跟 LLM 消息流是两回事
+#
+# 存哪(内存 vs 文件)—— 第一版只做内存态,进程死了就没。
+# 要落盘就是往 app 私有目录写个 JSON,后续再说(YAGNI)。
+_SESSION_MESSAGES: Optional[list] = None
+
+
+def reset_session() -> None:
+    """清空会话(对应「新对话」)。"""
+    global _SESSION_MESSAGES
+    _SESSION_MESSAGES = None
+
+
+def get_session_messages() -> list:
+    """当前会话的完整消息流(调试/测试用)。"""
+    return list(_SESSION_MESSAGES) if _SESSION_MESSAGES else []
+
 
 def set_java_bridge(bridge: Any) -> None:
     """由 Java 侧在启动时调用,注入能力宿主。
@@ -126,18 +152,27 @@ def confirm_guard(name: str, args: dict) -> Optional[str]:
 # ── 对外入口 ─────────────────────────────────────────────────────────────
 
 
-def run(user_text: str, system_prompt: Optional[str] = None) -> str:
+def run(
+    user_text: str,
+    system_prompt: Optional[str] = None,
+    initial_messages: Optional[list] = None,
+) -> str:
     """跑一个完整 agent 回合。**Java 侧的唯一调用点。**
 
     Args:
         user_text: 用户自然语言输入
         system_prompt: 覆盖默认系统提示词(可选)
+        initial_messages: 历史消息(多轮上下文)。
+            **照搬 V2 桌面端的接法**(session_manager.py:308):
+                result = loop.run(user_message=..., initial_messages=session.messages)
+                session.messages = result.get("messages", [])
+            不传 = 每次都是全新会话(模型会"失忆")。
 
     Returns:
         JSON 字符串:
         {
           "final_response": str,        # LLM 的最终回答
-          "messages": [...],            # 完整消息流(调试用)
+          "messages": [...],            # 完整消息流 —— 宿主要存回它,才能多轮
           "api_calls": int,
           "tool_calls": int,
           "exit_reason": str,           # completed / max_turns_reached / error:*
@@ -164,6 +199,8 @@ def run(user_text: str, system_prompt: Optional[str] = None) -> str:
             ensure_ascii=False,
         )
 
+    global _SESSION_MESSAGES
+
     tools = register_java_tools()
 
     runner = ToolRunner(verbose=False)
@@ -185,7 +222,22 @@ def run(user_text: str, system_prompt: Optional[str] = None) -> str:
         max_context_tokens=8000,
     )
 
-    result = loop.run(user_text, system_prompt=system_prompt)
+    # 多轮上下文 —— 照搬 V2 桌面端接法(session_manager.py:308):
+    #   传历史进去,再把返回的新消息流存回去。
+    # initial_messages 显式传入时优先用它(测试/进阶调用);
+    # 否则用模块级会话(Android 侧的默认路径)。
+    history = initial_messages if initial_messages is not None else _SESSION_MESSAGES
+
+    result = loop.run(
+        user_text,
+        system_prompt=system_prompt,
+        initial_messages=history,
+    )
+
+    # 存回新消息流 —— 下一轮就有上下文了。
+    # result["messages"] 已含完整的 assistant 回复,不需要额外 add_message
+    # (与 V2 桌面端 session_manager.py:313 的处理一致)。
+    _SESSION_MESSAGES = result.get("messages", [])
 
     result["tools"] = tools
     return json.dumps(result, ensure_ascii=False)

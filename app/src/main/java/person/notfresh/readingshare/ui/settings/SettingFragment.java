@@ -75,6 +75,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import person.notfresh.readingshare.sync.SimpleSyncManager;
+import person.notfresh.readingshare.agent.bridge.AgentConfig;
 
 public class SettingFragment extends Fragment implements AddOverrideRuleDialog.OnRuleSubmitListener {
 
@@ -235,6 +236,9 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
 
         // 「关于」弹窗(简化版:app 名 + 版本 + GitHub 链接下划线)
         root.findViewById(R.id.button_about).setOnClickListener(v -> showAboutDialog());
+
+        // AI 助手设置:加载已有配置 + 保存按钮
+        setupAgentSettings(root);
 
         // 监听输入框内容变化 — 实时保存(每改一个字符就 apply 一次)。
         // 顺序很重要:setText(savedUrl) 在 addTextChangedListener 之前调用,
@@ -921,6 +925,40 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
             if (item != null && item.getId() > 0) ids.add(item.getId());
         }
         return SubjectUtil.getSubjectNamesByLinkIds(requireContext(), ids);
+    }
+
+    /**
+     * AI 助手设置 —— 加载已有配置 + 保存按钮。
+     *
+     * <p>**用保存按钮而不是实时保存**(跟 server_url 的实时保存不同):
+     * API key 不该每敲一个字符就落盘 —— 用户可能中途放弃,或者
+     * 只是路过这个页面。点"保存"才写。</p>
+     */
+    private void setupAgentSettings(View root) {
+        AgentConfig config = new AgentConfig(requireContext());
+
+        TextInputEditText modelInput = root.findViewById(R.id.agent_model_input);
+        TextInputEditText baseUrlInput = root.findViewById(R.id.agent_base_url_input);
+        TextInputEditText apiKeyInput = root.findViewById(R.id.agent_api_key_input);
+
+        modelInput.setText(config.model());
+        baseUrlInput.setText(config.baseUrl());
+        apiKeyInput.setText(config.apiKey());
+
+        root.findViewById(R.id.button_agent_settings_save).setOnClickListener(v -> {
+            String model = modelInput.getText() == null ? "" : modelInput.getText().toString().trim();
+            String baseUrl = baseUrlInput.getText() == null ? "" : baseUrlInput.getText().toString().trim();
+            String apiKey = apiKeyInput.getText() == null ? "" : apiKeyInput.getText().toString().trim();
+
+            if (apiKey.isEmpty()) {
+                Toast.makeText(requireContext(),
+                        getString(R.string.agent_settings_desc), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            config.save(model, baseUrl, apiKey);
+            Toast.makeText(requireContext(),
+                    getString(R.string.agent_settings_saved), Toast.LENGTH_SHORT).show();
+        });
     }
 
     /**
