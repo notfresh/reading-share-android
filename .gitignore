@@ -16,3 +16,7 @@ local.properties
 *.apk
 # gradle.properties 包含 release 签名密码，本地保留不入库
 gradle.properties
+# Python 字节码缓存（Chaquopy 的 agent 内核）
+__pycache__/
+*.pyc
+.pytest_cache/
