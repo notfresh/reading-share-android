@@ -6,5 +6,9 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.1.0'
+        // Chaquopy —— 在 app 进程内嵌 CPython,跑 minimal-agent-v2 的 agent 内核。
+        // 版本 17.2.0:支持 AGP 7.3~9.4 / Python 3.10~3.15 / minSdk 24+。
+        // 详见 minimal-agent-v2 docs/design-20261029-android-integration.md
+        classpath 'com.chaquo.python:gradle:17.2.0'
     }
-} 
+}

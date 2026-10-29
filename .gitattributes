@@ -1,0 +1,34 @@
+# 固化行尾规则 —— 修 worktree 检出后 gradlew 变 CRLF 导致 ./gradlew 跑不起来的问题。
+#
+# 背景:仓库里存的是 LF,但本机 core.autocrlf=true,新建 worktree 时
+# gradlew 被检出成 CRLF,导致 `#!/usr/bin/env sh\r` 报
+# "can't access tty / No such file or directory"。
+#
+# 规则:
+#   *.sh / gradlew 等 shell 脚本 → 仓库存 LF,检出也用 LF(eol=lf)
+#   文本源码 → 仓库存 LF,检出转 CRLF 不做(eol=lf 保持一致)
+#   二进制 → 不动
+
+* text=auto eol=lf
+
+*.sh text eol=lf
+gradlew text eol=lf
+*.java text eol=lf
+*.xml text eol=lf
+*.gradle text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.properties text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.apk binary
+*.so binary
+*.jar binary
+*.aar binary
+*.db binary

@@ -1,5 +1,7 @@
 plugins {
     id 'com.android.application'
+    // Chaquopy —— app 进程内嵌 CPython,跑 minimal-agent-v2 的 agent 内核
+    id 'com.chaquo.python'
 }
 
 android {
@@ -9,10 +11,17 @@ android {
         applicationId "person.notfresh.readingshare"
         minSdk 26
         targetSdk 34
-        versionCode 74
+versionCode 74
         versionName "2.3.27"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Chaquopy 的 Python 解释器是原生组件 —— 必须指定 ABI。
+        // 只留 arm64-v8a(真机) + x86_64(模拟器);每多一个 ABI 约 +13MB。
+        // 详见 minimal-agent-v2 docs/design-20261029-android-integration.md §2.5
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"
+        }
     }
 
     buildTypes {
@@ -30,6 +39,22 @@ android {
         viewBinding true
         // 2.3.19.6: 生命周期调试日志用 BuildConfig.DEBUG 包一层,release 不输出
         buildConfig true
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        // Python 3.11 —— minimal-agent-v2 的 android-agent 分支已验证 3.11 兼容
+        // (compileall 通过 + 无 3.12+ 专属语法)
+        version = "3.11"
+        pip {
+            // 手机端依赖锁:openai>=1.40 硬依赖 jiter(Rust 扩展),
+            // Chaquopy 无 Android wheel → 装不上,必须锁 1.30。
+            // 详见 minimal-agent-v2/android/requirements.txt
+            install("openai==1.30.0")
+            install("pydantic==1.10.13")
+            install("httpx==0.27.2")
+        }
     }
 }
 
