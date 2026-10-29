@@ -1,3 +1,57 @@
+# 2.4.2
+
+修复 Python 内核启动失败：`Python.start(new GenericPlatform())` 是桌面 JVM 的启动方式，
+Android 上必须用 `AndroidPlatform`。
+
+- `PythonAgentBridge` 构造改为接收 `Context`，启动时 `Python.start(new AndroidPlatform(appContext))`
+- 调用点 `AgentFragment.java:192` 传 `requireContext()`
+
+报错原文：`Cannot use GenericPlatform on Android. Call Python.start(new AndroidPlatform(context)) ...`
+
+# 2.4.1
+
+修复 AI 助手页启动即崩（`InflateException: Error inflating class TextView` /
+`Failed to resolve attribute at index 13`）。
+
+根因：布局用了 Material 3 的主题属性，但项目主题是 M2 的 `Theme.MaterialComponents`，
+这些属性在主题里不存在 → 解析失败。共 9 处：
+
+| 用的（M3，不存在） | 换成（M2，项目既有） |
+|---|---|
+| `colorPrimaryContainer` | `colorPrimary` |
+| `colorOnPrimaryContainer` | `colorOnPrimary` |
+| `colorSurfaceVariant` | `colorSurface` |
+| `colorOnSurfaceVariant` | `colorOnSurface` |
+
+涉及 `fragment_agent.xml` / `item_agent_message.xml` / `dialog_agent_confirm.xml`。
+
+# 2.4.0
+
+新增「AI 助手」——抽屉入口，用自然语言操作读享。
+
+## 架构
+
+- **Java 侧**：`agent/bridge/`（`PythonAgentBridge` 启动与调度、`AgentBridgeHost` 能力宿主、
+  `AgentTools` 工具实现、`MainThreadConfirmGate` 写操作确认门）
+- **Python 侧**：`app/src/main/python/`（minimal-agent-v2 的 agent 内核 7 个模块 + `agent_bridge.py`）
+- 跨语言调用走 Chaquopy 17.2.0，Python 3.11 跑在 app 进程内
+
+## 能力
+
+- 只读工具：按标签/主题/置顶查链接、全文搜索
+- 写工具：打标签、加备注等 —— **必须经确认弹窗**，取消即不执行
+
+## 体积取舍
+
+- `ndk { abiFilters "arm64-v8a" }`：4 ABI 全带 APK 137MB，只留 arm64 后 54.9MB
+- 代价：只能装 arm64 设备（2018 年后主流真机），发布给大众时需改回
+
+## 验证状态（真机 2.4.2）
+
+- 多轮对话 ✓
+- 工具调用（只读）✓
+- 写操作确认弹窗 + 取消不落库 ✓
+
 # 2.3.27
 
 新增「标题优化规则一」：抖音分享文案的广告前缀清洗。
