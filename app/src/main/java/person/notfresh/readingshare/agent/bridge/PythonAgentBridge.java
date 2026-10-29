@@ -109,10 +109,73 @@ public final class PythonAgentBridge {
         }
     }
 
+    // ── 对外:会话历史(2.4.4)────────────────────────────────────────
+
+    /**
+     * 会话列表(按名称 contains 过滤)。
+     *
+     * @param query 空串 = 全部
+     * @return JSON: {@code {"conversations":[{"id","title","updated_at","rounds"}],"current_id"}}
+     */
+    public String listConversations(String query) {
+        if (!isReady()) {
+            return "{\"conversations\":[],\"current_id\":\"\"}";
+        }
+        try {
+            return pyModule.callAttr("list_conversations", query == null ? "" : query).toString();
+        } catch (Exception e) {
+            Log.e(TAG, "取会话列表失败", e);
+            return "{\"conversations\":[],\"current_id\":\"\"}";
+        }
+    }
+
+    /**
+     * 载入历史会话 —— **恢复上下文,可以接着聊**。
+     *
+     * @return JSON: {@code {"ok":true,"id","title","display":[{"role","text"}]}}
+     */
+    public String loadConversation(String conversationId) {
+        if (!isReady()) {
+            return "{\"ok\":false,\"error\":\"Python agent 内核未就绪\"}";
+        }
+        try {
+            return pyModule.callAttr("load_conversation", conversationId).toString();
+        } catch (Exception e) {
+            Log.e(TAG, "载入会话失败", e);
+            return "{\"ok\":false,\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    /** 新建空会话(「新对话」),返回新会话 id。 */
+    public String newConversation() {
+        if (!isReady()) {
+            return "";
+        }
+        try {
+            return pyModule.callAttr("new_conversation").toString();
+        } catch (Exception e) {
+            Log.e(TAG, "新建会话失败", e);
+            return "";
+        }
+    }
+
+    /** 当前会话 id(没有则空串)。 */
+    public String currentConversationId() {
+        if (!isReady()) {
+            return "";
+        }
+        try {
+            return pyModule.callAttr("current_conversation_id").toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     /**
      * 清空会话(新对话)。
      *
-     * <p>会话状态在 Python 侧(进程级)—— 清掉后 agent 不记得之前的对话。</p>
+     * <p>会话状态在 Python 侧(进程级)—— 清掉后 agent 不记得之前的对话。
+     * 注意:历史会话文件不会删,仍能在列表里找到(见 {@link #listConversations})。</p>
      */
     public void resetSession() {
         if (!isReady()) {

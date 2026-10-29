@@ -52,7 +52,7 @@ import person.notfresh.readingshare.agent.bridge.PythonAgentBridge;
  * <p><b>生命周期</b>:Python 解释器是进程级的,Fragment 销毁不影响它;
  * 但确认门必须反注册(否则泄漏 Activity)。</p>
  */
-public class AgentFragment extends Fragment {
+public class AgentFragment extends Fragment implements ConversationHistoryDialog.Host {
 
     private static final String TAG = "AgentFragment";
 
@@ -93,11 +93,25 @@ public class AgentFragment extends Fragment {
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == R.id.action_agent_new_chat) {
+        int id = item.getItemId();
+        if (id == R.id.action_agent_history) {
+            openHistory();
+            return true;
+        }
+        if (id == R.id.action_agent_new_chat) {
             startNewChat();
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    /** 打开对话历史(子 FragmentManager —— 跟项目既有对话框的挂法一致)。 */
+    private void openHistory() {
+        if (bridge == null) {
+            showError(getString(R.string.agent_error_generic, getString(R.string.agent_not_ready)));
+            return;
+        }
+        new ConversationHistoryDialog().show(getChildFragmentManager(), ConversationHistoryDialog.TAG);
     }
 
     /**
@@ -107,7 +121,7 @@ public class AgentFragment extends Fragment {
      */
     private void startNewChat() {
         if (bridge != null) {
-            bridge.resetSession();
+            bridge.newConversation();
         }
         adapter.clear();
         showEmptyState();
@@ -148,6 +162,95 @@ public class AgentFragment extends Fragment {
         ensureBridge();
         refreshConfiguredBanner();
         showEmptyState();
+        restoreCurrentConversation();
+    }
+
+    /**
+     * 界面重建后(切页/转屏)把当前会话的气泡重新贴回来。
+     *
+     * <p>会话本体在 Python 侧(还活着),但 Fragment 的 adapter 是空的 ——
+     * 不补这一步,用户切回来会看到"历史没了",实际上下文还在。</p>
+     */
+    private void restoreCurrentConversation() {
+        if (bridge == null || adapter == null || adapter.getItemCount() > 0) {
+            return;
+        }
+        String currentId = bridge.currentConversationId();
+        if (currentId == null || currentId.isEmpty()) {
+            return;
+        }
+        agentExecutor.submit(() -> {
+            String json = bridge.loadConversation(currentId);
+            mainHandler.post(() -> renderConversation(json, false));
+        });
+    }
+
+    // ── ConversationHistoryDialog.Host ────────────────────────────────
+
+    @Override
+    public String onLoadConversations() {
+        if (bridge == null) {
+            return "{\"conversations\":[],\"current_id\":\"\"}";
+        }
+        return bridge.listConversations("");
+    }
+
+    @Override
+    public void onConversationPicked(String conversationId) {
+        if (bridge == null) {
+            return;
+        }
+        setBusy(true);
+        agentExecutor.submit(() -> {
+            String json = bridge.loadConversation(conversationId);
+            mainHandler.post(() -> {
+                setBusy(false);
+                renderConversation(json, true);
+            });
+        });
+    }
+
+    /** 用 Python 给的 display 列表重建气泡。 */
+    private void renderConversation(String json, boolean reportError) {
+        try {
+            org.json.JSONObject payload = new org.json.JSONObject(json);
+            if (!payload.optBoolean("ok", false)) {
+                if (reportError) {
+                    showError(getString(R.string.agent_error_generic, payload.optString("error")));
+                }
+                return;
+            }
+            adapter.clear();
+            org.json.JSONArray display = payload.optJSONArray("display");
+            if (display != null) {
+                for (int i = 0; i < display.length(); i++) {
+                    org.json.JSONObject row = display.optJSONObject(i);
+                    if (row == null) {
+                        continue;
+                    }
+                    adapter.addMessage(roleOf(row.optString("role")), row.optString("text"));
+                }
+            }
+            showEmptyState();
+            if (adapter.getItemCount() > 0) {
+                messagesView.scrollToPosition(adapter.getItemCount() - 1);
+            }
+        } catch (JSONException e) {
+            if (reportError) {
+                showError(getString(R.string.agent_error_generic, e.getMessage()));
+            }
+        }
+    }
+
+    /** 字符串 role → 气泡类型。未知的按 agent 处理(最不打扰)。 */
+    private static int roleOf(String role) {
+        if ("user".equals(role)) {
+            return AgentMessageAdapter.Message.ROLE_USER;
+        }
+        if ("tool".equals(role)) {
+            return AgentMessageAdapter.Message.ROLE_TOOL;
+        }
+        return AgentMessageAdapter.Message.ROLE_AGENT;
     }
 
     /** 空态引导 —— 没有对话时显示。 */

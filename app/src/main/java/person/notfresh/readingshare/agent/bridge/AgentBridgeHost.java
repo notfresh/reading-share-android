@@ -118,6 +118,16 @@ public final class AgentBridgeHost {
         return apiKey;
     }
 
+    /**
+     * app 私有 files 目录 —— 会话历史(conversations/*.json)落在这里。
+     *
+     * <p>为什么由 Java 提供:Python 侧拿不到 Context,而路径是
+     * Android 独有的概念,留在 Java 一侧更自然。</p>
+     */
+    public String files_dir() {
+        return appContext.getFilesDir().getAbsolutePath();
+    }
+
     /** 可用工具名(逗号分隔)—— 供日志排查。 */
     public String tool_names() {
         return String.join(",", toolRegistry.names());

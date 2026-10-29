@@ -334,6 +334,16 @@
     <string name="agent_error_generic">Error: %1$s</string>
     <string name="agent_empty_response">(The agent returned nothing)</string>
     <string name="agent_new_chat">New chat</string>
+    <string name="agent_title_default">New chat</string>
+    <string name="agent_not_ready">agent core is not ready</string>
+    <string name="agent_history_title">Chat history</string>
+    <string name="agent_history_search">Search by name</string>
+    <string name="agent_history_empty">No conversations yet</string>
+    <string name="agent_history_meta">%1$d rounds · %2$s</string>
+    <string name="agent_time_just_now">just now</string>
+    <string name="agent_time_minutes">%1$d min ago</string>
+    <string name="agent_time_hours">%1$d h ago</string>
+    <string name="agent_time_days">%1$d d ago</string>
     <string name="agent_empty_state_title">What\'s in your library? Just ask —</string>
     <string name="agent_empty_state_examples">"Which links do I have tagged 小红书?"\n"Tag them all as 待读"\n"What\'s pinned?"</string>
     <string name="agent_confirm_title">Confirm this action?</string>

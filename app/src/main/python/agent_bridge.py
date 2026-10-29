@@ -49,11 +49,70 @@ _JAVA_BRIDGE: Any = None
 # 要落盘就是往 app 私有目录写个 JSON,后续再说(YAGNI)。
 _SESSION_MESSAGES: Optional[list] = None
 
+# 当前会话 id(对应 conversations/<id>.json)。
+# 进程刚起来时是 None —— 第一次发消息时才创建,避免空会话占列表。
+_CURRENT_ID: Optional[str] = None
+
 
 def reset_session() -> None:
-    """清空会话(对应「新对话」)。"""
-    global _SESSION_MESSAGES
+    """清空会话(对应「新对话」)。会话文件保留在历史里。"""
+    global _SESSION_MESSAGES, _CURRENT_ID
     _SESSION_MESSAGES = None
+    _CURRENT_ID = None
+
+
+def _ensure_conversation() -> str:
+    """拿到当前会话 id;没有就新建一段。"""
+    global _CURRENT_ID
+    if _CURRENT_ID is None:
+        import conversation_store
+        _CURRENT_ID = conversation_store.create(_JAVA_BRIDGE)["id"]
+    return _CURRENT_ID
+
+
+def current_conversation_id() -> str:
+    return _CURRENT_ID or ""
+
+
+def new_conversation() -> str:
+    """「新对话」—— 只重置内存态,**不立刻建文件**。
+
+    文件在第一次发消息时由 _ensure_conversation 创建 —— 否则用户点几次
+    「新对话」就多几条 0 轮的空会话,污染历史列表。
+    """
+    global _SESSION_MESSAGES, _CURRENT_ID
+    _SESSION_MESSAGES = None
+    _CURRENT_ID = None
+    return ""
+
+
+def list_conversations(query: str = "") -> str:
+    """会话列表 JSON(按名字 contains 过滤)。Java 侧直接拿去填列表。"""
+    if _JAVA_BRIDGE is None:
+        return json.dumps({"conversations": []}, ensure_ascii=False)
+    import conversation_store
+    items = conversation_store.list_documents(_JAVA_BRIDGE, query)
+    return json.dumps({"conversations": items, "current_id": current_conversation_id()},
+                      ensure_ascii=False)
+
+
+def load_conversation(conversation_id: str) -> str:
+    """载入一段历史会话 —— 恢复上下文(可以接着聊)+ 返回界面气泡。"""
+    global _SESSION_MESSAGES, _CURRENT_ID
+    if _JAVA_BRIDGE is None:
+        return json.dumps({"ok": False, "error": "Java 桥接未初始化"}, ensure_ascii=False)
+    import conversation_store
+    doc = conversation_store.load(_JAVA_BRIDGE, conversation_id)
+    if doc is None:
+        return json.dumps({"ok": False, "error": "会话不存在"}, ensure_ascii=False)
+    _CURRENT_ID = doc["id"]
+    _SESSION_MESSAGES = list(doc.get("messages") or [])
+    return json.dumps({
+        "ok": True,
+        "id": doc["id"],
+        "title": doc.get("title") or conversation_store.DEFAULT_TITLE,
+        "display": conversation_store.display_messages(_SESSION_MESSAGES),
+    }, ensure_ascii=False)
 
 
 def get_session_messages() -> list:
@@ -239,5 +298,16 @@ def run(
     # (与 V2 桌面端 session_manager.py:313 的处理一致)。
     _SESSION_MESSAGES = result.get("messages", [])
 
+    # 落盘 + 自动起名(超 3 轮且没起过名时,用前 3 轮总结一次;失败下轮再试)
+    import conversation_store
+    conversation_id = _ensure_conversation()
+    conversation_store.save_turn(_JAVA_BRIDGE, conversation_id, _SESSION_MESSAGES)
+    title = conversation_store.maybe_autotitle(_JAVA_BRIDGE, llm, conversation_id)
+    if title is None:
+        doc = conversation_store.load(_JAVA_BRIDGE, conversation_id) or {}
+        title = doc.get("title") or conversation_store.DEFAULT_TITLE
+
     result["tools"] = tools
+    result["conversation_id"] = conversation_id
+    result["conversation_title"] = title
     return json.dumps(result, ensure_ascii=False)
