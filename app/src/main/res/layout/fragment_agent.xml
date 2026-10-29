@@ -18,11 +18,16 @@
         android:textColor="?attr/colorOnPrimary"
         android:visibility="gone" />
 
+    <!-- 消息列表 + 空态:同一个 FrameLayout,空态垂直居中盖在列表上 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/agent_messages"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:clipToPadding="false"
         android:paddingHorizontal="12dp"
         android:paddingTop="8dp"
@@ -33,9 +38,9 @@
         android:id="@+id/agent_empty_state"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_gravity="center"
         android:orientation="vertical"
         android:paddingHorizontal="32dp"
-        android:paddingBottom="16dp"
         android:visibility="gone">
 
         <TextView
@@ -57,6 +62,8 @@
             android:textSize="13sp" />
     </LinearLayout>
 
+    </FrameLayout>
+
     <!-- 思考中指示 -->
     <ProgressBar
         android:id="@+id/agent_progress"
@@ -70,6 +77,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="12dp"
         android:paddingTop="6dp"
@@ -99,6 +107,7 @@
             android:id="@+id/agent_send"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
             android:layout_marginStart="8dp"
             android:text="@string/agent_send" />
     </LinearLayout>

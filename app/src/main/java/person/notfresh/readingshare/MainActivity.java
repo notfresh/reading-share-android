@@ -305,6 +305,13 @@ public class MainActivity extends AppCompatActivity {
         return id == R.id.nav_home || id == R.id.nav_subject;
     }
 
+    /** 当前是否在 AI 助手页(聊天页没有链接上下文,悬浮槽位要收起)。 */
+    private boolean isOnAgentDestination() {
+        if (navController == null) return false;
+        NavDestination dest = navController.getCurrentDestination();
+        return dest != null && dest.getId() == R.id.nav_agent;
+    }
+
     /** 当前是否已经在阅读页(用于收起"打开阅读"槽位)。 */
     private boolean isOnReaderDestination() {
         if (navController == null) return false;
@@ -333,7 +340,8 @@ public class MainActivity extends AppCompatActivity {
      */
     private void updateFabExpandState() {
         if (binding == null || binding.appBarMain == null) return;
-        binding.appBarMain.fabSlot1.setVisibility(View.VISIBLE);  // 始终显示
+        // 槽位 1(切换链接/主题)在 AI 助手页没有意义,且会压在输入行上 → 收起
+        binding.appBarMain.fabSlot1.setVisibility(isOnAgentDestination() ? View.GONE : View.VISIBLE);
         // 槽位 2 = 打开阅读;已经在阅读页就没有意义,直接收起
         int vis = (isFabExpanded && !isOnReaderDestination()) ? View.VISIBLE : View.GONE;
         binding.appBarMain.fabSlot2.setVisibility(vis);

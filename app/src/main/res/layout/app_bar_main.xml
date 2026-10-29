@@ -22,7 +22,7 @@
 
     <include layout="@layout/content_main" />
 
-    <LinearLayout
+    <person.notfresh.readingshare.ui.FabDragLayout
         android:id="@+id/fab_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -79,6 +79,6 @@
             android:alpha="0.5"
             app:srcCompat="@android:drawable/ic_dialog_email" />
 
-    </LinearLayout>
+    </person.notfresh.readingshare.ui.FabDragLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
