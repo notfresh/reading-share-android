@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/text_merge_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:text="@string/tag_merge_dialog_subtitle" />
+
+    <!-- 目标标签下拉:复用设置页的 Dropdown(Material exposed dropdown) -->
+    <LinearLayout
+        android:id="@+id/merge_dropdown_host"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/text_merge_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp"
+        android:text="@string/tag_merge_target_empty"
+        android:visibility="gone" />
+
+    <!--
+      按钮放在布局里,不用 AlertDialog 的 setPositiveButton/setNegativeButton:
+      AlertDialog 的按钮一旦点击,弹窗立即 dismiss → DialogFragment 被移除、detach →
+      后面弹出的二次确认框(独立 AlertDialog)再回调回来时 requireContext() 就炸了
+      (实测 2.3.25 秒退的根因)。自定义按钮点完不 dismiss,fragment 全程 attached。
+    -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_merge_cancel"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/cancel" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_merge_confirm"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/tag_merge_confirm_ok" />
+
+    </LinearLayout>
+
+</LinearLayout>

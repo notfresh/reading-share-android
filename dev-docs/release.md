@@ -1,3 +1,141 @@
+# 2.3.27
+
+新增「标题优化规则一」：抖音分享文案的广告前缀清洗。
+
+## 问题
+
+抖音「复制链接」分享出来的文案，前面总是一段固定模板广告话术：
+
+```
+1.00 复制打开抖音，看看【南巷旧人的作品】# 格斗魅力 # 暴力美学 # 硬帅天花板 https://v.douyin.com/lq35T16GunU/ :5pm xsE:/ 03/08 s@E.ho
+```
+
+直接拿这段当标题,用户看到的是一坨广告。
+
+## 规则
+
+从字符串**开头**一路切到「看看」两个字**之后**为止，剩下的原样保留。
+详见 `dev-docs/title-optimization-rules.md`。
+
+三个真实样本的实测结果（单测 `DouyinTitleCleanerTest` 覆盖）：
+
+| 原始 | 切完剩什么 |
+|---|---|
+| `1.00 复制打开抖音，看看【南巷旧人的作品】# 格斗魅力 ...` | `【南巷旧人的作品】# 格斗魅力 # 暴力美学 # 硬帅天花板` |
+| `5.10 复制打开抖音，看看【姜胡说的作品】新手入门就五步 ...` | `【姜胡说的作品】新手入门就五步 新手拍短视频想快点出成绩，五步，一...` |
+| `6.92 复制打开抖音，看看【安宇sensei（起号版）的作品】...` | `【安宇sensei（起号版）的作品】坚持日更一定会越来越好的# 个人成长 # 坚持发抖...` |
+
+## 实现
+
+- `util/TitleCleaner.java` —— 切入口 + 规则注册表（加新规则 = 写一个实现类 + 注册表加一行）
+- `util/DouyinTitleCleaner.java` —— 抖音规则（纯 Java，无 Android 依赖，可跑 JUnit 单测）
+- 接入点：`MainActivity` 两个入口（系统分享 `handleIntent` / 剪切板检测 `handleClipboardText`）
+  —— 都在建 link 之前清洗，规则不命中则保留原标题
+- 规则全文见 `dev-docs/title-optimization-rules.md`（后续加「优化规则二」往这里追加）
+
+## 刻意不做
+
+- 不拆 `【】`、不拆 `#` 话题标签、不砍尾部 `...` —— 用户原话是「从开始到 看看两个字，把这些截掉就行」
+- 不写死「复制打开抖音」这个话术 —— 锚点只用「看看」，抖音改模板时规则依然生效
+- 没有「看看」的另一种抖音模板（`长按复制此条消息，打开抖音搜索，观看视频！`）本规则不命中，留作「优化规则二」
+
+## 构建
+
+`41 actionable tasks: 41 executed` → BUILD SUCCESSFUL
+单测 13 个用例全绿（`DouyinTitleCleanerTest`）
+
+> 注：`EventLogClientTest` / `SyncApiClientTest` 有 2 个失败用例 —— **改动前就存在**（已 stash 到基线复跑确认），与本次改动无关。
+
+# 2.3.26
+
+修复「标签合并」二次确认后秒退（2.3.25 崩溃栈定位）。
+
+## 根因：AlertDialog 按钮点击自动 dismiss → DialogFragment 被 detach
+
+`MergeTagDialog` 要弹「二次确认」，而二次确认是独立的 `AlertDialog`。原先确认/
+取消用 `setPositiveButton` / `setNegativeButton` —— **AlertDialog 的按钮一旦点击，
+弹窗立即 dismiss**。dismiss 会让 DialogFragment 被移除、detach：
+
+1. 点第一个弹窗的「合并」→ `AlertDialog` 自动 dismiss
+2. dismiss → `DialogFragment.onDismiss` → Fragment 被移除、detach
+3. 二次确认框（独立 AlertDialog，不受 fragment 生命周期管）还活着
+4. 点确认 → `doMerge` → `linkDao` 已在 `onDetach` 置 null → NPE
+5. 进 catch → catch 里调 `requireContext()` → fragment 已 detach →
+   `IllegalStateException: Fragment ... not attached to a context` → 秒退
+
+栈顶落在 `doMerge` 的 catch 块上（`requireContext()` 自身抛的），把第 4 步的
+原始 NPE 掩盖了 —— 所以第一眼看到的是「not attached」，真正的问题在前面。
+
+## 修法
+
+- **确认/取消按钮挪进布局**（`button_merge_confirm` / `button_merge_cancel`），
+  不用 `AlertDialog` 的 setPositiveButton / setNegativeButton —— 自定义按钮点击
+  不会自动 dismiss，fragment 全程 attached。
+- **回调里一律用缓存 context**（新增 `safeContext()`）：优先 `requireContext()`，
+  拿不到就用 `onAttach` 缓存的 application context。
+- **`onDetach` 不再把 `linkDao` 置 null**：二次确认回调可能发生在 detach 之后。
+- `doMergeInternal` 开头显式检查 `linkDao == null` 并抛带说明的
+  `IllegalStateException`，不再让 NPE 裸奔。
+
+## 通用教训
+
+**DialogFragment 里弹「第二层确认框」时，第一层不能用 AlertDialog 的默认按钮**
+—— 默认按钮点击即 dismiss，fragment 当场 detach，第二层回调回来就炸。
+要么用布局里的自定义按钮，要么让第二层确认做成 fragment 内部的状态切换。
+
+# 2.3.25
+
+修复「标签合并」点击后秒退（2.3.24 实测崩溃）。
+
+## 做了什么
+
+- **异常拦截**：合并流程四段全部兜住，任何一段抛异常都不再让 app 挂掉，
+  并且把栈 + 断点位置复制到剪贴板（用户粘一下就能看出断在哪）：
+  - `mergeTag:onCreateDialog`（弹窗构建）
+  - `mergeTag:onMergeButton`（点「合并」按钮）
+  - `mergeTag:<源>-><目标>`（合并主体）
+  - `mergeTag:eventLog`（事件日志写入）
+- **`CrashClipboard.copyException(ctx, label, throwable)`**（新 API）：业务异常手动
+  复制栈到剪贴板，与「崩溃即复制」的全局 handler 共用同一套写入逻辑。
+
+## 顺手修掉的三个问题
+
+- **FragmentManager 不一致（确定 bug）**：`HomeFragment` show 合并弹窗用
+  `getParentFragmentManager()`，而同文件的 `PinnedTagsPickerDialog` 用
+  `getChildFragmentManager()`。前者会让 `DialogFragment.getParentFragment()`
+  返回 null → `onTagMerged` 回调收不到 → 合并后 UI 不刷新。已统一为
+  `getChildFragmentManager()`。
+- **AlertDialog 实现**：`android.app.AlertDialog` → `androidx.appcompat.app.AlertDialog`。
+  下拉是 `MaterialAutoCompleteTextView`（ExposedDropdownMenu），在非 appcompat 的
+  Dialog 里 theme / 测量容易炸。
+- **事件日志单独兜底**：`EventLogClient.get()` 在未 init 时抛
+  `EventLogException`，不该让合并回滚。
+
+# 2.3.24
+
+新增「标签合并」功能：长按任意标签 → 选「合并到其他标签」→ 选目标标签 →
+源标签下的全部链接挂到目标标签下，源标签本身被删除。
+
+## 做了什么
+
+- `LinkDao.mergeTag(source, target)` —— 单事务完成：目标标签不存在则创建 →
+  `INSERT OR IGNORE ... SELECT` 搬移 `link_tags` 关联（主键是
+  `(link_id, tag_id_ref)`，已同时挂目标标签的链接自动跳过，不产生重复关联）→
+  删掉源标签的关联行 → 删掉源标签本身。
+- `ui/tag/MergeTagDialog.java` —— 选目标标签（带链接计数）+ 二次确认（显示
+  源/目标/链接条数）。
+- `util/TagMergeCleanup.java` —— 合并后同步 5 处「按标签名索引」的本地状态，
+  漏掉任何一处都会留脏数据：置顶标签、高亮标签、选中标签、最近标签、标签排序
+  （`tag_order` 存的是 tag_id，源标签的位置由目标标签继承）。
+- **事件日志**：每条受影响的 link 写一条 `links` topic 的 update 事件，payload
+  带合并后的新标签集，`old` 快照由 SDK 自动从本地事件流推导。这是后续「联机
+  同步」模块的接口 —— 本版只做单机合并，但日志已经写好，将来直接接。
+
+## 没做的
+
+跨设备同步的标签级事件（新增 `tags` topic + `TagEventApplier` + 服务端协议）
+留到联机模块单独做。
+
 # 2.3.22
 
 WebView 缓存治理：本地缓存最多 1 小时 + 新增「强制刷新（绕过缓存）」菜单项。

@@ -17,7 +17,7 @@
             android:textSize="18sp"
             android:layout_marginBottom="8dp"/>
 
-        <!-- 2.3.19.8: 下拉统一走 SettingDropdown(Material exposed dropdown),此处只留宿主容器 -->
+        <!-- 2.3.19.8: 下拉统一走 Dropdown(Material exposed dropdown),此处只留宿主容器 -->
         <LinearLayout
             android:id="@+id/default_tab_dropdown_host"
             android:layout_width="match_parent"

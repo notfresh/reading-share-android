@@ -55,6 +55,7 @@ import person.notfresh.readingshare.util.ShareUtil;
 import person.notfresh.readingshare.util.ImageUtil;
 import person.notfresh.readingshare.util.PinnedTagsManager;
 import person.notfresh.readingshare.ui.tag.PinnedTagsPickerDialog;
+import person.notfresh.readingshare.ui.tag.MergeTagDialog;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -96,7 +97,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 
  * @see TagsFragment（已废弃，功能已合并到此Fragment）
  */
-public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionListener, PinnedTagsPickerDialog.OnPinnedChangedListener {
+public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionListener, PinnedTagsPickerDialog.OnPinnedChangedListener, MergeTagDialog.OnMergeListener {
 
     private static final String TAG = "HomeFragment";  // Logcat过滤关键字
     private static final int REQUEST_CODE_PICK_ICON = 1001;
@@ -2574,7 +2575,8 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 getString(R.string.tag_op_delete_tag),
                 getString(R.string.tag_op_delete_tag_and_links),
                 getString(R.string.tag_op_publish_to_website),
-                getString(R.string.tag_op_toggle_highlight)
+                getString(R.string.tag_op_toggle_highlight),
+                getString(R.string.tag_op_merge_to_other_tag)
         };
 
         new AlertDialog.Builder(requireContext())
@@ -2593,11 +2595,33 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                     case 3: // 高亮标签
                         toggleTagHighlight(tag);
                         break;
+                    case 4: // 合并到其他标签
+                        // 用 getChildFragmentManager() —— 与本文件里 PinnedTagsPickerDialog
+                        // (:272)保持一致。用 getParentFragmentManager() 的话
+                        // DialogFragment.getParentFragment() 返回 null,回调收不到。
+                        MergeTagDialog.newInstance(tag)
+                                .show(getChildFragmentManager(), "merge_tag_dialog");
+                        break;
                 }
             })
             .show();
     }
-    
+
+    /**
+     * 标签合并完成回调 —— 刷新标签区 + 链接列表。
+     */
+    @Override
+    public void onTagMerged(String sourceTag, String targetTag, int movedCount) {
+        // 源标签已不存在,从选中集合里移除(若它正被筛选)
+        selectedTagNames.remove(sourceTag);
+        loadTags();
+        if (selectedTagNames.isEmpty()) {
+            refreshLinksList();
+        } else {
+            updateContentBySelectedTags();
+        }
+    }
+
     /**
      * 确认删除标签
      */

@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.ui.Dropdown;
 import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.LinksHistoryActivity;
 import person.notfresh.readingshare.EventLogActivity;
@@ -80,8 +81,8 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
     private static final int REQUEST_CODE_IMPORT_FILE = 1; // 改为通用文件导入
     private static final String DEFAULT_SERVER_URL = "https://duxiang.ai";
 
-    private SettingDropdown defaultTabDropdown;
-    private SettingDropdown recentTagsWindowDropdown;
+    private Dropdown defaultTabDropdown;
+    private Dropdown recentTagsWindowDropdown;
     private LinkDao linkDao; // 声明 LinkDao
     private TextInputEditText serverUrlInput;
     private TextInputEditText syncSecretKeyInput;
@@ -137,7 +138,7 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         }
 
         ViewGroup defaultTabHost = root.findViewById(R.id.default_tab_dropdown_host);
-        defaultTabDropdown = SettingDropdown.attach(requireContext(), defaultTabHost)
+        defaultTabDropdown = Dropdown.attach(requireContext(), defaultTabHost)
                 .setHint(R.string.setting_default_tab_hint);
         defaultTabDropdown.setOptions(tabOptions, adjustedTab);
 
@@ -172,7 +173,7 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         int windowIndex = Math.max(0, Math.min(windowOptions.size() - 1, savedWindow - 3));
 
         ViewGroup windowHost = root.findViewById(R.id.recent_tags_window_dropdown_host);
-        recentTagsWindowDropdown = SettingDropdown.attach(requireContext(), windowHost)
+        recentTagsWindowDropdown = Dropdown.attach(requireContext(), windowHost)
                 .setHint(R.string.setting_recent_tags_window_hint);
         recentTagsWindowDropdown.setOptions(windowOptions, windowIndex);
 
