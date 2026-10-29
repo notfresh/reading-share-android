@@ -3,9 +3,9 @@ package person.notfresh.readingshare.agent.bridge;
 import android.content.Context;
 import android.util.Log;
 
-import com.chaquo.python.GenericPlatform;
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -41,9 +41,12 @@ public final class PythonAgentBridge {
     private static boolean sPythonStarted = false;
 
     private final AgentBridgeHost host;
+    /** Python 解释器要在 Android 环境里启动,必须持有 Context。 */
+    private final Context appContext;
     private PyObject pyModule;
 
-    public PythonAgentBridge(AgentBridgeHost host) {
+    public PythonAgentBridge(Context context, AgentBridgeHost host) {
+        this.appContext = context.getApplicationContext();
         this.host = host;
     }
 
@@ -60,7 +63,7 @@ public final class PythonAgentBridge {
         try {
             if (!sPythonStarted) {
                 if (!Python.isStarted()) {
-                    Python.start(new GenericPlatform());
+                    Python.start(new AndroidPlatform(appContext));
                 }
                 sPythonStarted = true;
             }

@@ -189,7 +189,7 @@ public class AgentFragment extends Fragment {
     private void ensureBridge() {
         if (bridgeHost == null) {
             bridgeHost = new AgentBridgeHost(requireContext());
-            bridge = new PythonAgentBridge(bridgeHost);
+            bridge = new PythonAgentBridge(requireContext(), bridgeHost);
             confirmDialog = new AgentConfirmDialog(requireContext());
         }
         // LLM 配置每次都对齐当前设置 —— 用户可能刚在设置页改了 key/模型

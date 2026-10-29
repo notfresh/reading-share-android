@@ -34,7 +34,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:background="?attr/colorSurfaceVariant"
+        android:background="?attr/colorSurface"
         android:fontFamily="monospace"
         android:padding="10dp"
         android:textSize="12sp"
