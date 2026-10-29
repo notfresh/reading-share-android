@@ -17,10 +17,21 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // Chaquopy 的 Python 解释器是原生组件 —— 必须指定 ABI。
-        // 只留 arm64-v8a(真机) + x86_64(模拟器);每多一个 ABI 约 +13MB。
+        //
+        // **只留 arm64-v8a**:
+        //   - Python 解释器 + Chaquopy native 每个 ABI 约 12MB,4 个 ABI = 48MB
+        //   - 加上 onnxruntime 每 ABI 15~17MB → 全带的话 APK 137MB
+        //   - 只留 arm64-v8a → APK 约 60MB(下载/安装都快得多)
+        //
+        // 目标设备 = 红米 Turbo 3 / Turbo 5(Snapdragon 8s Gen3/Gen4),
+        // 纯 arm64-v8a,没有 32 位设备。
+        //
+        // ⚠️ **这是个取舍**:这个 APK 只装 arm64-v8a 设备。
+        // 要发布给大众用户的话得把 4 个 ABI 都带上(见 git 历史)。
+        //
         // 详见 minimal-agent-v2 docs/design-20261029-android-integration.md §2.5
         ndk {
-            abiFilters "arm64-v8a", "x86_64"
+            abiFilters "arm64-v8a"
         }
     }
 
