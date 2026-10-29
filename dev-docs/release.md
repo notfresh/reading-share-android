@@ -1,3 +1,23 @@
+# 2.4.3
+
+三处布局修正 + 悬浮按钮组支持长按拖拽。
+
+## 拖拽（新能力）
+
+底部 FAB 组原来固定在角落，会挡住输入行/列表。现在长按 0.5 秒进入拖拽：
+震动 + 轻微放大 → 拖到任意位置松手 → 位置落盘，重启 app 还在原处。
+
+- 新类 `ui/FabDragLayout.java`（LinearLayout 子类），`fab_container` 只换标签名，id 全不变
+- 走 `onInterceptTouchEvent`「先旁观、长按成立才拦截」：短按照常交给里面的 FAB，事件不被吞
+- 位置夹在父容器内；左右手切换、展开/收起导致尺寸变化后自动重新夹紧
+- 存 `settings` 的 `fab_offset_x` / `fab_offset_y`（绝对像素）
+
+## 修正
+
+- AI 助手页收起「切换链接/主题」槽位（`MainActivity:344` + `isOnAgentDestination()`）——它压在输入行上
+- 空态提示移到 FrameLayout 里垂直居中，不再被顶到底部贴着输入框
+- 输入行加 `gravity="center_vertical"`，发送按钮与输入框底部对齐
+
 # 2.4.2
 
 修复 Python 内核启动失败：`Python.start(new GenericPlatform())` 是桌面 JVM 的启动方式，
