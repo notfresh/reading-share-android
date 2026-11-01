@@ -37,8 +37,8 @@ final class ForYouSource implements ReaderSource {
     private static final long WINDOW_MS = 30L * 24 * 60 * 60 * 1000;
     /** 一批 = 5 个，消费完重算（用户拍板）。 */
     private static final int BATCH = 5;
-    /** 单次候选查询上限：一批取 5，候选池放宽到 30 保证洗牌有空间。 */
-    private static final int POOL_LIMIT = 30;
+    /** 单次候选查询上限：一批取 5,候选池放宽到 100 保证洗牌有空间。 */
+    private static final int POOL_LIMIT = 100;
 
     private final LinkDao linkDao;
 
