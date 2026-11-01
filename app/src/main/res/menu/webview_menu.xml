@@ -33,6 +33,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/action_wv_chat_ai"
+        android:title="@string/chat_with_ai"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_wv_share"
         android:title="@string/webview_share"
         app:showAsAction="never" />

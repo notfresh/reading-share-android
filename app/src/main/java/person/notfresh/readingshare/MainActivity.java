@@ -36,6 +36,7 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.model.LinkJson;
+import person.notfresh.readingshare.ui.agent.AgentFragment;
 import person.notfresh.readingshare.ui.home.HomeFragment;
 import person.notfresh.readingshare.ui.subject.SubjectFragment;
 import android.content.ClipboardManager;
@@ -85,6 +86,9 @@ import person.notfresh.readingshare.links.strategy.LinkProcessStrategy;
 import person.notfresh.readingshare.links.strategy.LinkStrategies;
 
 public class MainActivity extends AppCompatActivity {
+
+    /** 「Chat with AI」:Intent extra,值 = ChatContextBuilder.toJson 的上下文 JSON。 */
+    public static final String EXTRA_OPEN_AGENT_WITH_CONTEXT = "open_agent_with_context";
 
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
@@ -416,7 +420,17 @@ public class MainActivity extends AppCompatActivity {
         String navigateTo = intent.getStringExtra("navigate_to");
         int destinationId;
         
-        if ("documents".equals(navigateTo)) {
+        if ("agent".equals(navigateTo)) {
+            // 「Chat with AI」入口:跳 AI 助手页并带上预置上下文(WebView 菜单用)
+            destinationId = R.id.nav_agent;
+            String contextJson = intent.getStringExtra(EXTRA_OPEN_AGENT_WITH_CONTEXT);
+            if (contextJson != null && !contextJson.isEmpty()) {
+                Bundle args = new Bundle();
+                args.putString(AgentFragment.ARG_CHAT_CONTEXT, contextJson);
+                navController.navigate(R.id.nav_agent, args);
+                return;
+            }
+        } else if ("documents".equals(navigateTo)) {
             // 从外部打开PDF后返回，导航到文档列表
             destinationId = R.id.nav_documents;
         } else if ("home".equals(navigateTo)) {

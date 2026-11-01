@@ -37,6 +37,7 @@ import person.notfresh.readingshare.agent.bridge.AgentBridgeHost;
 import person.notfresh.readingshare.agent.bridge.AgentConfig;
 import person.notfresh.readingshare.agent.bridge.MainThreadConfirmGate;
 import person.notfresh.readingshare.agent.bridge.PythonAgentBridge;
+import person.notfresh.readingshare.util.ChatContextBuilder;
 
 /**
  * AI 助手页 —— 自然语言操作阅读库。
@@ -55,6 +56,9 @@ import person.notfresh.readingshare.agent.bridge.PythonAgentBridge;
 public class AgentFragment extends Fragment implements ConversationHistoryDialog.Host {
 
     private static final String TAG = "AgentFragment";
+
+    /** 「Chat with AI」预置上下文的 args key（JSON:title/url/body,见 ChatContextBuilder）。 */
+    public static final String ARG_CHAT_CONTEXT = "chat_context_json";
 
     private RecyclerView messagesView;
     private AgentMessageAdapter adapter;
@@ -127,6 +131,22 @@ public class AgentFragment extends Fragment implements ConversationHistoryDialog
         showEmptyState();
     }
 
+    /**
+     * 「Chat with AI」预置上下文:args 带了 chat_context_json 时,
+     * 用 ChatContextBuilder 组装标题/链接/正文填进输入框(不自动发送)。
+     * 坏数据 / 缺 args 降级为无上下文,普通入口零影响。
+     */
+    private void applyPresetContext() {
+        if (getArguments() == null) return;
+        String[] parts = ChatContextBuilder.fromJson(getArguments().getString(ARG_CHAT_CONTEXT, ""));
+        if (parts == null) return;
+        String preset = ChatContextBuilder.build(parts[0], parts[1], parts[2]);
+        if (preset.isEmpty()) return;
+        input.setText(preset);
+        input.setSelection(preset.length());
+        input.requestFocus();
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -143,6 +163,10 @@ public class AgentFragment extends Fragment implements ConversationHistoryDialog
         progress = root.findViewById(R.id.agent_progress);
         notConfiguredBanner = root.findViewById(R.id.agent_not_configured);
         emptyState = root.findViewById(R.id.agent_empty_state);
+
+        // 「Chat with AI」预置上下文（WebView 菜单跳入时带 title/url/body）——
+        // 填进输入框不自动发送,用户补自己的问题再点发送。
+        applyPresetContext();
 
         sendButton.setOnClickListener(v -> send());
         input.setOnEditorActionListener((v, actionId, event) -> {

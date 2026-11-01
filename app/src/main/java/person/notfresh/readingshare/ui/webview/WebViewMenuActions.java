@@ -20,7 +20,9 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 
 import person.notfresh.readingshare.LinksHistoryActivity;
+import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.R;
+import person.notfresh.readingshare.util.ChatContextBuilder;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
 import person.notfresh.readingshare.util.ShareUtil;
@@ -170,6 +172,10 @@ public final class WebViewMenuActions {
             openOverrideRule();
             return true;
         }
+        if (itemId == R.id.action_wv_chat_ai) {
+            chatWithAi();
+            return true;
+        }
         // action_wv_toggle_navigation 落这里 = false:翻页控件开关由宿主的
         // WebViewNavControls 处理(两个宿主各自触发 toggleManually)
         return false;
@@ -303,6 +309,38 @@ public final class WebViewMenuActions {
         Intent intent = new Intent(host.context(), LinksHistoryActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         host.context().startActivity(intent);
+    }
+
+    /**
+     * 「Chat with AI」:提取正文(尽力) → 组装上下文 → 跳 AI 助手页预填输入框。
+     * 正文拿不到(多媒体/失败)就只带标题+URL,不报错;爬取放后台线程。
+     */
+    private void chatWithAi() {
+        final String url = page.url();
+        if (url == null || url.isEmpty()) {
+            toast(R.string.reader_action_no_url);
+            return;
+        }
+        final String title = page.title();
+        final Context app = host.context().getApplicationContext();
+        new Thread(() -> {
+            String body = null;
+            try {
+                body = CrawlUtil.getArticleByUrl(url);
+            } catch (Exception e) {
+                Log.e(TAG, "chat context extract failed for " + url, e);
+            }
+            final String bodyFinal = body;
+            mainHandler.post(() -> {
+                if (!host.isAlive()) return;
+                Intent intent = new Intent(app, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.putExtra("navigate_to", "agent");
+                intent.putExtra(MainActivity.EXTRA_OPEN_AGENT_WITH_CONTEXT,
+                        ChatContextBuilder.toJson(title, url, bodyFinal));
+                app.startActivity(intent);
+            });
+        }, "wv-chat-ai").start();
     }
 
     /** contextUrl 优先取重定向前原 URL(用户原始意图),退回当前 URL。 */

@@ -1,3 +1,14 @@
+# 2.4.7
+
+WebView 页新增「Chat with AI」菜单项(Activity 与阅读页 WebView 共用)。
+
+- 一键把当前页面作为上下文带进 AI 助手页:标题、链接、正文(尽力提取,截断 2000 字)
+- 上下文**填进输入框不自动发送**,用户补自己的问题再点发送
+- 正文拿不到(多媒体/爬取失败)只带标题+URL,不报错
+- 实现:新建 `util/ChatContextBuilder`(组装单一来源);`WebViewMenuActions.chatWithAi()`
+  后台爬取 → `MainActivity.handleNavigation()` 识别 `navigate_to=agent` →
+  `AgentFragment.applyPresetContext()` 读 args 预填输入框;普通入口(无 args)零影响
+
 # 2.4.6
 
 阅读页数据来源新增第 5 个选项:**猜你喜欢**(For you)。

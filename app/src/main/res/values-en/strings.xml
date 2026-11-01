@@ -106,6 +106,7 @@
     <string name="webview_switch_out">Switch out temporarily</string>
     <string name="webview_share">Share</string>
     <string name="extract_web_content">Extract web content</string>
+    <string name="chat_with_ai">Chat with AI</string>
     <string name="toggle_navigation">Show/hide navigation controls</string>
     <string name="toggle_external_block">Toggle external link block mode</string>
     <string name="add_tag">Add tag</string>
