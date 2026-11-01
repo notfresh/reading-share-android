@@ -39,14 +39,16 @@ public final class ReaderSourceSectionBinder {
             ReaderSourceSpec.TYPE_ALL,
             ReaderSourceSpec.TYPE_PINNED,
             ReaderSourceSpec.TYPE_TAG,
-            ReaderSourceSpec.TYPE_SUBJECT
+            ReaderSourceSpec.TYPE_SUBJECT,
+            ReaderSourceSpec.TYPE_FOR_YOU
     };
 
     private static final int[] TYPE_LABELS = {
             R.string.reader_source_type_all,
             R.string.reader_source_type_pinned,
             R.string.reader_source_type_tag,
-            R.string.reader_source_type_subject
+            R.string.reader_source_type_subject,
+            R.string.reader_source_type_for_you
     };
 
     private ReaderSourceSectionBinder() {

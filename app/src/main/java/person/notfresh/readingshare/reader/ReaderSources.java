@@ -29,6 +29,7 @@ public final class ReaderSources {
         register(ReaderSourceSpec.TYPE_PINNED, (ctx, spec) -> new PinnedLinksSource(ctx));
         register(ReaderSourceSpec.TYPE_TAG, (ctx, spec) -> new TagSource(ctx, spec.getParam()));
         register(ReaderSourceSpec.TYPE_SUBJECT, (ctx, spec) -> new SubjectSource(ctx, parseSubjectId(spec.getParam())));
+        register(ReaderSourceSpec.TYPE_FOR_YOU, (ctx, spec) -> new ForYouSource(ctx));
     }
 
     private ReaderSources() {

@@ -1342,4 +1342,73 @@ public class LinkDao {
         cursor.close();
         return tagId;
     }
+
+    /**
+     * 猜你喜欢候选（2026-11-01,docs/261101-feature-Guess you like.md）。
+     *
+     * <p>按「兴趣权重」给未读链接打分排序：score = 该链接所属标签在最近 since 毫秒内
+     * 被阅读（links_history 出现）的次数之和。只带标签的链接参与；无标签的走
+     * {@link #getForYouDomainCandidates} 兜底。返回列：0=_id, 1=score。</p>
+     */
+    public Cursor getForYouCandidates(long since, int limit) {
+        String query = "SELECT l." + LinkDbHelper.COLUMN_ID + " AS _id, " +
+                "SUM(h.cnt) AS score " +
+                "FROM " + LinkDbHelper.TABLE_LINKS + " l " +
+                "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " lt " +
+                "ON l." + LinkDbHelper.COLUMN_ID + " = lt." + LinkDbHelper.COLUMN_LINK_ID + " " +
+                "JOIN " + LinkDbHelper.TABLE_TAGS + " t " +
+                "ON lt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = t." + LinkDbHelper.COLUMN_TAG_ID + " " +
+                "JOIN (SELECT " + LinkDbHelper.COLUMN_TAG_NAME + " AS name, COUNT(*) AS cnt " +
+                "FROM " + LinkDbHelper.TABLE_LINKS_HISTORY + " h " +
+                "JOIN " + LinkDbHelper.TABLE_LINKS + " hl ON h." + LinkDbHelper.COLUMN_URL + " = hl." + LinkDbHelper.COLUMN_URL + " " +
+                "JOIN " + LinkDbHelper.TABLE_LINK_TAGS + " hlt ON hl." + LinkDbHelper.COLUMN_ID + " = hlt." + LinkDbHelper.COLUMN_LINK_ID + " " +
+                "JOIN " + LinkDbHelper.TABLE_TAGS + " ht ON hlt." + LinkDbHelper.COLUMN_TAG_ID_REF + " = ht." + LinkDbHelper.COLUMN_TAG_ID + " " +
+                "WHERE h." + LinkDbHelper.COLUMN_VISITED_AT + " >= ? " +
+                "GROUP BY " + LinkDbHelper.COLUMN_TAG_NAME + ") h " +
+                "ON t." + LinkDbHelper.COLUMN_TAG_NAME + " = h.name " +
+                "WHERE NOT EXISTS (SELECT 1 FROM " + LinkDbHelper.TABLE_LINKS_HISTORY + " x " +
+                "WHERE x." + LinkDbHelper.COLUMN_URL + " = l." + LinkDbHelper.COLUMN_URL + ") " +
+                "GROUP BY l." + LinkDbHelper.COLUMN_ID + " " +
+                "ORDER BY score DESC " +
+                "LIMIT ?";
+        return database.rawQuery(query, new String[]{String.valueOf(since), String.valueOf(limit)});
+    }
+
+    /**
+     * 猜你喜欢的无标签兜底：未读且无标签的链接，按「其域名的近期阅读次数」降序。
+     * 返回列：0=_id, 1=domain_read_count。
+     */
+    public Cursor getForYouDomainCandidates(long windowMs, int limit) {
+        long now = System.currentTimeMillis();
+        String query = "SELECT l." + LinkDbHelper.COLUMN_ID + " AS _id, " +
+                "IFNULL(d.cnt, 0) AS score " +
+                "FROM " + LinkDbHelper.TABLE_LINKS + " l " +
+                "LEFT JOIN (SELECT " +
+                "substr(h." + LinkDbHelper.COLUMN_URL + ", " +
+                "instr(h." + LinkDbHelper.COLUMN_URL + ", '//') + 2, " +
+                "CASE WHEN instr(substr(h." + LinkDbHelper.COLUMN_URL + ", " +
+                "instr(h." + LinkDbHelper.COLUMN_URL + ", '//') + 2), '/') > 0 " +
+                "THEN instr(substr(h." + LinkDbHelper.COLUMN_URL + ", " +
+                "instr(h." + LinkDbHelper.COLUMN_URL + ", '//') + 2), '/') - 1 " +
+                "ELSE length(h." + LinkDbHelper.COLUMN_URL + ") END) AS host, " +
+                "COUNT(*) AS cnt " +
+                "FROM " + LinkDbHelper.TABLE_LINKS_HISTORY + " h " +
+                "WHERE h." + LinkDbHelper.COLUMN_VISITED_AT + " >= ? " +
+                "GROUP BY host) d " +
+                "ON d.host = substr(l." + LinkDbHelper.COLUMN_URL + ", " +
+                "instr(l." + LinkDbHelper.COLUMN_URL + ", '//') + 2, " +
+                "CASE WHEN instr(substr(l." + LinkDbHelper.COLUMN_URL + ", " +
+                "instr(l." + LinkDbHelper.COLUMN_URL + ", '//') + 2), '/') > 0 " +
+                "THEN instr(substr(l." + LinkDbHelper.COLUMN_URL + ", " +
+                "instr(l." + LinkDbHelper.COLUMN_URL + ", '//') + 2), '/') - 1 " +
+                "ELSE length(l." + LinkDbHelper.COLUMN_URL + ") END) " +
+                "WHERE NOT EXISTS (SELECT 1 FROM " + LinkDbHelper.TABLE_LINKS_HISTORY + " x " +
+                "WHERE x." + LinkDbHelper.COLUMN_URL + " = l." + LinkDbHelper.COLUMN_URL + ") " +
+                "AND NOT EXISTS (SELECT 1 FROM " + LinkDbHelper.TABLE_LINK_TAGS + " lt " +
+                "WHERE lt." + LinkDbHelper.COLUMN_LINK_ID + " = l." + LinkDbHelper.COLUMN_ID + ") " +
+                "ORDER BY score DESC, l." + LinkDbHelper.COLUMN_TIMESTAMP + " DESC " +
+                "LIMIT ?";
+        return database.rawQuery(query, new String[]{String.valueOf(now - windowMs), String.valueOf(limit)});
+    }
+
 } 

@@ -49,6 +49,7 @@
     <string name="reader_source_type_pinned">置顶链接</string>
     <string name="reader_source_type_tag">某个标签</string>
     <string name="reader_source_type_subject">某个主题</string>
+    <string name="reader_source_type_for_you">猜你喜欢</string>
     <string name="reader_source_param_none">（无需选择）</string>
     <string name="reader_source_empty_tags">暂无标签</string>
     <string name="reader_source_empty_subjects">暂无主题</string>

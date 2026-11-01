@@ -49,6 +49,7 @@
     <string name="reader_source_type_pinned">Pinned links</string>
     <string name="reader_source_type_tag">A tag</string>
     <string name="reader_source_type_subject">A subject</string>
+    <string name="reader_source_type_for_you">For you</string>
     <string name="reader_source_param_none">(not required)</string>
     <string name="reader_source_empty_tags">No tags yet</string>
     <string name="reader_source_empty_subjects">No subjects yet</string>

@@ -17,6 +17,7 @@ public final class ReaderSourceSpec {
     public static final String TYPE_PINNED = "pinned";
     public static final String TYPE_TAG = "tag";
     public static final String TYPE_SUBJECT = "subject";
+    public static final String TYPE_FOR_YOU = "foryou";
 
     private final String type;
     private final String param;
@@ -68,6 +69,7 @@ public final class ReaderSourceSpec {
 
     public static boolean isKnownType(String type) {
         return TYPE_ALL.equals(type) || TYPE_PINNED.equals(type)
-                || TYPE_TAG.equals(type) || TYPE_SUBJECT.equals(type);
+                || TYPE_TAG.equals(type) || TYPE_SUBJECT.equals(type)
+                || TYPE_FOR_YOU.equals(type);
     }
 }
