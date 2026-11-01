@@ -1,3 +1,24 @@
+# 2.4.6
+
+阅读页数据来源新增第 5 个选项:**猜你喜欢**(For you)。
+
+## 算法
+
+- 核心思想:你最常读哪类,就推荐哪类里你还没读的
+- 兴趣权重 = 最近 30 天阅读历史(links_history.visited_at)按标签聚合的阅读次数
+- 候选打分:未读链接 score = 所属标签权重之和;无标签的链接用域名阅读次数兜底
+- 已读过的链接自动剔除;读完一批(5 个)滚动重算,重进阅读页也重算
+- 同分随机洗牌,每次进入的信息流都不一样
+
+## 实现落点
+
+- 新建 `reader/ForYouSource.java`(算法主体,实现既有 `ReaderSource` 接口)
+- `LinkDao` 新增 `getForYouCandidates` / `getForYouDomainCandidates`(权重聚合在 SQL 层)
+- `ReaderSourceSpec.TYPE_FOR_YOU` + `ReaderSources` 注册一行 + 设置页下拉加项(中英双语)
+- 无新表、无新 SP 字段、无状态,回滚 = 单 commit revert
+
+设计文档:`docs/261101-feature-Guess you like.md`。
+
 # 2.4.5
 
 AI 助手新增两个工具:**按日期查链接**、**用 WebView 直接打开链接**(都不需要确认)。
