@@ -343,6 +343,17 @@ public final class EventLogClient {
             for (EventRecord e : batch) {
                 store.append(e);
                 total++;
+                // 墓碑守卫:本地事件流已有该实体的 delete → 晚到的 create/update
+                // 一律丢弃(删除永久赢)。防两类复活:
+                //   1) 对端离线改动(其 update 的 process_time 比本端 delete 晚);
+                //   2) 重装/新设备 bootstrap 把服务端全量灌成 create。
+                // delete 事件本身不受此守卫影响(幂等重放安全)。
+                if (e.getAction() != EventAction.DELETE
+                        && store.hasDeleteEvent(e.getTopic(), e.getEntityId())) {
+                    logSyncAttempt(SyncLogEntry.Direction.PULL, 0, 0,
+                            "tombstoned: " + e.getTopic() + "/" + e.getEntityId(), true);
+                    continue;
+                }
                 // LWW folding — pull 到的事件折叠回 link 表（PROTOCOL §5.4）
                 // 折叠是 sync layer 职责，本部署里 EventLogClient 兼任；
                 // applier 决定哪些 topic 折叠（link 业务折叠，其它 noop）

@@ -795,10 +795,16 @@ public class LinkDao {
     }
 
     /**
-     * 删除标签及其所有关联,并且删除只有这个标签的链接
+     * 删除标签及其所有关联,并且删除只有这个标签的链接。
+     *
+     * <p>返回被级联删除的链接快照(删除前状态),供调用方补发 links delete 事件
+     * 同步到其它设备 —— 墓碑机制下,对端晚到的 create/update 才不会复活这些链接。</p>
+     *
      * @param tag 要删除的标签名
+     * @return 被级联删除的链接列表(删除前快照);标签不存在/出错时返回空列表
      */
-    public void deleteTagWithLinks(String tag) {
+    public List<LinkItem> deleteTagWithLinks(String tag) {
+        List<LinkItem> deletedLinks = new ArrayList<>();
         SQLiteDatabase db = database;
         db.beginTransaction();
         
@@ -848,9 +854,13 @@ public class LinkDao {
                 }
                 linksCursor.close();
                 
-                // 3. 删除只有一个标签的链接
+                // 3. 删除只有一个标签的链接(先取删除前快照,供补发 delete 事件)
                 for (long linkId : linksToDelete) {
                     Log.d("LinkDao", "删除仅有此标签的链接: linkId=" + linkId);
+                    LinkItem snap = getLinkById(linkId);
+                    if (snap != null) {
+                        deletedLinks.add(snap);
+                    }
                     db.delete(
                             LinkDbHelper.TABLE_LINKS,
                             LinkDbHelper.COLUMN_ID + " = ?",
@@ -880,9 +890,11 @@ public class LinkDao {
             db.setTransactionSuccessful();
         } catch (Exception e) {
             Log.e("LinkDao", "删除标签及链接时出错: " + e.getMessage(), e);
+            deletedLinks.clear(); // 事务失败,快照不可信
         } finally {
             db.endTransaction();
         }
+        return deletedLinks;
     }
 
 

@@ -2631,7 +2631,12 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
                         if (!isCascading) {
                             linkDao.deleteTag(tag);
                         } else { // 级联删除
-                            linkDao.deleteTagWithLinks(tag);
+                            // 补发被级联删除链接的 delete 事件 —— 同步墓碑,
+                            // 防止对端晚到的 create/update 复活这些链接
+                            // (entity_id = URL,走 LinkSync 唯一入口)
+                            for (LinkItem deleted : linkDao.deleteTagWithLinks(tag)) {
+                                LinkSync.recordDelete(deleted);
+                            }
                         }
                         Log.d("HomeFragment", "Tag deleted from database");
                         

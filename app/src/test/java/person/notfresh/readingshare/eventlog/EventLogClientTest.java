@@ -361,6 +361,18 @@ public class EventLogClientTest {
         }
 
         @Override
+        public synchronized boolean hasDeleteEvent(String topic, String entityId) {
+            for (EventRecord r : byId.values()) {
+                if (r.getTopic().equals(topic)
+                        && r.getEntityId().equals(entityId)
+                        && r.getAction() == EventAction.DELETE) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
         public synchronized List<EventRecord> since(String topic, String sinceEventTime) {
             return since(topic, sinceEventTime, Integer.MAX_VALUE);
         }

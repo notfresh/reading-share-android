@@ -39,6 +39,12 @@ public interface EventLogStore {
     void deleteAll();
 
     /**
+     * 本地事件流里该实体是否已有 delete 事件(墓碑)。
+     * 折叠(LWW)前查询:有墓碑 → 晚到的 create/update 一律丢弃,删除永久赢。
+     */
+    boolean hasDeleteEvent(String topic, String entityId);
+
+    /**
      * 该实体最近一条"带 data 的事件"的 payload(JSON 字符串),用于给新事件填
      * {@code old}(PROTOCOL §3.1 变更前快照)。无历史返回 null。
      */

@@ -235,6 +235,25 @@ public final class SqliteEventLogStore implements EventLogStore {
     }
 
     /**
+     * 墓碑查询:本地事件流里该实体是否已有 delete 事件。
+     * 折叠(LWW)前查询,有墓碑 → 晚到的 create/update 不落库(删除永久赢)。
+     * 命中 idx_events_entity (topic, entity_id) 索引。
+     */
+    @Override
+    public boolean hasDeleteEvent(String topic, String entityId) {
+        Cursor c = db.rawQuery(
+                "SELECT 1 FROM " + TABLE_EVENTS +
+                        " WHERE " + COL_TOPIC + " = ? AND " + COL_ENTITY_ID + " = ?" +
+                        " AND " + COL_ACTION + " = ? LIMIT 1",
+                new String[]{topic, entityId, EventAction.DELETE.name()});
+        try {
+            return c.moveToFirst();
+        } finally {
+            c.close();
+        }
+    }
+
+    /**
      * 该实体最近一条"带 data 的事件"的 payload(JSON 字符串),用于给新事件填 old。
      * 按 process_time(与折叠/LWW 同口径);无历史返回 null。
      */
