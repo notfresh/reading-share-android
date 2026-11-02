@@ -960,6 +960,8 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
 
     /**
      * 「关于」弹窗:app 名 + 版本号 + GitHub 链接(下划线,可点击跳转)
+     * + 最近 10 个版本的 release note(assets/release_notes.txt,构建时从
+     * dev-docs/release.md 自动生成 —— 单一来源仍是 release.md)。
      * 仿 EventLogActivity.makeClickableHint 的样式(SpannableString + URLSpan)
      */
     private void showAboutDialog() {
@@ -988,17 +990,42 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
         int linkEnd = full.length();
         ss.setSpan(new URLSpan(url), linkStart, linkEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
+        // 更新日志:头部信息 + 分隔线 + 最近 10 版 release note(纯文本,构建时生成)
+        StringBuilder about = new StringBuilder(full)
+                .append("\n\n────────────────────\n\n");
+        String notes = readReleaseNotes();
+        about.append(notes.isEmpty()
+                ? "(更新日志不可用)"   // asset 读取失败不崩,降级成占位文案
+                : notes);
+
         TextView tv = new TextView(requireContext());
-        tv.setText(ss);
+        tv.setText(new SpannableString(about.toString()));
         tv.setTextIsSelectable(true);
         tv.setPadding(48, 32, 48, 32);
         tv.setLinksClickable(true);
         tv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
+        // 日志很长 → 套 ScrollView 可滚动;头部 URLSpan 的点击靠 MovementMethod 仍有效
+        android.widget.ScrollView scroll = new android.widget.ScrollView(requireContext());
+        scroll.addView(tv);
+
         new AlertDialog.Builder(requireContext())
             .setTitle("关于")
-            .setView(tv)
+            .setView(scroll)
             .setPositiveButton("关闭", null)
             .show();
+    }
+
+    /** 读 assets/release_notes.txt(构建时由 scripts/gen_release_notes.py 生成)。失败返回空串。 */
+    private String readReleaseNotes() {
+        try (java.io.InputStream in =
+                     requireContext().getAssets().open("release_notes.txt")) {
+            java.util.Scanner sc = new java.util.Scanner(in, "UTF-8")
+                    .useDelimiter("\\A");
+            return sc.hasNext() ? sc.next() : "";
+        } catch (Exception e) {
+            Log.w("SettingFragment", "release_notes.txt 读取失败", e);
+            return "";
+        }
     }
 }

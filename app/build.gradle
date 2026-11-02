@@ -87,4 +87,12 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     implementation "androidx.media:media:1.6.0"
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.16.3'
-} 
+}
+
+// 每次构建前从 dev-docs/release.md 重新生成 assets/release_notes.txt
+// (「关于」弹窗的更新日志,单一来源 = release.md;产物不进 git)
+tasks.register('genReleaseNotes', Exec) {
+    workingDir rootDir
+    commandLine 'python3', 'scripts/gen_release_notes.py'
+}
+preBuild.dependsOn genReleaseNotes 

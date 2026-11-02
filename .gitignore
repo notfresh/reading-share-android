@@ -20,3 +20,6 @@ gradle.properties
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# genReleaseNotes 产物(构建时从 dev-docs/release.md 重新生成)
+app/src/main/assets/release_notes.txt
