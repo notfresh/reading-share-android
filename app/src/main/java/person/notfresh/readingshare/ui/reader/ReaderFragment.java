@@ -43,6 +43,7 @@ import person.notfresh.readingshare.model.ReaderSourceSpec;
 import person.notfresh.readingshare.model.WebViewOverrideRule;
 import person.notfresh.readingshare.reader.ReaderSources;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
+import person.notfresh.readingshare.util.BackgroundAudioKeeper;
 import person.notfresh.readingshare.util.ReaderSourceStore;
 import person.notfresh.readingshare.ui.webview.WebViewMenuActions;
 import person.notfresh.readingshare.ui.webview.WebViewNavControls;
@@ -148,6 +149,10 @@ public class ReaderFragment extends Fragment implements WebViewMenuActions.Page,
     public void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
+        // 回前台,后台保活不再需要(与 WebViewActivity 同一套 Keeper)
+        if (isAdded()) {
+            BackgroundAudioKeeper.release(requireContext().getApplicationContext());
+        }
         reloadQueueIfSourceChanged();
     }
 
@@ -166,7 +171,11 @@ public class ReaderFragment extends Fragment implements WebViewMenuActions.Page,
 
     @Override
     public void onPause() {
-        if (webView != null) webView.onPause();
+        // 2.4.8:切后台不再显式暂停 WebView —— 交 BackgroundAudioWebView(不吞可见性)
+        // + BackgroundAudioKeeper(前台服务+WakeLock)保活,音频继续。
+        if (isAdded()) {
+            BackgroundAudioKeeper.acquire(requireContext().getApplicationContext());
+        }
         super.onPause();
     }
 

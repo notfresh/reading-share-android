@@ -49,9 +49,8 @@ import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.core.model.SubjectItem;
 import person.notfresh.readingshare.core.model.SubjectUtil;
 import person.notfresh.readingshare.embedding.TagEmbeddingManager;
-import person.notfresh.readingshare.eventlog.EventLogClient;
+
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.util.PinnedTagsManager;
 import person.notfresh.readingshare.ui.subject.SelectSubjectDialog;
 import person.notfresh.readingshare.util.ExportUtil;
@@ -80,6 +79,7 @@ import java.nio.charset.StandardCharsets;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import person.notfresh.readingshare.links.LinkSync;
 
 /**
  * 标签管理Fragment
@@ -936,8 +936,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public void onDeleteLink(LinkItem link) {
         linkDao.deleteLink(link.getId());
-        EventLogClient.get().delete("links", String.valueOf(link.getId()),
-                System.currentTimeMillis());
+        LinkSync.recordDelete(link);
         // 刷新列表
         loadTags(); // 使用已有的 loadTags() 方法重新加载标签和链接
         restoreSelections();
@@ -955,10 +954,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linkDao.updateLinkTitle(oldLink.getUrl(), newTitle);
         LinkItem snap = oldLink;
         snap.setTitle(newTitle);
-        EventLogClient.get().update("links",
-                String.valueOf(oldLink.getId()),
-                System.currentTimeMillis(),
-                LinkJson.toJsonString(snap));
+        LinkSync.recordUpdate(snap);
         // 重新加载当前标签的链接
         loadTags();
     }
@@ -997,10 +993,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public void updateLinkTags(LinkItem item) {
         linkDao.updateLinkTags(item);
-        EventLogClient.get().update("links",
-                String.valueOf(item.getId()),
-                item.getTimestamp(),
-                LinkJson.toJsonString(item));
+        LinkSync.recordUpdate(item);
         // 重新加载标签和链接
         loadTags();
         // 更新当前显示的内容
@@ -1310,8 +1303,7 @@ public class TagsFragment extends Fragment implements LinksAdapter.OnLinkActionL
                 // 批量删除并刷新（直接从适配器移除，避免重新查询数据库）
                 for (LinkItem item : selectedItems) {
                     linkDao.deleteLink(item.getId());
-                    EventLogClient.get().delete("links", String.valueOf(item.getId()),
-                            System.currentTimeMillis());
+                    LinkSync.recordDelete(item);
                     linksAdapter.removeLinkItem(item);
                 }
                 Toast.makeText(requireContext(), "已删除已分享的链接", Toast.LENGTH_SHORT).show();

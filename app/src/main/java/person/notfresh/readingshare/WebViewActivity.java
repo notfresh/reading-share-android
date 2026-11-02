@@ -59,6 +59,7 @@ import person.notfresh.readingshare.model.WebViewOverrideRule;
 import person.notfresh.readingshare.ui.webview.WebViewMenuActions;
 import person.notfresh.readingshare.ui.webview.WebViewNavControls;
 import person.notfresh.readingshare.util.ExternalLinkOpener;
+import person.notfresh.readingshare.util.BackgroundAudioKeeper;
 import person.notfresh.readingshare.util.ReadingPositionStore;
 import person.notfresh.readingshare.util.WebViewDefaults;
 import person.notfresh.readingshare.util.WebViewCachePolicy;
@@ -241,6 +242,7 @@ public class WebViewActivity extends AppCompatActivity
             wakeLock.release();
             wakeLock = null;
         }
+        BackgroundAudioKeeper.release(this);
         super.onDestroy();
     }
 
@@ -285,10 +287,7 @@ public class WebViewActivity extends AppCompatActivity
             webView.resumeTimers();
         }
         // 回到前台,前台保活服务不再需要(进程已在前台)
-        stopService(new Intent(this, WebViewBackgroundService.class));
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-        }
+        BackgroundAudioKeeper.release(this);
     }
 
 
@@ -740,11 +739,7 @@ public class WebViewActivity extends AppCompatActivity
         saveReadingPosition();
         // 退后台/锁屏期间由前台服务 + WakeLock 保活,保证 WebView 里的音频不断。
         // 不请求 AudioFocus(WebView 自己管理焦点)。
-        Intent serviceIntent = new Intent(this, WebViewBackgroundService.class);
-        startForegroundService(serviceIntent);
-        if (wakeLock != null && !wakeLock.isHeld()) {
-            wakeLock.acquire(30 * 60 * 1000L);
-        }
+        BackgroundAudioKeeper.acquire(this);
         super.onPause();
     }
 
@@ -868,10 +863,7 @@ public class WebViewActivity extends AppCompatActivity
         // 服务的停止统一由 onResume 和 onDestroy 管理。
         if (!isPlaying && isAppInForeground) {
             // 前台音频停止播放时，可以停止服务
-            stopService(new Intent(WebViewActivity.this, WebViewBackgroundService.class));
-            if (wakeLock != null && wakeLock.isHeld()) {
-                wakeLock.release();
-            }
+            BackgroundAudioKeeper.release(this);
         }
     }
 

@@ -1411,4 +1411,172 @@ public class LinkDao {
         return database.rawQuery(query, new String[]{String.valueOf(now - windowMs), String.valueOf(limit)});
     }
 
+
+    // ==================== 跨端同步：按 URL 定位 / 去重 ====================
+    //
+    // 同步的 entity_id 是 URL（不是自增 _id）—— 自增 id 在两台设备上必然
+    // 碰撞（各自从 1 开始）。所以折叠远端事件时按 URL 找本地行。
+
+    /**
+     * 按 URL 取本地链接（带标签）。
+     *
+     * @param url 链接 URL
+     * @return 本地链接；不存在返回 null
+     */
+    public LinkItem getLinkByUrl(String url) {
+        if (url == null || url.isEmpty()) return null;
+        Cursor cursor = null;
+        try {
+            cursor = database.query(
+                    LinkDbHelper.TABLE_LINKS,
+                    null,
+                    LinkDbHelper.COLUMN_URL + " = ?",
+                    new String[]{url}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                LinkItem item = createLinkItemFromCursor(cursor);
+                List<String> tags = getLinkTags(item.getId());
+                for (String t : tags) {
+                    item.addTag(t);
+                }
+                return item;
+            }
+        } catch (Exception e) {
+            Log.e("LinkDao", "getLinkByUrl failed url=" + url, e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return null;
+    }
+
+    /**
+     * 按 URL 写入/更新一条链接 —— 同步折叠用。
+     *
+     * <p>URL 已存在就更新那条，不存在就新增。Android 端 links.url 没有
+     * UNIQUE 约束（历史数据可能有重复 URL），所以这里手工处理「找到哪条
+     * 就更新哪条」，并由 {@link #dedupeByUrlKeepingNewest(String)} 收敛重复。</p>
+     *
+     * <p><b>不产生同步事件</b> —— 调用方在远端折叠作用域内调用，否则会
+     * 造成「拉取 → 落库 → 记事件 → 推回服务端」的无限回环。</p>
+     *
+     * @param item 链接（只写共有字段 + 本地独有字段）
+     * @return 本地 link id；失败返回 -1
+     */
+    public long upsertByUrl(LinkItem item) {
+        if (item == null || item.getUrl() == null || item.getUrl().isEmpty()) {
+            return -1L;
+        }
+        Long existingId = getLinkIdByUrl(item.getUrl());
+        ContentValues values = new ContentValues();
+        values.put(LinkDbHelper.COLUMN_TITLE, item.getTitle());
+        values.put(LinkDbHelper.COLUMN_URL, item.getUrl());
+        values.put(LinkDbHelper.COLUMN_TIMESTAMP, item.getTimestamp());
+        values.put("is_pinned", item.isPinned() ? 1 : 0);
+
+        long linkId;
+        if (existingId != null) {
+            linkId = existingId;
+            // 更新已有行时**只写同步字段**。
+            // source_app / original_intent / target_activity / remark /
+            // summary / click_count 是 Android 本地独有的 —— 远端折叠来的
+            // item 这些字段是空的，全量写会把本地数据冲掉。
+            database.update(LinkDbHelper.TABLE_LINKS, values,
+                    LinkDbHelper.COLUMN_ID + " = ?",
+                    new String[]{String.valueOf(linkId)});
+        } else {
+            // 新增行：本地独有字段用 item 里的值（首次插入时它们有值）
+            values.put(LinkDbHelper.COLUMN_SOURCE_APP, item.getSourceApp());
+            values.put(LinkDbHelper.COLUMN_ORIGINAL_INTENT, item.getOriginalIntent());
+            values.put(LinkDbHelper.COLUMN_TARGET_ACTIVITY, item.getTargetActivity());
+            values.put(LinkDbHelper.COLUMN_REMARK, item.getRemark());
+            values.put(LinkDbHelper.COLUMN_SUMMARY, item.getSummary());
+            values.put("click_count", item.getClickCount());
+            linkId = database.insert(LinkDbHelper.TABLE_LINKS, null, values);
+            if (linkId <= 0) return -1L;
+        }
+        item.setId(linkId);
+        updateLinkTags(item);
+        return linkId;
+    }
+
+    /**
+     * 同一个 URL 有多行时：保留 timestamp 最新的那条，其余删掉。
+     *
+     * <p>Android 端 links.url 没有 UNIQUE 约束，历史数据 / 异常路径可能留下
+     * 重复行。两端必须收敛到「一条 URL 一条记录」，否则同一条链接会被折叠
+     * 多次。</p>
+     *
+     * <p>保留规则：timestamp 最新的那条全量保留，其余删除。</p>
+     *
+     * @param url 链接 URL
+     * @return 删除的行数；无重复返回 0
+     */
+    public int dedupeByUrlKeepingNewest(String url) {
+        if (url == null || url.isEmpty()) return 0;
+        List<LinkItem> matches = getLinksByUrl(url);
+        if (matches.size() <= 1) return 0;
+
+        LinkItem newest = matches.get(0);
+        for (LinkItem candidate : matches) {
+            if (candidate.getTimestamp() > newest.getTimestamp()) {
+                newest = candidate;
+            }
+        }
+        int deleted = 0;
+        for (LinkItem m : matches) {
+            if (m.getId() == newest.getId()) continue;
+            if (deleteLink(m.getId())) {
+                deleted++;
+            }
+        }
+        if (deleted > 0) {
+            Log.d("LinkDao", "dedupe url kept id=" + newest.getId() + " deleted=" + deleted);
+        }
+        return deleted;
+    }
+
+    /**
+     * 取出所有 URL 等于给定值的链接行。
+     *
+     * @param url 链接 URL
+     * @return 匹配的链接列表（可能多条）
+     */
+    public List<LinkItem> getLinksByUrl(String url) {
+        List<LinkItem> out = new ArrayList<>();
+        if (url == null || url.isEmpty()) return out;
+        Cursor cursor = null;
+        try {
+            cursor = database.query(
+                    LinkDbHelper.TABLE_LINKS,
+                    null,
+                    LinkDbHelper.COLUMN_URL + " = ?",
+                    new String[]{url}, null, null, null);
+            while (cursor != null && cursor.moveToNext()) {
+                LinkItem item = createLinkItemFromCursor(cursor);
+                List<String> tags = getLinkTags(item.getId());
+                for (String t : tags) {
+                    item.addTag(t);
+                }
+                out.add(item);
+            }
+        } catch (Exception e) {
+            Log.e("LinkDao", "getLinksByUrl failed url=" + url, e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return out;
+    }
+
+    /** 按 URL 删除所有匹配行 —— 同步折叠的 delete（tombstone）用。 */
+    public int deleteLinksByUrl(String url) {
+        if (url == null || url.isEmpty()) return 0;
+        int n = database.delete(
+                LinkDbHelper.TABLE_LINKS,
+                LinkDbHelper.COLUMN_URL + " = ?",
+                new String[]{url});
+        if (n > 0) {
+            Log.d("LinkDao", "deleteLinksByUrl deleted=" + n);
+        }
+        return n;
+    }
+
 } 

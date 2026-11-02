@@ -33,9 +33,8 @@ import androidx.fragment.app.Fragment;
 import person.notfresh.readingshare.databinding.ActivityMainBinding;
 import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
-import person.notfresh.readingshare.eventlog.EventLogClient;
+
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.ui.agent.AgentFragment;
 import person.notfresh.readingshare.ui.home.HomeFragment;
 import person.notfresh.readingshare.ui.subject.SubjectFragment;
@@ -84,6 +83,7 @@ import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.core.model.Subject;
 import person.notfresh.readingshare.links.strategy.LinkProcessStrategy;
 import person.notfresh.readingshare.links.strategy.LinkStrategies;
+import person.notfresh.readingshare.links.LinkSync;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -781,10 +781,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                         newLink.setTags(tagList);
                         linkDao.insertLink(newLink);
-                        EventLogClient.get().create("links",
-                                String.valueOf(newLink.getId()),
-                                newLink.getTimestamp(),
-                                LinkJson.toJsonString(newLink));
+                        LinkSync.recordCreate(newLink);
 
                         // 若在下拉框中选了某个主题，则添加到该主题
                         int subjectPos = subjectSpinner.getSelectedItemPosition();

@@ -21,9 +21,9 @@ import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.util.CrashClipboard;
 import person.notfresh.readingshare.util.TagMergeCleanup;
+import person.notfresh.readingshare.links.LinkSync;
 
 /**
  * 「合并标签」对话框 —— 选一个目标标签,把源标签下的链接全部搬过去,并删掉源标签。
@@ -280,10 +280,7 @@ public class MergeTagDialog extends DialogFragment {
             LinkItem item = linkDao.getLinkById(id);
             if (item == null) continue;
             try {
-                EventLogClient.get().update("links",
-                        String.valueOf(item.getId()),
-                        item.getTimestamp(),
-                        LinkJson.toJsonString(item));
+                LinkSync.recordUpdate(item);
             } catch (Throwable t) {
                 // 事件日志失败不该让合并回滚(DB 已提交),但要把栈留下来 ——
                 // EventLogClient.get() 在未 init 时抛 EventLogException(2.3.24)

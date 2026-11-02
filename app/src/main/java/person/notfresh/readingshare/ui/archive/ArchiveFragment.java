@@ -41,12 +41,12 @@ import person.notfresh.readingshare.R;
 import person.notfresh.readingshare.adapter.LinksAdapter;
 import person.notfresh.readingshare.databinding.FragmentHomeBinding;
 import person.notfresh.readingshare.db.LinkDao;
-import person.notfresh.readingshare.eventlog.EventLogClient;
+
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.util.ExportUtil;
 import person.notfresh.readingshare.util.ShareUtil;
 import person.notfresh.readingshare.util.SubjectUtil;
+import person.notfresh.readingshare.links.LinkSync;
 
 public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActionListener {
 
@@ -201,8 +201,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
     public void onDeleteLink(LinkItem link) {
         // linkDao.deleteLink(link.getUrl());
         linkDao.deleteLink(link.getId());
-        EventLogClient.get().delete("links", String.valueOf(link.getId()),
-                System.currentTimeMillis());
+        LinkSync.recordDelete(link);
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);
@@ -213,10 +212,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
         linkDao.updateLinkTitle(oldLink.getUrl(), newTitle);
         LinkItem snap = oldLink;
         snap.setTitle(newTitle);
-        EventLogClient.get().update("links",
-                String.valueOf(oldLink.getId()),
-                System.currentTimeMillis(),
-                LinkJson.toJsonString(snap));
+        LinkSync.recordUpdate(snap);
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);
@@ -230,10 +226,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
     //@Override
     public void addTagToLink(LinkItem item, String tag) {
         linkDao.addTagToLink(item.getId(), tag);
-        EventLogClient.get().update("links",
-                String.valueOf(item.getId()),
-                item.getTimestamp(),
-                LinkJson.toJsonString(item));
+        LinkSync.recordUpdate(item);
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);
@@ -249,10 +242,7 @@ public class ArchiveFragment extends Fragment implements LinksAdapter.OnLinkActi
     //@Override
     public void updateLinkTags(LinkItem item) {
         linkDao.updateLinkTags(item);
-        EventLogClient.get().update("links",
-                String.valueOf(item.getId()),
-                item.getTimestamp(),
-                LinkJson.toJsonString(item));
+        LinkSync.recordUpdate(item);
         // 刷新列表
         Map<String, List<LinkItem>> groupedLinks = linkDao.getLinksGroupByDate();
         adapter.setGroupedLinks(groupedLinks);

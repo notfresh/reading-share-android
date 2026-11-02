@@ -16,7 +16,7 @@ import java.util.Set;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
+import person.notfresh.readingshare.links.LinkSync;
 
 /**
  * 轻量级同步管理器
@@ -225,10 +225,7 @@ public class SimpleSyncManager {
 
                     LinkItem newLink = new LinkItem(title, url, "sync", "", "");
                     linkDao.insertLink(newLink);
-                    EventLogClient.get().create("links",
-                            String.valueOf(newLink.getId()),
-                            newLink.getTimestamp(),
-                            LinkJson.toJsonString(newLink));
+                    LinkSync.recordCreate(newLink);
                     downloadedCount++;
                     Log.d(TAG, "创建新链接: " + title);
                 }

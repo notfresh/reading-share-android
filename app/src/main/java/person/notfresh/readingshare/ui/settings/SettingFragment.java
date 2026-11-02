@@ -43,7 +43,6 @@ import person.notfresh.readingshare.MainActivity;
 import person.notfresh.readingshare.LinksHistoryActivity;
 import person.notfresh.readingshare.EventLogActivity;
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.db.DbConnection;
@@ -76,6 +75,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import person.notfresh.readingshare.sync.SimpleSyncManager;
 import person.notfresh.readingshare.agent.bridge.AgentConfig;
+import person.notfresh.readingshare.links.LinkSync;
 
 public class SettingFragment extends Fragment implements AddOverrideRuleDialog.OnRuleSubmitListener {
 
@@ -603,10 +603,7 @@ public class SettingFragment extends Fragment implements AddOverrideRuleDialog.O
             LinkItem item = itemsToImport.get(i);
             try {
                 linkDao.insertLink(item);
-                EventLogClient.get().create("links",
-                        String.valueOf(item.getId()),
-                        item.getTimestamp(),
-                        LinkJson.toJsonString(item));
+                LinkSync.recordCreate(item);
                 // 关联 subject(若导出时带过来)— 已存在复用,不存在新建
                 List<String> subjects = i < subjectsToImport.size()
                         ? subjectsToImport.get(i) : java.util.Collections.emptyList();

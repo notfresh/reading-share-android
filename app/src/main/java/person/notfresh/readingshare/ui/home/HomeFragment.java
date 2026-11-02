@@ -43,9 +43,8 @@ import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SearchHistoryManager;
 import person.notfresh.readingshare.db.SubjectDao;
-import person.notfresh.readingshare.eventlog.EventLogClient;
+
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.model.SearchHistoryItem;
 import person.notfresh.readingshare.core.model.SubjectItem;
 import person.notfresh.readingshare.core.model.SubjectUtil;
@@ -80,6 +79,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.text.SimpleDateFormat;
 import java.util.concurrent.atomic.AtomicInteger;
+import person.notfresh.readingshare.links.LinkSync;
 
 /**
  * 首页Fragment
@@ -858,9 +858,13 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     @Override
     public boolean deleteLink(Long linkId){
         Log.d("HomeFragment", "deleteLink: + link id " + linkId);
+        // 同步埋点需要 URL（entity_id = URL）—— 删除前先把这条链接查出来。
+        // 公共签名 deleteLink(Long) 不变，只在内部多查一次。
+        LinkItem target = linkDao.getLinkById(linkId);
         linkDao.deleteLink(linkId);
-        EventLogClient.get().delete("links", String.valueOf(linkId),
-                System.currentTimeMillis());
+        if (target != null) {
+            LinkSync.recordDelete(target);
+        }
         refreshLinksList();
         return true;
     }
@@ -871,8 +875,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
 
         // 删除数据库中的链接
         linkDao.deleteLink(link.getId());
-        EventLogClient.get().delete("links", String.valueOf(link.getId()),
-                System.currentTimeMillis());
+        LinkSync.recordDelete(link);
 
         // 直接从适配器中移除，避免重新查询数据库
         boolean removed = adapter.removeLinkItem(link);
@@ -899,10 +902,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
         linkDao.updateLinkTitle(oldLink.getUrl(), newTitle);
         LinkItem snap = oldLink;
         snap.setTitle(newTitle);
-        EventLogClient.get().update("links",
-                String.valueOf(oldLink.getId()),
-                System.currentTimeMillis(),
-                LinkJson.toJsonString(snap));
+        LinkSync.recordUpdate(snap);
         // 退出洗牌模式（新增/删除链接后按时间排序显示）
         if (isShuffleMode) {
             isShuffleMode = false;
@@ -916,10 +916,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     //@Override
     public void addTagToLink(LinkItem item, String tag) {
         linkDao.addTagToLink(item.getId(), tag);
-        EventLogClient.get().update("links",
-                String.valueOf(item.getId()),
-                item.getTimestamp(),
-                LinkJson.toJsonString(item));
+        LinkSync.recordUpdate(item);
         // 统一刷新：根据是否有标签筛选来决定刷新方式
         refreshLinksList();
         // 如果标签区域可见，重新加载标签（更新标签计数）
@@ -936,10 +933,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     //@Override
     public void updateLinkTags(LinkItem item) {
         linkDao.updateLinkTags(item);
-        EventLogClient.get().update("links",
-                String.valueOf(item.getId()),
-                item.getTimestamp(),
-                LinkJson.toJsonString(item));
+        LinkSync.recordUpdate(item);
         // 统一刷新：根据是否有标签筛选来决定刷新方式
         refreshLinksList();
         // 如果标签区域可见，重新加载标签（更新标签计数）
@@ -1257,8 +1251,7 @@ public class HomeFragment extends Fragment implements LinksAdapter.OnLinkActionL
     private void deleteSelectedLinks(List<LinkItem> items) {
         for (LinkItem item : items) {
             linkDao.deleteLink(item.getId());
-            EventLogClient.get().delete("links", String.valueOf(item.getId()),
-                    System.currentTimeMillis());
+            LinkSync.recordDelete(item);
             adapter.removeLinkItem(item);
         }
         refreshLinksList();

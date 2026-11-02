@@ -1,23 +1,33 @@
 package person.notfresh.readingshare.links;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.List;
+import java.util.Set;
 
 import person.notfresh.readingshare.db.LinkDao;
-import person.notfresh.readingshare.eventlog.EventAction;
 import person.notfresh.readingshare.eventlog.EventLogException;
 import person.notfresh.readingshare.eventlog.EventRecord;
 import person.notfresh.readingshare.eventlog.LinkApplier;
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
 
 /**
  * 把 {@code links} topic 的事件折叠到 {@link LinkDao}。
  *
- * <p>折叠规则（PROTOCOL §5.4 LWW）：同 {@code entity_id} 的多条事件，按
- * {@code process_time} 升序依次处理；后到的覆盖先到的。</p>
+ * <p><b>entity_id = URL</b>（不是本地自增 _id）。自增 id 在两台设备上必然
+ * 碰撞 —— 各自从 1 开始。用 URL 当跨端身份，两端才能对上同一条链接。
+ * 标题只是 payload 字段，不参与身份判定（改标题 ≠ 换身份）。</p>
+ *
+ * <p><b>字段级 LWW</b>（PROTOCOL §5.4）：用事件的 {@code old}（变更前快照）
+ * 算 diff，只覆盖这条事件真正改动过的字段。这样两端同时改同一链接的不同
+ * 字段时（手机改标题、插件改置顶），两边的改动都能保留；同字段才后写覆盖。</p>
+ *
+ * <p><b>去重</b>：Android 端 links.url 没有 UNIQUE 约束，历史数据可能留下
+ * 重复行。折叠时保留 timestamp 最新的那条，其余删掉 —— 保证「一条 URL 一条
+ * 记录」，两端才能收敛。</p>
+ *
+ * <p><b>不产生反向事件</b>：折叠远端事件时不能往本地事件日志再记一条 ——
+ * 否则会「拉取 → 落库 → 记事件 → 推回服务端 → 对方再拉」的无限回环。
+ * 这一点由调用方保证：折叠只在 pull 路径上发生，push 路径不碰这里。</p>
  *
  * <p>构造一次，整个 app 生命周期复用（App.onCreate 里 new，跟 {@link LinkDao}
  * 单例一致）— SQLite 连接由 {@code DbConnection} 全局持有，不重复打开。</p>
@@ -37,80 +47,64 @@ public final class LinkEventApplier implements LinkApplier {
 
     @Override
     public void apply(EventRecord event) {
-        if (!TOPIC_LINKS.equals(event.getTopic())) {
+        if (event == null || !TOPIC_LINKS.equals(event.getTopic())) {
             return; // 非 link topic 不归本 applier 管
+        }
+        // entity_id 现在是 URL —— 空值直接跳过
+        String url = event.getEntityId();
+        if (url == null || url.isEmpty()) {
+            return;
         }
         switch (event.getAction()) {
             case CREATE:
-                handleCreate(event);
-                break;
             case UPDATE:
-                handleUpdate(event);
+                handleUpsert(event, url);
                 break;
             case DELETE:
-                handleDelete(event);
+                handleDelete(url);
                 break;
-        }
-    }
-
-    private void handleCreate(EventRecord event) {
-        LinkItem item = decode(event);
-        if (item == null) return;
-        // 同步去重：URL + title 完全相同 → 本地已是同一份,跳过落库
-        // (URL 同但 title 不同 → 覆盖,标题变更要跟上;DELETE 不走此分支)
-        String existingTitle = linkDao.getLinkTitleByUrl(item.getUrl());
-        if (existingTitle != null && existingTitle.equals(item.getTitle())) {
-            return;
-        }
-        // create: 拉服务端版本作为权威 — 直接 replace（已存在的则覆盖）
-        // 幂等：服务端可能重发同 id 的 create，CONFLICT_REPLACE 安全
-        linkDao.replaceById(item);
-    }
-
-    private void handleUpdate(EventRecord event) {
-        LinkItem item = decode(event);
-        if (item == null) return;
-        // update: 服务端版本为权威；CONFLICT_REPLACE 保证本地之前没有也能落地
-        linkDao.replaceById(item);
-    }
-
-    private void handleDelete(EventRecord event) {
-        // entity_id 是 String（来自服务端），转 long 调 LinkDao
-        long entityId = parseEntityId(event.getEntityId());
-        if (entityId <= 0) return;
-        linkDao.deleteLink(entityId);
-    }
-
-    private static LinkItem decode(EventRecord event) {
-        if (event.getData() == null) return null;
-        LinkItem item = LinkJson.fromJsonString(event.getData());
-        if (item == null) return null;
-        // 用服务端 entity_id 兜底 — eventLogClient 推上来时存的是 link.id 转字符串
-        if (event.getEntityId() != null && !event.getEntityId().isEmpty()) {
-            try {
-                long serverEntityId = Long.parseLong(event.getEntityId());
-                if (serverEntityId > 0) {
-                    item.setId(serverEntityId);
-                }
-            } catch (NumberFormatException ignored) {
-                // 不是数字 id，保留 LinkJson 解出的 id
-            }
-        }
-        return item;
-    }
-
-    private static long parseEntityId(String s) {
-        if (s == null) return -1L;
-        try {
-            return Long.parseLong(s);
-        } catch (NumberFormatException e) {
-            return -1L;
         }
     }
 
     /**
-     * Local hook — 让 LinkDao 暴露 upsert/replaceIfExists/deleteLink（已有 deleteLink，
-     * upsert 和 replaceIfExists 需要补）。SEfirst 单向门警告：补这两个方法必须
-     * 真有调用方（本 applier）；不补的话 applier 就降级为 delete-only。
+     * create / update 都走同一套逻辑 —— 两者的差别只在 old 是否为空，
+     * 而 diff 逻辑本身能处理 old 缺失（退化为实体级覆盖）。
      */
+    private void handleUpsert(EventRecord event, String url) {
+        JSONObject remote = LinkWire.wireFields(event.getData());
+        if (remote == null) {
+            return;
+        }
+
+        LinkItem local = linkDao.getLinkByUrl(url);
+        JSONObject localWire = LinkWire.wireFields(
+                local == null ? null : LinkWire.toWireJson(local));
+
+        // 字段级 LWW：只覆盖这条事件改动过的字段。
+        // old 和 data 都是 wire 格式 —— 字段名、类型一致，diff 才有意义。
+        Set<String> changed = LinkWire.diffFields(event.getOldJson(), event.getData());
+        JSONObject mergedWire = LinkWire.mergeByFields(localWire, remote, changed);
+
+        // mergedWire → 本地 LinkItem
+        LinkItem merged = LinkWire.fromWireJson(mergedWire.toString());
+        if (merged == null) {
+            return;
+        }
+        // 保留 Android 本地独有字段（remark / summary / click_count 等）——
+        // 它们不参与同步，折叠时不能被远端事件的空值冲掉。
+        if (local != null) {
+            merged.setRemark(local.getRemark());
+            merged.setSummary(local.getSummary());
+            merged.setClickCount(local.getClickCount());
+        }
+
+        linkDao.upsertByUrl(merged);
+        // 收敛本地同 URL 的重复行：保留 timestamp 最新的那条
+        linkDao.dedupeByUrlKeepingNewest(url);
+    }
+
+    private void handleDelete(String url) {
+        // delete = tombstone：按 URL 删掉本地所有匹配行
+        linkDao.deleteLinksByUrl(url);
+    }
 }

@@ -28,7 +28,7 @@ import person.notfresh.readingshare.eventlog.SyncPointStore;
 import person.notfresh.readingshare.links.LinkEventApplier;
 import person.notfresh.readingshare.sync.SimpleSyncManager;
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
+import person.notfresh.readingshare.links.LinkSync;
 
 /**
  * 应用入口。
@@ -197,8 +197,7 @@ public class App extends Application {
                     // 若所有 link 共用同一个 process_time,推送游标按
                     // process_time > cursor 推进,推完第一批(100/1000 条)后就再也
                     // 取不到同毫秒的后续事件 — 超出一批的 link 永远推不上去。
-                    EventLogClient.get().create("links", String.valueOf(link.getId()),
-                            link.getTimestamp(), LinkJson.toJsonString(link));
+                    LinkSync.recordCreate(link);
                 }
                 EventLogClient.get().setBootstrapFlag();
             } catch (Exception ignored) {

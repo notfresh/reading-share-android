@@ -18,9 +18,9 @@ import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.db.SubjectDao;
 import person.notfresh.readingshare.eventlog.EventLogClient;
 import person.notfresh.readingshare.model.LinkItem;
-import person.notfresh.readingshare.model.LinkJson;
 import person.notfresh.readingshare.util.LinkSearchScope;
 import person.notfresh.readingshare.util.LinkSearchSpec;
+import person.notfresh.readingshare.links.LinkSync;
 
 /**
  * Agent 工具的具体实现。
@@ -406,10 +406,7 @@ public final class AgentTools {
             return;
         }
         try {
-            EventLogClient.get().update("links",
-                    String.valueOf(item.getId()),
-                    item.getTimestamp(),
-                    LinkJson.toJsonString(item));
+            LinkSync.recordUpdate(item);
         } catch (Exception e) {
             // 埋点失败不该让整个工具失败 —— 数据已经写进库了
             Log.e(TAG, "记录事件日志失败: " + item.getId(), e);
