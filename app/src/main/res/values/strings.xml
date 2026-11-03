@@ -314,6 +314,7 @@
     <string name="home_dialog_add_tag_suggestion_label">已有标签(输入即联想):</string>
     <string name="home_dialog_add_tag_current_label">当前标签（点击可删除）:</string>
     <string name="home_dialog_add_tag_recent_label">最近使用的标签:</string>
+    <string name="home_dialog_add_tag_recommend_label">推荐标签(按标题语义):</string>
     <string name="home_dialog_add_remark_hint">添加备注内容</string>
     <string name="link_button_add_tag">添加标签</string>
     <string name="link_button_add_remark">备注</string>

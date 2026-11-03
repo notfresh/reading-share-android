@@ -68,6 +68,7 @@ import android.view.Gravity;
 import person.notfresh.readingshare.util.BilibiliUrlConverter;
 import person.notfresh.readingshare.util.CrawlUtil;
 import person.notfresh.readingshare.util.RecentTagsManager;
+import person.notfresh.readingshare.util.TagRecommender;
 import person.notfresh.readingshare.util.StringUtil;
 import person.notfresh.readingshare.util.TitleCleaner;
 
@@ -751,6 +752,32 @@ public class MainActivity extends AppCompatActivity {
                 recentTagsContainer.addView(tagView);
             }
         }
+
+        // 推荐标签：按标题语义，点击填入标签输入框
+        TextView recommendTagsLabel = dialogView.findViewById(R.id.text_recommend_tags_label);
+        FlexboxLayout recommendTagsContainer = dialogView.findViewById(R.id.recommend_tags_container);
+        String recommendTitle = titleInput.getHint() != null ? titleInput.getHint().toString() : "";
+        TagRecommender.recommend(context, recommendTitle, null, recommendedTags -> {
+            if (recommendedTags.isEmpty() || recommendTagsLabel == null || recommendTagsContainer == null) {
+                return;
+            }
+            recommendTagsLabel.setVisibility(View.VISIBLE);
+            for (String tag : recommendedTags) {
+                TextView tagView = (TextView) LayoutInflater.from(context)
+                        .inflate(R.layout.item_recent_tag, recommendTagsContainer, false);
+                tagView.setText(tag);
+                tagView.setOnClickListener(v -> {
+                    String currentText = tagsInput.getText().toString().trim();
+                    if (!currentText.isEmpty() && !currentText.endsWith(",") && !currentText.endsWith("，")) {
+                        tagsInput.setText(currentText + "，" + tag);
+                    } else {
+                        tagsInput.setText(currentText + tag);
+                    }
+                    tagsInput.setSelection(tagsInput.getText().length());
+                });
+                recommendTagsContainer.addView(tagView);
+            }
+        });
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("保存链接")

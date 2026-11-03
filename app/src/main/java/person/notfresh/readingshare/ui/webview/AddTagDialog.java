@@ -28,6 +28,7 @@ import person.notfresh.readingshare.db.DbConnection;
 import person.notfresh.readingshare.db.LinkDao;
 import person.notfresh.readingshare.model.LinkItem;
 import person.notfresh.readingshare.util.RecentTagsManager;
+import person.notfresh.readingshare.util.TagRecommender;
 import person.notfresh.readingshare.util.TagSuggestionHelper;
 
 /**
@@ -177,19 +178,23 @@ public final class AddTagDialog {
         if (!recent.isEmpty() && recentLabel != null) {
             recentLabel.setVisibility(View.VISIBLE);
             for (String tag : recent) {
-                addChip(ctx, recentContainer, tag, v -> {
-                    String text = input.getText().toString().trim();
-                    if (text.isEmpty()) {
-                        input.setText(tag);
-                    } else if (!text.endsWith(",") && !text.endsWith("，")) {
-                        input.setText(text + ", " + tag);
-                    } else {
-                        input.setText(text + " " + tag);
-                    }
-                    input.setSelection(input.getText().length());
-                });
+                addChip(ctx, recentContainer, tag, v -> appendTagToInput(input, tag));
             }
         }
+
+        // ---- 推荐标签：按标题语义，点击填入输入框 ----
+        TextView recommendLabel = dialogView.findViewById(R.id.text_recommend_tags_label);
+        FlexboxLayout recommendContainer = dialogView.findViewById(R.id.recommend_tags_container);
+        TagRecommender.recommend(ctx, target.title(), excluded, tags -> {
+            if (tags.isEmpty() || recommendLabel == null || recommendContainer == null) {
+                return;
+            }
+            recommendLabel.setVisibility(View.VISIBLE);
+            for (String tag : tags) {
+                if (excluded.contains(tag)) continue;
+                addChip(ctx, recommendContainer, tag, v -> appendTagToInput(input, tag));
+            }
+        });
 
         final TagSuggestionHelper.Binder binder = TagSuggestionHelper.attach(
                 input, suggestionRecycler, suggestionLabel, ctx, excluded);
@@ -222,6 +227,19 @@ public final class AddTagDialog {
         chip.setText(text);
         chip.setOnClickListener(onClick);
         container.addView(chip);
+    }
+
+    /** 把标签追加进输入框（最近标签 / 推荐标签共用）：已有内容且未以逗号结尾时先补逗号。 */
+    private static void appendTagToInput(EditText input, String tag) {
+        String text = input.getText().toString().trim();
+        if (text.isEmpty()) {
+            input.setText(tag);
+        } else if (!text.endsWith(",") && !text.endsWith("，")) {
+            input.setText(text + ", " + tag);
+        } else {
+            input.setText(text + " " + tag);
+        }
+        input.setSelection(input.getText().length());
     }
 
     /** 按 DAO 落库（WebView 页路径）：有 linkId 用 id，没有则按当前页面 URL 新建一条。 */

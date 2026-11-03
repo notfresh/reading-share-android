@@ -313,6 +313,7 @@
     <string name="home_dialog_add_tag_suggestion_label">Existing tags (auto-suggest as you type):</string>
     <string name="home_dialog_add_tag_current_label">Current tags (tap to remove):</string>
     <string name="home_dialog_add_tag_recent_label">Recently used tags:</string>
+    <string name="home_dialog_add_tag_recommend_label">Recommended tags (by title):</string>
     <string name="home_dialog_add_remark_hint">Add note content</string>
     <string name="link_button_add_tag">Add tag</string>
     <string name="link_button_add_remark">Note</string>
